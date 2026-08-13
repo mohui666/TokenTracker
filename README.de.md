@@ -8,6 +8,8 @@
 
 Sammle automatisch Token-Zahlen von **29 KI-Coding-Tools**, aggregiere sie lokal und sieh echte Kostentrends in einem schönen Dashboard. Kein Cloud-Konto, keine API-Keys, kein Setup – nur ein Befehl.
 
+> **Rein lokaler Fork – alle Cloud-Funktionen entfernt: kein Leaderboard, kein Account-Login, kein Cloud-Sync, keine Telemetrie. Deine Nutzungsdaten verlassen dieses Gerät nie.**
+
 [![npm version](https://img.shields.io/npm/v/tokentracker-cli.svg?color=blue)](https://www.npmjs.com/package/tokentracker-cli)
 [![npm downloads](https://img.shields.io/npm/dm/tokentracker-cli.svg?color=brightgreen)](https://www.npmjs.com/package/tokentracker-cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
