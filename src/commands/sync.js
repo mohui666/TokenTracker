@@ -2,7 +2,6 @@ const os = require("node:os");
 const path = require("node:path");
 const fs = require("node:fs/promises");
 const fssync = require("node:fs");
-const cp = require("node:child_process");
 const readline = require("node:readline");
 
 const { resolveInstallPaths, ensureFlatCursor } = require("../lib/install-resolver");
@@ -12,7 +11,6 @@ const {
   ensureDir,
   readJson,
   writeJson,
-  chmod600IfPossible,
   openLock,
   inspectLock,
 } = require("../lib/fs");
@@ -112,15 +110,7 @@ const {
   claudeMessageDedupKey,
 } = require("../lib/rollout");
 const { computeClaudeGroundTruthBuckets } = require("../lib/claude-categorizer");
-const { createProgress, renderBar, formatNumber, formatBytes } = require("../lib/progress");
-const {
-  normalizeState: normalizeUploadState,
-  decideAutoUpload,
-  recordUploadFailure,
-  recordUploadSuccess,
-  parseRetryAfterMs,
-} = require("../lib/upload-throttle");
-const { maybeSendHeartbeat } = require("../lib/telemetry");
+const { createProgress, renderBar, formatNumber } = require("../lib/progress");
 const {
   isCursorInstalled,
   extractCursorSessionToken,
@@ -134,7 +124,6 @@ const {
   openCursorStore,
 } = require("../lib/cursor-store");
 const { resolveTrackerPaths } = require("../lib/tracker-paths");
-const { resolveRuntimeConfig, isLegacyInsforgeBaseUrl } = require("../lib/runtime-config");
 const { extractTokenCount } = require("../lib/codex-rollout-parser");
 const {
   consumeUsageDelta,
@@ -177,8 +166,7 @@ const CLAUDE_MEM_OBSERVER_PATH_SEGMENT = "--claude-mem-observer-sessions";
 // cleanup: the repair does atomic-drop + rescan, so any hour_start no longer
 // represented in the on-disk logs is silently removed from queue.jsonl. On
 // the reporter's machine this wiped 2.17B claude tokens (-1.27B opus-4-7,
-// -474M opus-4-6, -376M sonnet-4-5, -48M haiku, -6M sonnet-4-6). The
-// upload-offset reset also propagated the damage to the cloud.
+// -474M opus-4-6, -376M sonnet-4-5, -48M haiku, -6M sonnet-4-6).
 // 0.26.4 HALTS back at v4 so the buggy atomic-rewrite path stops auto-firing
 // on existing installs. The dedup fixes in parseClaudeFile /
 // categorizeSessionFile / computeClaudeGroundTruthBuckets are KEPT — they are
@@ -186,22 +174,12 @@ const CLAUDE_MEM_OBSERVER_PATH_SEGMENT = "--claude-mem-observer-sessions";
 // for whatever data is actually on disk. A targeted, log-gap-safe mimo
 // migration will ship later under its own key.
 const CLAUDE_GROUND_TRUTH_REPAIR_KEY = "claudeGroundTruthRepair_2026_05_v4";
-// One-time full re-upload: the cloud ingest dropped `conversation_count` to 0
-// from 2026-04-18 until the 2026-06-10 field-mapping fix (it read
-// `b.conversations`; queue rows carry `conversation_count`). Historical cloud
-// rows can only be repaired from each user's local queue.jsonl — resetting the
-// upload offset replays the full queue and the ingest's whole-row upsert
-// overwrites every historical bucket with the correct conversation counts
-// (token columns replay to the same final values: last emission per key wins,
-// exactly how the cloud rows were built the first time).
-const CLOUD_CONVERSATIONS_BACKFILL_KEY = "cloudConversationsBackfill_2026_06";
 // One-time repair (#187): until the codexHashes event-dedup landed, a Codex
 // session file rewritten with a new inode (Codex-Manager atomically rewrites
 // sessions/ files to patch the provider on every account switch) was re-scanned
 // from offset 0 and its tokens re-added to the persistent hourly buckets. This
-// rebuilds the codex buckets from disk (event-deduped), atomically drops the
-// inflated codex rows from queue.jsonl, and resets the upload offset so the
-// corrected values overwrite the cloud. GUARDED: skips if any codex session
+// rebuilds the codex buckets from disk (event-deduped) and atomically drops the
+// inflated codex rows from queue.jsonl. GUARDED: skips if any codex session
 // file that previously contributed is no longer on disk (deleted, or moved to
 // ~/.codex/archived_sessions/ which sync does not scan) — clearing its bucket
 // would lose that history (ref the v6 ground-truth-repair data-loss incident).
@@ -214,8 +192,8 @@ const CODEX_RESCAN_DEDUP_REPAIR_KEY = "codexRescanDedupRepair_2026_06";
 // inflated history. This re-runs the exact #187 guarded rebuild under a new key
 // — the rebuild re-parses every codex file with the CURRENT (fork-aware)
 // parser, so replay rows are excluded — and inherits all its safety properties
-// (unreproducible-session skip, atomic throwaway rebuild, queue strip, upload
-// offset reset for the cloud overwrite). Pre-gated: installs with no forked
+// (unreproducible-session skip, atomic throwaway rebuild, queue strip).
+// Pre-gated: installs with no forked
 // rollout on disk carry no fork phantom and mark done without the rebuild.
 const CODEX_FORK_REPLAY_REPAIR_KEY = "codexForkReplayRepair_2026_07";
 // One-time repair for Codex rollouts that contain token counters from multiple
@@ -226,7 +204,6 @@ const CODEX_FORK_REPLAY_REPAIR_KEY = "codexForkReplayRepair_2026_07";
 // contributing rollout before committing the rebuild. The new key is required
 // so installs that finalized the original migration on a false negative retry.
 const CODEX_USAGE_LINEAGE_REPAIR_KEY = "codexUsageLineageRepair_2026_07_v2";
-const LEGACY_BASE_URL_MIGRATION_NOTE = "reset_after_legacy_baseurl_migration_2026_07";
 // Keep the one escalated desktop refresh bounded; explicit full syncs can retry
 // the same migration without this ceiling when the history needs a deeper scan.
 const CODEX_BACKGROUND_LINEAGE_SCAN_MAX_BYTES = 1024 * 1024;
@@ -465,71 +442,14 @@ async function cmdSync(argv, context = {}) {
     // try/finally so an auxiliary diagnostic never strands the sync lock.
     await clearSyncSkip(trackerDir);
     progress = !opts.auto ? createProgress({ stream: process.stdout }) : null;
-    const configPath = path.join(trackerDir, "config.json");
     const cursorsPath = path.join(trackerDir, "cursors.json");
     const queuePath = path.join(trackerDir, "queue.jsonl");
     const queueStatePath = path.join(trackerDir, "queue.state.json");
     const projectQueuePath = path.join(trackerDir, "project.queue.jsonl");
     const projectQueueStatePath = path.join(trackerDir, "project.queue.state.json");
-    const uploadThrottlePath = path.join(trackerDir, "upload.throttle.json");
     const grokSignalPath = path.join(trackerDir, "grok-last-session.json");
     const legacyGrokSignalPath = path.join(trackerDir, "tracker", "grok-last-session.json");
 
-    // Native publication owns backlog and failure-backoff retries on its next
-    // five-minute tick. Remove any legacy detached retry marker immediately so
-    // an already-sleeping retry process observes the missing marker and exits.
-    if (opts.publishAccount) {
-      await clearAutoRetry(trackerDir);
-    }
-
-    const config = await readJson(configPath);
-    let legacyBaseUrlMigration = null;
-    // One-time repair for installs initialized before the 2026-04-19 InsForge
-    // project migration (0.5.67): init preserved any persisted config.baseUrl,
-    // so those installs kept uploading to the retired b46ug8xu project until
-    // its backend went dark on 2026-07-27 — every upload since 503s while the
-    // dashboard shows no error (silent cloud outage). Reset the upload offset
-    // so the whole local queue replays into the current project, clear the 503
-    // backoff, then remove the retired URL as the final commit step. Keeping the
-    // URL until every prerequisite succeeds makes an interrupted migration
-    // retryable on the next sync. Device tokens are opaque random values looked
-    // up by SHA-256 hash in tokentracker_device_tokens (not JWT_SECRET-signed);
-    // the database was restored into the current project, so preserve the old
-    // token unless the local API has already minted a replacement from the
-    // user's current login session and passed it through the environment.
-    // Ingest is a whole-row upsert per bucket key, making replay idempotent.
-    if (config && isLegacyInsforgeBaseUrl(config.baseUrl)) {
-      const priorQueueState = (await readJson(queueStatePath)) || {};
-      // Prepare the replay exactly once. The note survives successful batches,
-      // so retryable failures retain both their committed offset and backoff
-      // instead of restarting history and hammering the backend on every hook.
-      if (priorQueueState.note !== LEGACY_BASE_URL_MIGRATION_NOTE) {
-        await writeJson(queueStatePath, {
-          ...priorQueueState,
-          offset: 0,
-          updatedAt: new Date().toISOString(),
-          note: LEGACY_BASE_URL_MIGRATION_NOTE,
-        });
-        try {
-          await fs.unlink(uploadThrottlePath);
-        } catch (error) {
-          if (error?.code !== "ENOENT") throw error;
-        }
-      }
-      const replacementDeviceToken =
-        typeof process.env.TOKENTRACKER_DEVICE_TOKEN === "string"
-          ? process.env.TOKENTRACKER_DEVICE_TOKEN.trim()
-          : "";
-      const previousDeviceToken =
-        typeof config.deviceToken === "string" ? config.deviceToken.trim() : "";
-      // Do not commit either the replacement token or URL removal yet. The
-      // current backend must accept a token first; otherwise a stale environment
-      // token could destroy a valid restored credential and make recovery worse.
-      legacyBaseUrlMigration = {
-        previousDeviceToken,
-        replacementDeviceToken,
-      };
-    }
     const codexCursorRoots = [process.env.CODEX_HOME || path.join(home, ".codex")];
     const cursorStore = await openCursorStore({
       trackerDir,
@@ -540,8 +460,6 @@ async function cmdSync(argv, context = {}) {
         : {}),
     });
     const cursors = cursorStore.cursors;
-    const uploadThrottle = normalizeUploadState(await readJson(uploadThrottlePath));
-    let uploadThrottleState = uploadThrottle;
     let grokHookSignal = null;
     let grokHookSignalPath = null;
     for (const candidate of [grokSignalPath, legacyGrokSignalPath]) {
@@ -585,8 +503,8 @@ async function cmdSync(argv, context = {}) {
       : null;
 
     const autoSourceScope = resolveAutoSourceScope(opts);
-    // --background controls local scan breadth; --drain only controls upload
-    // depth and lock priority. Plain `sync --drain` remains a full source scan.
+    // --background controls local scan breadth; --drain only affects lock
+    // priority. Plain `sync --drain` remains a full source scan.
     const isBackgroundLightweightSync = opts.auto && opts.background;
     const isBackgroundAllLocalSync = isBackgroundLightweightSync && opts.allLocalSources;
     const isFullSourceScan = !autoSourceScope && !isBackgroundLightweightSync;
@@ -1583,7 +1501,7 @@ async function cmdSync(argv, context = {}) {
     // One-time migration: earlier CLI versions mis-parsed the Cursor CSV after
     // Cursor inserted new "Cloud Agent ID"/"Automation ID" columns, writing
     // cursor records under model="unknown". Purge those local buckets, emit
-    // zero retractions so the cloud upserts overwrite them to zero, and reset
+    // zero retractions to overwrite them locally, and reset
     // the incremental cursor so the fixed parser re-fetches all affected rows.
     if (isFullSourceScan) {
       await migrateCursorUnknownBuckets({ cursors, queuePath });
@@ -2488,10 +2406,6 @@ async function cmdSync(argv, context = {}) {
       }
     }
 
-    if (isFullSourceScan) {
-      await applyCloudConversationsBackfill({ cursors, queueStatePath });
-    }
-
     const totalParsed =
       parseResult.filesProcessed +
       openclawResult.filesProcessed +
@@ -2596,176 +2510,18 @@ async function cmdSync(argv, context = {}) {
 
     progress?.stop();
 
-    const runtimeConfig = config ? { ...config } : {};
-    if (legacyBaseUrlMigration?.replacementDeviceToken) {
-      runtimeConfig.deviceToken = legacyBaseUrlMigration.replacementDeviceToken;
-    }
-    const runtime = resolveRuntimeConfig({ config: runtimeConfig, env: process.env });
-
-    let uploadResult = { inserted: 0, skipped: 0 };
-    let uploadAttempted = false;
-    let autoUploadDecision = null;
-
-    if (opts.publishAccount || (legacyBaseUrlMigration && opts.auto)) {
-      const uploadStateBefore = (await readJson(queueStatePath)) || { offset: 0 };
-      const queueSizeBefore = await safeStatSize(queuePath);
-      const pendingBytesBefore = Math.max(
-        0,
-        queueSizeBefore - Number(uploadStateBefore.offset || 0),
-      );
-      // Native publication and every auto-triggered legacy migration share the
-      // failure-backoff gate. Intentionally ignore the 30-minute success
-      // throttle: native refresh owns its own cadence, while a pending migration
-      // should complete as soon as a credential becomes usable.
-      autoUploadDecision = decideAutoUpload({
-        nowMs: Date.now(),
-        pendingBytes: pendingBytesBefore,
-        state: {
-          ...uploadThrottleState,
-          nextAllowedAtMs: Number(uploadThrottleState.backoffUntilMs || 0),
-        },
-        config: {
-          batchSize: 200,
-          maxBatchesSmall: 5,
-          maxBatchesLarge: 5,
-        },
-      });
-    }
-
-    if (runtime.deviceToken && runtime.baseUrl &&
-        (!isBackgroundLightweightSync || opts.publishAccount) &&
-        (!autoUploadDecision || autoUploadDecision.allowed)) {
-      uploadAttempted = true;
-      // Mirror the machine identity into the purge-surviving seed file so a
-      // future `uninstall --purge` + reinstall recovers the same cloud device
-      // instead of double-counting history under a new one (issue #176). This
-      // is the migration path for installs that predate the seed file.
-      try {
-        require("../lib/machine-id").getOrCreateMachineId(queuePath);
-      } catch {
-        // best effort — upload below must not be blocked by identity mirroring
-      }
-      try {
-        let successfulDeviceToken = runtime.deviceToken;
-        const drainWithToken = (deviceToken) =>
-          drainQueueToCloud({
-            baseUrl: runtime.baseUrl,
-            deviceToken,
-            queuePath,
-            queueStatePath,
-            maxBatches: opts.drain ? 100 : (autoUploadDecision?.maxBatches || 5),
-            batchSize: autoUploadDecision?.batchSize || 200,
-          });
-        try {
-          uploadResult = await drainWithToken(successfulDeviceToken);
-        } catch (error) {
-          const fallbackDeviceToken = legacyBaseUrlMigration?.previousDeviceToken;
-          const replacementDeviceToken = legacyBaseUrlMigration?.replacementDeviceToken;
-          const stateAfterFailure = (await readJson(queueStatePath)) || { offset: 0 };
-          const canFallbackWithoutSplittingHistory =
-            (error?.status === 401 || error?.status === 403) &&
-            replacementDeviceToken &&
-            fallbackDeviceToken &&
-            fallbackDeviceToken !== replacementDeviceToken &&
-            Number(stateAfterFailure.offset || 0) === 0;
-          if (!canFallbackWithoutSplittingHistory) throw error;
-          successfulDeviceToken = fallbackDeviceToken;
-          uploadResult = await drainWithToken(successfulDeviceToken);
-        }
-        // A successful ingest response proves which credential belongs to the
-        // current backend. Only now commit the token and remove the retry marker.
-        // Empty queues make no request, so keep the marker until future data can
-        // validate a credential instead of persisting an unverified token.
-        if (legacyBaseUrlMigration && uploadResult.batches > 0) {
-          // device-login does not share the sync lock and may have written a
-          // fresh current-backend config while the scan/upload was running.
-          // Re-read before committing, merge only while the legacy marker still
-          // exists, and never clobber a concurrently completed login.
-          const latestConfig = (await readJson(configPath)) || config;
-          if (isLegacyInsforgeBaseUrl(latestConfig.baseUrl)) {
-            latestConfig.deviceToken = successfulDeviceToken;
-            delete latestConfig.baseUrl;
-            await writeJson(configPath, latestConfig);
-            await chmod600IfPossible(configPath);
-          }
-        }
-        // Record success so the exponential backoff step resets — otherwise
-        // a single past failure keeps us pessimistically throttled forever.
-        uploadThrottleState = recordUploadSuccess({
-          nowMs: Date.now(),
-          state: uploadThrottleState,
-        });
-        await writeJson(uploadThrottlePath, uploadThrottleState);
-      } catch (e) {
-        // Persist a backoff on 429 / 5xx so the next auto-sync waits instead
-        // of retrying immediately and making the rate-limit worse. The
-        // throttle module already parses Retry-After when we surface it on
-        // the error object (drainQueueToCloud stamps err.status + err.retryAfterMs).
-        uploadThrottleState = recordUploadFailure({
-          nowMs: Date.now(),
-          state: uploadThrottleState,
-          error: e,
-        });
-        await writeJson(uploadThrottlePath, uploadThrottleState);
-        if (!opts.auto) {
-          process.stderr.write(`Upload error: ${e?.message || e}\n`);
-        }
-        // `sync --drain` is the readiness boundary for first-time cloud view:
-        // callers must not treat a swallowed upload failure as a completed
-        // historical backfill and switch away from the intact local data.
-        if (opts.drain) throw e;
-      }
-    }
-
-    const afterState = (await readJson(queueStatePath)) || { offset: 0 };
-    const queueSize = await safeStatSize(queuePath);
-    // Only the main queue is uploaded by drainQueueToCloud. project.queue.jsonl
-    // is local project-usage state, so counting it here creates false backlog
-    // and can keep auto retry alive even after cloud sync has drained.
-    const pendingBytes = Math.max(0, queueSize - Number(afterState.offset || 0));
-
-    if (pendingBytes <= 0) {
-      await clearAutoRetry(trackerDir);
-    } else if (opts.auto && uploadAttempted && !opts.publishAccount) {
-      const retryAtMs = Number(uploadThrottleState?.nextAllowedAtMs || 0);
-      if (retryAtMs > Date.now()) {
-        await scheduleAutoRetry({
-          trackerDir,
-          retryAtMs,
-          reason: "backlog",
-          pendingBytes,
-          source: autoSourceScope ? `${autoSourceScope}-backlog` : "auto-backlog",
-          syncSource: autoSourceScope,
-          autoRetryNoSpawn: runtime.autoRetryNoSpawn,
-        });
-      }
-    }
-
     if (!opts.auto) {
       process.stdout.write(
         [
           "Sync finished:",
           `- Parsed files: ${totalParsed}`,
           `- New 30-min buckets queued: ${totalBuckets}`,
-          runtime.deviceToken
-            ? `- Uploaded: ${uploadResult.inserted} inserted, ${uploadResult.skipped} skipped`
-            : "- Uploaded: skipped (no device token)",
-          runtime.deviceToken && pendingBytes > 0 && !opts.drain
-            ? `- Remaining: ${formatBytes(pendingBytes)} pending (run sync again, or use --drain)`
-            : null,
           "",
         ]
           .filter(Boolean)
           .join("\n"),
       );
     }
-
-    // Anonymous daily heartbeat (shared 24h throttle with serve — see
-    // src/lib/telemetry.js). Awaited because hook-spawned sync processes exit
-    // right after this function returns, which would kill an in-flight
-    // request; the throttle makes it a network no-op on all but the first
-    // sync of the day, and maybeSendHeartbeat never throws.
-    await maybeSendHeartbeat({ trackerDir });
   } finally {
     progress?.stop();
     await lock.release();
@@ -2895,9 +2651,6 @@ module.exports = {
   repairMimoClaudeMislabel,
   reincludeClaudeMemObserverFiles,
   repairGrokQueueFromSessionSnapshots,
-  applyCloudConversationsBackfill,
-  scheduleAutoRetry,
-  buildAutoRetryScript,
   isCodexColdScanAuditDue,
   recordCodexColdScanAudit,
   CURSOR_UNKNOWN_MIGRATION_KEY,
@@ -2909,7 +2662,6 @@ module.exports = {
   DROID_DUP_SESSION_REPAIR_KEY,
   CLAUDE_MEM_OBSERVER_REINCLUDE_KEY,
   GROK_APPEND_ONLY_REPAIR_MIGRATION_KEY,
-  CLOUD_CONVERSATIONS_BACKFILL_KEY,
 };
 
 function normalizeString(value) {
@@ -3090,154 +2842,6 @@ function normalizeIsoOrEpoch(value) {
   return dt.toISOString();
 }
 
-async function safeStatSize(p) {
-  try {
-    const st = await fs.stat(p);
-    return st && st.isFile() ? st.size : 0;
-  } catch (_e) {
-    return 0;
-  }
-}
-
-function deriveAutoSkipReason({ decision, state }) {
-  if (!decision || decision.reason !== "throttled") return decision?.reason || "unknown";
-  const backoffUntilMs = Number(state?.backoffUntilMs || 0);
-  const nextAllowedAtMs = Number(state?.nextAllowedAtMs || 0);
-  if (backoffUntilMs > 0 && backoffUntilMs >= nextAllowedAtMs) return "backoff";
-  return "throttled";
-}
-
-async function scheduleAutoRetry({
-  trackerDir,
-  retryAtMs,
-  reason,
-  pendingBytes,
-  source,
-  syncSource,
-  autoRetryNoSpawn,
-}) {
-  const retryMs = coerceRetryMs(retryAtMs);
-  if (!retryMs) return { scheduled: false, retryAtMs: 0 };
-
-  const retryPath = path.join(trackerDir, AUTO_RETRY_FILENAME);
-  const nowMs = Date.now();
-  const existing = await readJson(retryPath);
-  const existingMs = coerceRetryMs(existing?.retryAtMs);
-  const normalizedSyncSource = normalizeSyncSource(syncSource);
-  if (existingMs && existingMs >= retryMs - 1000) {
-    const existingSyncSource = normalizeSyncSource(existing?.syncSource);
-    if (existingSyncSource !== normalizedSyncSource) {
-      await writeJson(
-        retryPath,
-        buildAutoRetryPayload({
-          retryMs: existingMs,
-          nowMs,
-          reason,
-          pendingBytes,
-          source,
-          syncSource: normalizedSyncSource,
-        }),
-      );
-    }
-    return { scheduled: false, retryAtMs: existingMs };
-  }
-
-  const payload = buildAutoRetryPayload({
-    retryMs,
-    nowMs,
-    reason,
-    pendingBytes,
-    source,
-    syncSource: normalizedSyncSource,
-  });
-
-  await writeJson(retryPath, payload);
-
-  const delayMs = Math.min(AUTO_RETRY_MAX_DELAY_MS, Math.max(0, retryMs - nowMs));
-  if (delayMs <= 0) return { scheduled: false, retryAtMs: retryMs };
-  if (autoRetryNoSpawn) {
-    return { scheduled: false, retryAtMs: retryMs };
-  }
-
-  spawnAutoRetryProcess({
-    retryPath,
-    trackerBinPath: path.join(trackerDir, "app", "bin", "tracker.js"),
-    fallbackPkg: "tokentracker-cli",
-    delayMs,
-  });
-  return { scheduled: true, retryAtMs: retryMs };
-}
-
-function buildAutoRetryPayload({ retryMs, nowMs, reason, pendingBytes, source, syncSource }) {
-  const payload = {
-    version: 1,
-    retryAtMs: retryMs,
-    retryAt: new Date(retryMs).toISOString(),
-    reason: typeof reason === "string" && reason.length > 0 ? reason : "throttled",
-    pendingBytes: Math.max(0, Number(pendingBytes || 0)),
-    scheduledAt: new Date(nowMs).toISOString(),
-    source: typeof source === "string" ? source : "auto",
-  };
-  if (syncSource) payload.syncSource = syncSource;
-  return payload;
-}
-
-async function clearAutoRetry(trackerDir) {
-  const retryPath = path.join(trackerDir, AUTO_RETRY_FILENAME);
-  await fs.unlink(retryPath).catch(() => {});
-}
-
-function spawnAutoRetryProcess({ retryPath, trackerBinPath, fallbackPkg, delayMs }) {
-  const script = buildAutoRetryScript({ retryPath, trackerBinPath, fallbackPkg, delayMs });
-  try {
-    const child = cp.spawn(process.execPath, ["-e", script], {
-      detached: true,
-      stdio: "ignore",
-      env: process.env,
-    });
-    child.unref();
-  } catch (_e) {}
-}
-
-function buildAutoRetryScript({ retryPath, trackerBinPath, fallbackPkg, delayMs }) {
-  return (
-    `'use strict';\n` +
-    `const fs = require('node:fs');\n` +
-    `const cp = require('node:child_process');\n` +
-    `const retryPath = ${JSON.stringify(retryPath)};\n` +
-    `const trackerBinPath = ${JSON.stringify(trackerBinPath)};\n` +
-    `const fallbackPkg = ${JSON.stringify(fallbackPkg)};\n` +
-    `const delayMs = ${Math.max(0, Math.floor(delayMs || 0))};\n` +
-    `setTimeout(() => {\n` +
-    `  let payload = null;\n` +
-    `  let retryAtMs = 0;\n` +
-    `  try {\n` +
-    `    const raw = fs.readFileSync(retryPath, 'utf8');\n` +
-    `    payload = JSON.parse(raw);\n` +
-    `    retryAtMs = Number(payload.retryAtMs || 0);\n` +
-    `  } catch (_) {}\n` +
-    `  if (!retryAtMs || Date.now() + 1000 < retryAtMs) process.exit(0);\n` +
-    `  const argv = ['sync', '--auto', '--from-retry'];\n` +
-    `  if (payload && typeof payload.syncSource === 'string' && payload.syncSource.trim()) {\n` +
-    `    argv.push('--source', payload.syncSource.trim());\n` +
-    `  }\n` +
-    `  const cmd = fs.existsSync(trackerBinPath)\n` +
-    `    ? [process.execPath, trackerBinPath, ...argv]\n` +
-    `    : ['npx', '--yes', fallbackPkg, ...argv];\n` +
-    `  try {\n` +
-    `    const child = cp.spawn(cmd[0], cmd.slice(1), { detached: true, stdio: 'ignore', env: process.env });\n` +
-    `    child.unref();\n` +
-    `  } catch (_) {}\n` +
-    `}, delayMs);\n`
-  );
-}
-
-function coerceRetryMs(v) {
-  const n = Number(v);
-  if (!Number.isFinite(n) || n <= 0) return 0;
-  return Math.floor(n);
-}
-
 async function writeOpenclawSignal(trackerDir) {
   const openclawSignalPath = path.join(trackerDir, "openclaw.signal");
   try {
@@ -3245,109 +2849,6 @@ async function writeOpenclawSignal(trackerDir) {
   } catch (_e) {
     // best-effort marker
   }
-}
-
-const AUTO_RETRY_FILENAME = "auto.retry.json";
-const AUTO_RETRY_MAX_DELAY_MS = 2 * 60 * 60 * 1000;
-
-const INGEST_SLUG = "tokentracker-ingest";
-const MAX_INGEST_BUCKETS = 500;
-
-async function drainQueueToCloud({ baseUrl, deviceToken, queuePath, queueStatePath, maxBatches = 5, batchSize = 200 }) {
-  const state = (await readJson(queueStatePath)) || { offset: 0 };
-  let offset = Number(state.offset || 0);
-  let inserted = 0;
-  let skipped = 0;
-  let batches = 0;
-
-  const queueSize = await safeStatSize(queuePath);
-  const limit = Math.min(Math.max(1, Math.floor(Number(batchSize || 200))), MAX_INGEST_BUCKETS);
-
-  for (let batch = 0; batch < maxBatches; batch++) {
-    if (offset >= queueSize) break;
-    const result = await readQueueBatch(queuePath, offset, limit);
-    if (result.buckets.length === 0) break;
-
-    const root = baseUrl.replace(/\/$/, "");
-    const anonKey = process.env.TOKENTRACKER_INSFORGE_ANON_KEY || "";
-    const headers = {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      Authorization: `Bearer ${deviceToken}`,
-    };
-    if (anonKey) headers.apikey = anonKey;
-    const res = await fetch(`${root}/functions/${INGEST_SLUG}`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ hourly: result.buckets }),
-    });
-
-    const rawText = await res.text().catch(() => "");
-    let data = {};
-    try { data = JSON.parse(rawText); } catch { data = {}; }
-    if (!res.ok) {
-      const err = new Error(`HTTP ${res.status}: ${rawText.substring(0, 500)}`);
-      err.status = res.status;
-      const retryAfter = res.headers?.get?.("Retry-After") ?? null;
-      const retryAfterMs = parseRetryAfterMs(retryAfter);
-      if (retryAfterMs !== null) err.retryAfterMs = retryAfterMs;
-      throw err;
-    }
-
-    inserted += Number(data?.inserted || 0);
-    skipped += Number(data?.skipped || 0);
-    batches += 1;
-
-    offset = result.nextOffset;
-    state.offset = offset;
-    state.updatedAt = new Date().toISOString();
-    await writeJson(queueStatePath, state);
-  }
-
-  return { inserted, skipped, batches };
-}
-
-async function readQueueBatch(queuePath, startOffset, maxBuckets) {
-  const st = await fs.stat(queuePath).catch(() => null);
-  if (!st || !st.isFile()) return { buckets: [], nextOffset: startOffset };
-  if (startOffset >= st.size) return { buckets: [], nextOffset: startOffset };
-
-  const stream = fssync.createReadStream(queuePath, { encoding: "utf8", start: startOffset });
-  const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
-
-  const bucketMap = new Map();
-  let offset = startOffset;
-  let linesRead = 0;
-  for await (const line of rl) {
-    const bytes = Buffer.byteLength(line, "utf8") + 1;
-    offset += bytes;
-    if (!line.trim()) continue;
-    let bucket;
-    try {
-      bucket = JSON.parse(line);
-    } catch (_e) {
-      continue;
-    }
-    const hourStart = typeof bucket?.hour_start === "string" ? bucket.hour_start : null;
-    if (!hourStart) continue;
-    const source = (typeof bucket?.source === "string" ? bucket.source.trim().toLowerCase() : "") || "codex";
-    const model = (typeof bucket?.model === "string" ? bucket.model.trim() : "") || "unknown";
-    bucket.source = source;
-    bucket.model = model;
-    // Apply the same legacy-row corrections every local reader applies
-    // (local-api readQueueData / project queue / wrapped aggregator). Without
-    // this the cloud permanently kept the RAW legacy values — e.g. old Codex
-    // rows whose input_tokens still include cached tokens (6-7x inflated) —
-    // while the local dashboard showed corrected numbers.
-    bucket = require("../lib/local-api").normalizeQueueRow(bucket);
-    bucketMap.set(`${source}|${model}|${hourStart}`, bucket);
-    linesRead += 1;
-    if (linesRead >= maxBuckets) break;
-  }
-
-  rl.close();
-  stream.close?.();
-  return { buckets: Array.from(bucketMap.values()), nextOffset: offset };
 }
 
 function normalizeGrokRepairSource(value) {
@@ -3493,22 +2994,6 @@ function applyGrokRepairHourlyState(cursors, rows) {
   };
 }
 
-async function resetGrokRepairUploadOffset(queueStatePath) {
-  if (typeof queueStatePath !== "string" || !queueStatePath) return false;
-  let state = {};
-  try {
-    state = JSON.parse(await fs.readFile(queueStatePath, "utf8"));
-  } catch (_e) {
-    state = {};
-  }
-  state.offset = 0;
-  state.updatedAt = new Date().toISOString();
-  state.note = "reset_after_grok_append_only_repair_2026_05_v4";
-  await ensureDir(path.dirname(queueStatePath));
-  await fs.writeFile(queueStatePath, JSON.stringify(state, null, 2) + "\n", "utf8");
-  return true;
-}
-
 function hasAppliedGrokRepairMigration(value) {
   if (!value) return false;
   if (value === true) return true;
@@ -3551,22 +3036,6 @@ async function backupExistingFile(filePath) {
   return backupPath;
 }
 
-async function resetUploadOffsetForMimoRepair(queueStatePath) {
-  if (typeof queueStatePath !== "string" || !queueStatePath) return false;
-  let state = {};
-  try {
-    state = JSON.parse(await fs.readFile(queueStatePath, "utf8"));
-  } catch (_e) {
-    state = {};
-  }
-  state.offset = 0;
-  state.updatedAt = new Date().toISOString();
-  state.note = "reset_after_mimo_claude_mislabel_repair_2026_06";
-  await ensureDir(path.dirname(queueStatePath));
-  await fs.writeFile(queueStatePath, JSON.stringify(state, null, 2) + "\n", "utf8");
-  return true;
-}
-
 // Remove every source=mimo row from a queue file (atomic rewrite, backed up
 // first). Returns the number of rows removed. Non-JSON lines are preserved.
 async function dropMimoQueueRows(filePath) {
@@ -3605,8 +3074,7 @@ async function dropMimoQueueRows(filePath) {
 // One-time repair for the 0.57.0 mimo mislabel bug. Purges all source=mimo data
 // (the mislabeled Claude/claude-mem mirror) from the local queues and cursor
 // state, so the next sync re-parses mimocode.db with the providerID-filtered
-// reader and rebuilds source=mimo from scratch — correct mimo-auto only. Cloud
-// orphans (mimo rows already uploaded) are cleaned server-side separately.
+// reader and rebuilds source=mimo from scratch — correct mimo-auto only.
 async function repairMimoClaudeMislabel({
   cursors,
   queuePath,
@@ -3679,12 +3147,6 @@ async function repairMimoClaudeMislabel({
   // 3. Reset the mimo message index so the next sync re-parses the DB fresh.
   delete cursors.mimo;
 
-  // 4. Reset upload offsets — the queue rewrite changed byte offsets, so a full
-  //    replay is required (cloud keeps latest per key; orphan mimo rows already
-  //    uploaded are removed server-side).
-  if (removedMain > 0) await resetUploadOffsetForMimoRepair(queueStatePath);
-  if (removedProject > 0) await resetUploadOffsetForMimoRepair(projectQueueStatePath);
-
   migrations[MIMO_PROVIDER_REPAIR_KEY] = {
     appliedAt: new Date().toISOString(),
     removedMain,
@@ -3740,7 +3202,6 @@ async function repairGrokQueueFromSessionSnapshots({ cursors, queuePath, queueSt
       existingGrokRows: 0,
       rowsWritten: 0,
       snapshotsUsed: 0,
-      uploadOffsetReset: false,
     };
     return false;
   }
@@ -3754,7 +3215,6 @@ async function repairGrokQueueFromSessionSnapshots({ cursors, queuePath, queueSt
       existingGrokRows,
       rowsWritten: 0,
       snapshotsUsed: 0,
-      uploadOffsetReset: false,
     };
     return false;
   }
@@ -3801,17 +3261,14 @@ async function repairGrokQueueFromSessionSnapshots({ cursors, queuePath, queueSt
       rowsWritten: 0,
       staleRowsRetracted,
       snapshotsUsed: repairRows.length,
-      uploadOffsetReset: false,
     };
     return false;
   }
 
   await ensureDir(path.dirname(queuePath));
   const queueBackupPath = await backupExistingFile(queuePath);
-  const queueStateBackupPath = await backupExistingFile(queueStatePath);
   await fs.appendFile(queuePath, `${repairLines.join("\n")}\n`, "utf8");
 
-  const uploadOffsetReset = await resetGrokRepairUploadOffset(queueStatePath);
   migrations[GROK_APPEND_ONLY_REPAIR_MIGRATION_KEY] = {
     status: "applied",
     appliedAt: new Date().toISOString(),
@@ -3823,37 +3280,9 @@ async function repairGrokQueueFromSessionSnapshots({ cursors, queuePath, queueSt
       if (Math.trunc(normalizeGrokRepairNumber(snapshot.totalTokens)) <= 0) return false;
       return Boolean(toGrokRepairHalfHourStart(snapshot.lastEventTimestamp || snapshot.updatedAt));
     }).length,
-    uploadOffsetReset,
     queueBackupPath,
-    queueStateBackupPath,
   };
   return true;
-}
-
-async function applyCloudConversationsBackfill({ cursors, queueStatePath }) {
-  if (!cursors || typeof cursors !== "object") return false;
-  cursors.migrations = cursors.migrations || {};
-  if (cursors.migrations[CLOUD_CONVERSATIONS_BACKFILL_KEY]) return false;
-
-  // Reset ONLY the cloud upload offset. The queue file itself is untouched;
-  // ingest upserts are idempotent per (user, device, hour, source, model),
-  // so replaying the whole queue is safe — it costs upload batches, not
-  // correctness. Project queue is never uploaded and is not touched.
-  let prevOffset = 0;
-  try {
-    const st = (await readJson(queueStatePath)) || {};
-    prevOffset = Number(st.offset || 0);
-  } catch (_e) {
-    /* missing state file — nothing to reset */
-  }
-  if (prevOffset > 0) {
-    await writeJson(queueStatePath, { offset: 0, updatedAt: new Date().toISOString() });
-  }
-  cursors.migrations[CLOUD_CONVERSATIONS_BACKFILL_KEY] = {
-    appliedAt: new Date().toISOString(),
-    previousOffset: prevOffset,
-  };
-  return prevOffset > 0;
 }
 
 async function migrateCursorUnknownBuckets({ cursors, queuePath }) {
@@ -4162,14 +3591,6 @@ async function repairCodebuddyLogJsonlOverlap({
   }
   cursors.codebuddy = tmpCursors.codebuddy || {};
 
-  let uploadState = {};
-  try { uploadState = JSON.parse(await fs.readFile(queueStatePath, "utf8")); } catch (_e) {}
-  uploadState.offset = 0;
-  uploadState.updatedAt = new Date().toISOString();
-  uploadState.note = "reset_after_codebuddy_log_jsonl_repair_2026_08";
-  await ensureDir(path.dirname(queueStatePath));
-  await fs.writeFile(queueStatePath, JSON.stringify(uploadState, null, 2) + "\n", "utf8");
-
   migrations[CODEBUDDY_LOG_JSONL_REPAIR_KEY] = {
     status: "applied",
     appliedAt: new Date().toISOString(),
@@ -4330,14 +3751,6 @@ async function repairWorkbuddyContextUsage({
   }
   cursors.workbuddy = tmpCursors.workbuddy || {};
 
-  let uploadState = {};
-  try { uploadState = JSON.parse(await fs.readFile(queueStatePath, "utf8")); } catch (_e) {}
-  uploadState.offset = 0;
-  uploadState.updatedAt = new Date().toISOString();
-  uploadState.note = "reset_after_workbuddy_context_usage_repair_2026_08";
-  await ensureDir(path.dirname(queueStatePath));
-  await fs.writeFile(queueStatePath, JSON.stringify(uploadState, null, 2) + "\n", "utf8");
-
   migrations[WORKBUDDY_CONTEXT_USAGE_REPAIR_KEY] = {
     status: "applied",
     appliedAt: new Date().toISOString(),
@@ -4349,13 +3762,10 @@ async function repairWorkbuddyContextUsage({
 }
 
 // One-time repair (#187): rebuild codex hourly buckets that the inode-keyed
-// re-scan double-counted before the codexHashes event-dedup landed, and push
-// the corrected values to the cloud. Runs BEFORE the codex parse in the same
+// re-scan double-counted before the codexHashes event-dedup landed. Runs BEFORE
+// the codex parse in the same
 // sync: it clears codex hourly state + codexHashes so the parse rebuilds clean,
-// atomically strips the inflated codex rows from queue.jsonl, and resets the
-// upload offset so the re-uploaded clean rows overwrite the cloud (with no
-// stale-high codex rows left in the queue, the ingest's within-batch MAX keeps
-// nothing larger, so its overwrite-upsert replaces the inflated cloud rows).
+// and atomically strips the inflated codex rows from queue.jsonl.
 //
 // GUARDED against the v6 ground-truth-repair data-loss incident: a clear+reparse
 // rebuilds codex buckets ONLY from the codex files this sync re-parses (now both
@@ -4375,7 +3785,6 @@ async function repairCodexRescanInflation({
   // its own key: the rebuild always uses the CURRENT parser, so any parser fix
   // shipped since the last run is applied to the rebuilt history.
   migrationKey = CODEX_RESCAN_DEDUP_REPAIR_KEY,
-  uploadNote = "reset_after_codex_rescan_dedup_2026_06",
 }) {
   if (!cursors || typeof cursors !== "object") return false;
   const migrations = (cursors.migrations ||= {});
@@ -4574,9 +3983,7 @@ async function repairCodexRescanInflation({
   // migration to re-run next sync — re-rebuild + re-strip + re-commit converges.
   //
   // 1. queue.jsonl: drop the inflated codex rows, append the clean rebuilt ones
-  //    (atomic tmp+rename). With no old-high codex rows left, the cloud ingest's
-  //    within-batch MAX keeps nothing larger and its overwrite-upsert replaces
-  //    the inflated cloud rows on the next upload.
+  //    (atomic tmp+rename).
   if (typeof queuePath === "string" && queuePath) {
     let raw = "";
     try {
@@ -4681,33 +4088,6 @@ async function repairCodexRescanInflation({
     projectHourly.updatedAt = new Date().toISOString();
   }
 
-  // 4. Reset the cloud upload offset so the corrected queue re-uploads. Other
-  //    sources re-upsert idempotently (last emission per key wins).
-  if (typeof queueStatePath === "string" && queueStatePath) {
-    let uploadState = {};
-    try {
-      uploadState = JSON.parse(await fs.readFile(queueStatePath, "utf8"));
-    } catch (_e) {
-      uploadState = {};
-    }
-    uploadState.offset = 0;
-    uploadState.updatedAt = new Date().toISOString();
-    uploadState.note = uploadNote;
-    await fs.writeFile(queueStatePath, JSON.stringify(uploadState));
-  }
-  if (projectRepairEnabled && typeof projectQueueStatePath === "string" && projectQueueStatePath) {
-    let uploadState = {};
-    try {
-      uploadState = JSON.parse(await fs.readFile(projectQueueStatePath, "utf8"));
-    } catch (_e) {
-      uploadState = {};
-    }
-    uploadState.offset = 0;
-    uploadState.updatedAt = new Date().toISOString();
-    uploadState.note = uploadNote;
-    await fs.writeFile(projectQueueStatePath, JSON.stringify(uploadState));
-  }
-
   migrations[migrationKey] = new Date().toISOString();
   return true;
 }
@@ -4801,7 +4181,6 @@ async function repairCodexForkReplayInflation({
     projectQueueStatePath,
     rolloutFiles,
     migrationKey: CODEX_FORK_REPLAY_REPAIR_KEY,
-    uploadNote: "reset_after_codex_fork_replay_2026_07",
   });
 }
 
@@ -4867,7 +4246,6 @@ async function repairCodexInterleavedUsageInflation({
     rolloutFiles,
     expectedCodexFileSnapshots: scan.fileSnapshots,
     migrationKey: CODEX_USAGE_LINEAGE_REPAIR_KEY,
-    uploadNote: "reset_after_codex_usage_lineage_2026_07_v2",
   });
 }
 
@@ -5485,20 +4863,6 @@ async function repairDroidDuplicateSessionInflation({ cursors, queuePath, queueS
   }
   droidState.updatedAt = new Date().toISOString();
 
-  // 4. reset the cloud upload offset so corrected rows re-upload (idempotent upsert).
-  if (typeof queueStatePath === "string" && queueStatePath) {
-    let uploadState = {};
-    try {
-      uploadState = JSON.parse(await fs.readFile(queueStatePath, "utf8"));
-    } catch {
-      uploadState = {};
-    }
-    uploadState.offset = 0;
-    uploadState.updatedAt = new Date().toISOString();
-    uploadState.note = "reset_after_droid_dup_session_2026_06";
-    await fs.writeFile(queueStatePath, JSON.stringify(uploadState));
-  }
-
   migrations[DROID_DUP_SESSION_REPAIR_KEY] = {
     status: "done",
     at: new Date().toISOString(),
@@ -5518,9 +4882,7 @@ async function repairDroidDuplicateSessionInflation({ cursors, queuePath, queueS
 // queue.jsonl's claude totals by ~40%. We do an atomic rewrite — keep all
 // non-claude rows verbatim, replace every claude/claude-mem row with the
 // ground-truth set — then reset cursors so the next incremental sync stays
-// in sync, and reset the cloud upload offset so the corrected rows actually
-// reach the cloud (the ingest endpoint upserts by (source, model,
-// hour_start), so re-uploading other sources is idempotent).
+// in sync.
 async function repairClaudeQueueFromGroundTruth({
   cursors,
   queuePath,
@@ -5676,22 +5038,6 @@ async function repairClaudeQueueFromGroundTruth({
   }
   cursors.claudeHashes = seenHashes;
 
-  // 4. Reset cloud-upload offset so the corrected rows are re-sent. Other
-  //    sources are upserted idempotently by the ingest endpoint, so this is
-  //    safe — just costs one extra round of bandwidth.
-  if (typeof queueStatePath === "string" && queueStatePath) {
-    let uploadState = {};
-    try {
-      uploadState = JSON.parse(await fs.readFile(queueStatePath, "utf8"));
-    } catch (_e) {
-      uploadState = {};
-    }
-    uploadState.offset = 0;
-    uploadState.updatedAt = new Date().toISOString();
-    uploadState.note = "reset_after_claude_repair_2026_05_v4";
-    await fs.writeFile(queueStatePath, JSON.stringify(uploadState));
-  }
-
   // 5. Repair project queue. Historical claude rows in project.queue.jsonl
   //    were uniformly mis-attributed to project_key=
   //    "claude-mem/observer-sessions" (left over from the observer
@@ -5745,19 +5091,6 @@ async function repairClaudeQueueFromGroundTruth({
       }
     }
 
-    // Reset project upload offset.
-    if (typeof projectQueueStatePath === "string" && projectQueueStatePath) {
-      let st = {};
-      try {
-        st = JSON.parse(await fs.readFile(projectQueueStatePath, "utf8"));
-      } catch (_e) {
-        st = {};
-      }
-      st.offset = 0;
-      st.updatedAt = new Date().toISOString();
-      st.note = "reset_after_claude_repair_2026_05_v6";
-      await fs.writeFile(projectQueueStatePath, JSON.stringify(st));
-    }
   }
 
   migrations[CLAUDE_GROUND_TRUTH_REPAIR_KEY] = {
@@ -5767,7 +5100,6 @@ async function repairClaudeQueueFromGroundTruth({
     rowsRemoved: claudeRowsRemoved,
     filesReset,
     hashesRetained: seenHashes.length,
-    uploadOffsetReset: typeof queueStatePath === "string" && !!queueStatePath,
     projectRowsRemoved,
     projectBucketsCleared,
   };
@@ -5824,7 +5156,7 @@ async function reincludeClaudeMemObserverFiles({ cursors, claudeFiles, queuePath
   return filesReset > 0 || hashesRemoved > 0 || queueRowsRelabeled > 0;
 }
 
-async function relabelClaudeMemQueueRows(queuePath, queueStatePath = null) {
+async function relabelClaudeMemQueueRows(queuePath) {
   let raw;
   try {
     raw = await fs.readFile(queuePath, "utf8");
@@ -5833,32 +5165,11 @@ async function relabelClaudeMemQueueRows(queuePath, queueStatePath = null) {
   }
   if (!raw || !raw.includes('"claude-mem"')) return 0;
 
-  // The cloud-upload cursor (queue.state.json `offset`) is a byte position in
-  // the pre-rewrite file. Relabeling shrinks rewritten lines ("claude-mem" →
-  // "claude"), so the old offset would land mid-line in the new file and the
-  // next drainQueueToCloud batch would skip part of a row (or a whole row).
-  // Track the old→new byte mapping while rewriting and remap the offset to
-  // the equivalent line boundary (same pattern as project-usage-purge.js).
-  let previousOffset = 0;
-  if (typeof queueStatePath === "string" && queueStatePath) {
-    try {
-      const st = JSON.parse(await fs.readFile(queueStatePath, "utf8"));
-      const off = Number(st?.offset || 0);
-      if (Number.isFinite(off) && off > 0) previousOffset = off;
-    } catch (_e) {
-      previousOffset = 0;
-    }
-  }
-
   const lines = raw.split("\n");
   const out = [];
   let relabeled = 0;
-  let inputOffset = 0;
-  let outputOffset = 0;
-  let nextOffset = 0;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const isLast = i === lines.length - 1;
     let outLine = line;
     if (line) {
       try {
@@ -5873,12 +5184,6 @@ async function relabelClaudeMemQueueRows(queuePath, queueStatePath = null) {
       }
     }
     out.push(outLine);
-    inputOffset += Buffer.byteLength(line, "utf8") + (isLast ? 0 : 1);
-    outputOffset += Buffer.byteLength(outLine, "utf8") + (isLast ? 0 : 1);
-    // Upload offsets always sit at line boundaries; a mid-line offset
-    // (corruption) rounds down to the previous boundary so no row is skipped
-    // — worst case a row is re-uploaded, and cloud ingest upserts by key.
-    if (inputOffset <= previousOffset) nextOffset = outputOffset;
   }
   if (relabeled === 0) return 0;
 
@@ -5888,18 +5193,6 @@ async function relabelClaudeMemQueueRows(queuePath, queueStatePath = null) {
   await fs.writeFile(tmpPath, out.join("\n"), "utf8");
   await fs.rename(tmpPath, queuePath);
 
-  if (typeof queueStatePath === "string" && queueStatePath && previousOffset > 0) {
-    let state = {};
-    try {
-      state = JSON.parse(await fs.readFile(queueStatePath, "utf8"));
-      if (!state || typeof state !== "object") state = {};
-    } catch (_e) {
-      state = {};
-    }
-    state.offset = nextOffset;
-    state.updatedAt = new Date().toISOString();
-    await fs.writeFile(queueStatePath, JSON.stringify(state), "utf8");
-  }
   return relabeled;
 }
 

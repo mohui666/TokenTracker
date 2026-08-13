@@ -3,14 +3,12 @@ const os = require("node:os");
 const path = require("node:path");
 const { spawn } = require("node:child_process");
 const crypto = require("node:crypto");
-const { DEFAULT_BASE_URL, resolveRuntimeConfig } = require("./runtime-config");
 const {
   filterRowsByUsageScope,
   getSourceScope,
   listExcludedSources,
   normalizeUsageScope,
 } = require("./source-metadata");
-const { accountSlugFor, fetchAccountUsage, mintAccessToken } = require("./cloud-account");
 const { getOrCreateMachineId, computeStableMachineId } = require("./machine-id");
 
 const SYNC_TIMEOUT_MS = 120_000;
@@ -28,13 +26,6 @@ function getSystemDeviceName() {
     return null;
   }
 }
-
-// Avatar proxy (see /api/avatar-proxy below). In-memory LRU; survives the
-// CLI server lifetime, which is good enough — the dashboard reloads cheaply.
-const AVATAR_PROXY_TTL_MS = 60 * 60 * 1000; // 1h
-const AVATAR_PROXY_MAX_BYTES = 512 * 1024; // 512 KiB per image
-const AVATAR_PROXY_MAX_ENTRIES = 64;
-const avatarProxyCache = new Map();
 
 // ---------------------------------------------------------------------------
 // Per-model pricing — delegated to src/lib/pricing/
@@ -540,11 +531,27 @@ function scopedQueueRows(queuePath, url) {
 }
 
 // ── Local achievements ───────────────────────────────────────────────────────
-// Local-only badges (the cloud nine live in scripts/ops/user-badges.sql).
-// Thresholds are ordered bronze → silver → gold → diamond. This module is the
-// single server-side home for LOCAL thresholds; the dashboard renders whatever
-// the payload says and embeds none of these numbers.
+// Every badge unlocks locally from the deduped queue/project rows — there is
+// no cloud backend anymore. Thresholds + metric semantics mirror the retired
+// cloud badge catalog (formerly scripts/ops/user-badges.sql): token_titan,
+// big_day, wordsmith, marathoner, streak, weekend_warrior, momentum, polyglot,
+// multitool, veteran, plus the local originals project_hopper,
+// project_devotion, night_owl. podium (leaderboard rank) and trendsetter
+// (global model-debut data) are inherently cross-user and intentionally
+// dropped. Thresholds are ordered bronze → silver → gold → diamond. This
+// module is the single server-side home for thresholds; the dashboard renders
+// whatever the payload says and embeds none of these numbers.
 const LOCAL_BADGE_THRESHOLDS = {
+  token_titan: [100000000, 1000000000, 10000000000, 100000000000], // lifetime total tokens
+  big_day: [10000000, 100000000, 500000000, 3000000000], // best single-day tokens
+  wordsmith: [5000000, 25000000, 100000000, 300000000], // lifetime output tokens
+  marathoner: [7, 30, 100, 365], // active days
+  streak: [3, 7, 30, 100], // longest consecutive active-day run
+  weekend_warrior: [5, 20, 50, 100], // weekend (Sat/Sun) active days
+  momentum: [2, 6, 15, 40], // best week-over-week multiplier (adjacent ISO weeks, prev >= 10M)
+  polyglot: [5, 15, 30, 60], // distinct models
+  multitool: [2, 4, 6, 10], // distinct tools/sources
+  veteran: [30, 90, 180, 365], // days since first activity
   project_hopper: [3, 5, 10, 20], // distinct projects
   project_devotion: [1000000, 10000000, 100000000, 1000000000], // max tokens in one project
   night_owl: [5, 20, 60, 150], // active hour buckets between 00:00–05:59 local
@@ -552,25 +559,49 @@ const LOCAL_BADGE_THRESHOLDS = {
 
 const LOCAL_TIER_KEYS = ["bronze", "silver", "gold", "diamond"];
 
+// Week-over-week growth only counts when the previous ISO week cleared this
+// token floor (mirrors the retired cloud compute; keeps tiny baselines from
+// producing meaningless 100x ratios).
+const MOMENTUM_PREV_WEEK_FLOOR = 10_000_000;
+
+function dayKeyToMs(dayKey) {
+  const ms = Date.parse(`${dayKey}T00:00:00Z`);
+  return Number.isFinite(ms) ? ms : null;
+}
+
+function msToDayKey(ms) {
+  return new Date(ms).toISOString().slice(0, 10);
+}
+
+// Monday of the ISO week containing dayKey (day keys are `YYYY-MM-DD`).
+function isoWeekStartKey(dayKey) {
+  const ms = dayKeyToMs(dayKey);
+  if (ms == null) return null;
+  const dow = new Date(ms).getUTCDay(); // 0=Sun … 6=Sat
+  return msToDayKey(ms - ((dow + 6) % 7) * 86_400_000);
+}
+
 /**
  * Compute the local badge set from deduped queue rows.
  * Rows are replayed in hour_start order so each tier's `achieved` timestamp is
- * the hour at which the running metric first crossed that threshold. Local
- * time (night_owl) follows the caller's tz query params like every other
- * usage endpoint.
+ * the hour at which the running metric first crossed that threshold. Day
+ * boundaries (active days, streaks, weekends, best day, weekly momentum) use
+ * the caller's tz query params like every other usage endpoint. Day-grain
+ * metrics are accumulated per local day first, then replayed day by day so
+ * their achieved timestamps land on the day's first contributing bucket.
  */
 function computeLocalAchievements(queueRows, projectRows, { timeZoneContext } = {}) {
+  const tz = timeZoneContext || {};
   const sortByHour = (rows) =>
     rows
       .filter((row) => row && row.hour_start)
       .slice()
       .sort((a, b) => String(a.hour_start).localeCompare(String(b.hour_start)));
 
-  const trackers = {
-    project_hopper: { value: 0, achieved: {}, meta: {} },
-    project_devotion: { value: 0, achieved: {}, meta: {} },
-    night_owl: { value: 0, achieved: {}, meta: {} },
-  };
+  const trackers = {};
+  for (const badgeId of Object.keys(LOCAL_BADGE_THRESHOLDS)) {
+    trackers[badgeId] = { value: 0, achieved: {}, meta: {} };
+  }
 
   const bump = (badgeId, newValue, atIso, meta) => {
     const tracker = trackers[badgeId];
@@ -586,6 +617,7 @@ function computeLocalAchievements(queueRows, projectRows, { timeZoneContext } = 
     }
   };
 
+  // Project-row badges (unchanged local originals).
   const seenProjects = new Set();
   const perProjectTokens = new Map();
   for (const row of sortByHour(projectRows || [])) {
@@ -603,14 +635,136 @@ function computeLocalAchievements(queueRows, projectRows, { timeZoneContext } = 
     }
   }
 
+  // Queue-row badges. Single pass in hour order for the cumulative/variety
+  // metrics while collecting per-day totals for the day-grain badges.
   const nightHours = new Set();
+  const seenModels = new Set();
+  const seenSources = new Set();
+  const perModelTokens = new Map();
+  const perDay = new Map(); // dayKey → { tokens, firstHourIso }
+  let lifetimeTokens = 0;
+  let lifetimeOutputTokens = 0;
   for (const row of sortByHour(queueRows || [])) {
-    if (Number(row.total_tokens || 0) <= 0) continue;
-    if (nightHours.has(row.hour_start)) continue;
-    const parts = getZonedParts(new Date(row.hour_start), timeZoneContext || {});
-    if (!parts || parts.hour >= 6) continue;
-    nightHours.add(row.hour_start);
-    bump("night_owl", nightHours.size, row.hour_start);
+    const tokens = Number(row.total_tokens || 0);
+    if (tokens <= 0) continue;
+    const outputTokens = Number(row.output_tokens || 0);
+
+    lifetimeTokens += tokens;
+    bump("token_titan", lifetimeTokens, row.hour_start);
+    lifetimeOutputTokens += outputTokens;
+    bump("wordsmith", lifetimeOutputTokens, row.hour_start);
+
+    const model = typeof row.model === "string" && row.model.trim() ? row.model : "unknown";
+    if (!seenModels.has(model)) {
+      seenModels.add(model);
+      bump("polyglot", seenModels.size, row.hour_start);
+    }
+    perModelTokens.set(model, (perModelTokens.get(model) || 0) + tokens);
+
+    const source = typeof row.source === "string" && row.source.trim() ? row.source : "unknown";
+    if (!seenSources.has(source)) {
+      seenSources.add(source);
+      bump("multitool", seenSources.size, row.hour_start);
+    }
+
+    const parts = getZonedParts(new Date(row.hour_start), tz);
+    if (!parts) continue;
+    if (parts.hour < 6 && !nightHours.has(row.hour_start)) {
+      nightHours.add(row.hour_start);
+      bump("night_owl", nightHours.size, row.hour_start);
+    }
+    const dayKey = formatPartsDayKey(parts);
+    if (!dayKey) continue;
+    const day = perDay.get(dayKey);
+    if (day) {
+      day.tokens += tokens;
+    } else {
+      perDay.set(dayKey, { tokens, firstHourIso: row.hour_start });
+    }
+  }
+
+  // Day-grain badges: replay the local days in chronological order.
+  const dayKeys = Array.from(perDay.keys()).sort();
+  let currentRunStart = null;
+  let previousDayKey = null;
+  let runLength = 0;
+  const weekTokens = new Map(); // ISO week start dayKey → tokens
+  for (const dayKey of dayKeys) {
+    const day = perDay.get(dayKey);
+    const atIso = day.firstHourIso;
+
+    bump("marathoner", trackers.marathoner.value + 1, atIso);
+
+    const dayMs = dayKeyToMs(dayKey);
+    if (dayMs != null) {
+      const dow = new Date(dayMs).getUTCDay();
+      if (dow === 0 || dow === 6) {
+        bump("weekend_warrior", trackers.weekend_warrior.value + 1, atIso);
+      }
+      if (previousDayKey != null && dayKeyToMs(previousDayKey) != null
+          && dayMs - dayKeyToMs(previousDayKey) === 86_400_000) {
+        runLength += 1;
+      } else {
+        runLength = 1;
+        currentRunStart = dayKey;
+      }
+      if (runLength > trackers.streak.value) {
+        bump("streak", runLength, atIso, { run_start: currentRunStart, run_end: dayKey });
+      }
+      previousDayKey = dayKey;
+    }
+
+    if (day.tokens > trackers.big_day.value) {
+      bump("big_day", day.tokens, atIso, { date: dayKey });
+    }
+
+    const weekKey = isoWeekStartKey(dayKey);
+    if (weekKey) {
+      const total = (weekTokens.get(weekKey) || 0) + day.tokens;
+      weekTokens.set(weekKey, total);
+      const prevWeekKey = msToDayKey(dayKeyToMs(weekKey) - 7 * 86_400_000);
+      const prevTokens = weekTokens.get(prevWeekKey) || 0;
+      if (prevTokens >= MOMENTUM_PREV_WEEK_FLOOR) {
+        const ratio = total / prevTokens;
+        if (ratio > trackers.momentum.value) {
+          bump("momentum", ratio, atIso, { week: weekKey });
+        }
+      }
+    }
+  }
+
+  if (trackers.polyglot.value > 0) {
+    let favoriteModel = null;
+    let favoriteTokens = -1;
+    for (const [model, tokens] of perModelTokens) {
+      if (tokens > favoriteTokens) {
+        favoriteTokens = tokens;
+        favoriteModel = model;
+      }
+    }
+    trackers.polyglot.meta = { favorite_model: favoriteModel };
+  }
+
+  // Veteran grows with the wall clock, not with new rows: days between the
+  // first active local day and today (caller's tz). Tier timestamps are the
+  // local day on which each threshold was (or will be) reached.
+  if (dayKeys.length > 0) {
+    const firstDayKey = dayKeys[0];
+    const todayKey = formatPartsDayKey(getZonedParts(new Date(), tz));
+    const firstMs = dayKeyToMs(firstDayKey);
+    const todayMs = todayKey ? dayKeyToMs(todayKey) : null;
+    if (firstMs != null && todayMs != null) {
+      const days = Math.max(0, Math.round((todayMs - firstMs) / 86_400_000));
+      const tracker = trackers.veteran;
+      tracker.value = days;
+      tracker.meta = { first_day: firstDayKey };
+      const thresholds = LOCAL_BADGE_THRESHOLDS.veteran;
+      for (let i = 0; i < thresholds.length; i += 1) {
+        if (days >= thresholds[i]) {
+          tracker.achieved[LOCAL_TIER_KEYS[i]] = `${msToDayKey(firstMs + thresholds[i] * 86_400_000)}T00:00:00Z`;
+        }
+      }
+    }
   }
 
   return Object.entries(LOCAL_BADGE_THRESHOLDS).map(([badgeId, thresholds]) => {
@@ -772,36 +926,6 @@ function aggregateHourlyByDay(rows, dayKey, timeZoneContext) {
 function trimOutput(value, max = 4000) {
   const t = String(value || "");
   return t.length <= max ? t : t.slice(t.length - max);
-}
-
-function normalizeRemoteHttpBaseUrl(value) {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  try {
-    const url = new URL(trimmed);
-    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
-    url.username = "";
-    url.password = "";
-    url.hash = "";
-    return url.toString().replace(/\/$/, "");
-  } catch (_e) {
-    return null;
-  }
-}
-
-function resolveAllowedInsforgeBaseUrl(value) {
-  const requested = normalizeRemoteHttpBaseUrl(value);
-  if (!requested) return null;
-
-  const runtime = resolveRuntimeConfig();
-  const allowed = new Set(
-    [runtime.baseUrl, DEFAULT_BASE_URL]
-      .map((entry) => normalizeRemoteHttpBaseUrl(entry))
-      .filter(Boolean),
-  );
-
-  return allowed.has(requested) ? requested : null;
 }
 
 function parseCookieHeader(value) {
@@ -1040,436 +1164,17 @@ function json(res, data, status) {
 }
 
 // ---------------------------------------------------------------------------
-// IP check API proxy: dashboard/src/pages/IpCheckPage.jsx is a native React
-// page that calls ip.net.coffee's data endpoints (/api/iprisk, /api/geoip,
-// /api/dns/result, /favicons, /claude/status.json). Browser-side fetch can't
-// hit them cross-origin from the dashboard, so we reverse-proxy /proxy/ipcheck/*
-// to https://ip.net.coffee/* and strip embedding-hostile headers.
-// (Previously this proxy also served the upstream HTML page for an iframe;
-// the iframe and its HTML-rewrite path have been removed.)
-// ---------------------------------------------------------------------------
-
-const IP_CHECK_PROXY_PREFIX = "/proxy/ipcheck";
-const IP_CHECK_TARGET = "https://ip.net.coffee";
-
-// HTTP hop-by-hop headers (RFC 7230 §6.1) plus headers undici/fetch manages
-// internally. Forwarding any of these to `fetch(...)` either silently breaks
-// the request (host being wrong) or, on stricter undici versions like the
-// 6.24.1 shipped with Node 22.22.2, throws UND_ERR_INVALID_ARG and turns
-// every proxied POST into a 502. Keep this set authoritative for every
-// reverse-proxy site in this module.
-const HOP_BY_HOP_HEADERS = new Set([
-  "host",
-  "connection",
-  "keep-alive",
-  "content-length",
-  "transfer-encoding",
-  "upgrade",
-  "proxy-authorization",
-  "proxy-authenticate",
-  "proxy-connection",
-  "te",
-  "trailer",
-  "trailers",
-]);
-
-// Strip forbidden + hop-by-hop headers when forwarding an inbound request to
-// fetch(). Honours the Connection header's named-headers list (RFC 7230 §6.1)
-// so values like `Connection: keep-alive, x-custom` also drop x-custom.
-function buildProxyHeaders(headers) {
-  const entries =
-    headers && typeof headers.entries === "function"
-      ? Array.from(headers.entries())
-      : Object.entries(headers || {});
-
-  const connectionNamed = new Set();
-  const normalized = [];
-  for (const [rawKey, rawValue] of entries) {
-    if (rawValue == null) continue;
-    const key = String(rawKey).toLowerCase();
-    normalized.push([key, rawValue]);
-    if (key === "connection") {
-      const values = Array.isArray(rawValue) ? rawValue : [rawValue];
-      for (const v of values) {
-        String(v)
-          .split(",")
-          .map((part) => part.trim().toLowerCase())
-          .filter(Boolean)
-          .forEach((part) => connectionNamed.add(part));
-      }
-    }
-  }
-
-  const out = {};
-  for (const [key, rawValue] of normalized) {
-    if (HOP_BY_HOP_HEADERS.has(key) || connectionNamed.has(key)) continue;
-    if (Array.isArray(rawValue)) {
-      const joined = rawValue.filter((e) => e != null).map(String).join(", ");
-      if (joined) out[key] = joined;
-      continue;
-    }
-    out[key] = String(rawValue);
-  }
-  return out;
-}
-
-// ---------------------------------------------------------------------------
 // Main handler factory
 // ---------------------------------------------------------------------------
 
 function createLocalApiHandler({ queuePath }) {
   const qp = queuePath || resolveQueuePath();
 
-  // Server-side cookie relay: captures auth cookies from InsForge cloud responses
-  // so that both browser and WKWebView share the same login session via the proxy.
-  // Persisted to disk so cookies survive server restarts.
-  const csrfRelayCookieName = "insforge_csrf_token";
-  let relayCookies = new Map();
+  // Loopback-only mutation guard: /api/local-auth hands this per-boot token
+  // to the local dashboard so only same-machine callers can trigger syncs
+  // or mutate local state. (The InsForge cookie relay, cloud-sync preference
+  // mirror, and device-token issuance went away with the cloud backend.)
   const localAuthToken = crypto.randomBytes(24).toString("hex");
-  const trackerDataDir = path.join(os.homedir(), ".tokentracker", "tracker");
-  const cookiePath = path.join(trackerDataDir, "relay-cookies.json");
-  const localSyncDeviceTokenCache = new Map();
-  const localSyncDeviceTokenInflight = new Map();
-
-  // Load persisted cookies on startup
-  try {
-    if (!fs.existsSync(trackerDataDir)) fs.mkdirSync(trackerDataDir, { recursive: true });
-    if (fs.existsSync(cookiePath)) {
-      const content = fs.readFileSync(cookiePath, "utf8");
-      const saved = JSON.parse(content);
-      if (saved && typeof saved === "object") {
-        let count = 0;
-        for (const [k, v] of Object.entries(saved)) {
-          relayCookies.set(k, v);
-          count++;
-        }
-        if (count > 0) console.log(`[LocalAPI] Loaded ${count} relay cookies from ${cookiePath}`);
-      }
-    }
-  } catch (e) {
-    console.error("[LocalAPI] Failed to load relay cookies:", e.message);
-  }
-
-  function persistRelayCookies() {
-    try {
-      // Sticky semantics: never replace an existing on-disk session with an empty cookie map.
-      if (relayCookies.size === 0) return;
-
-      const json = JSON.stringify(Object.fromEntries(relayCookies));
-      fs.writeFileSync(cookiePath, json, { encoding: "utf8", mode: 0o600 });
-    } catch (e) {
-      console.error("[LocalAPI] Failed to persist relay cookies:", e.message);
-    }
-  }
-
-  function clearRelayCookies(reason) {
-    if (relayCookies.size === 0) return;
-    relayCookies.clear();
-    try {
-      if (fs.existsSync(cookiePath)) fs.unlinkSync(cookiePath);
-    } catch (e) {
-      console.error("[LocalAPI] Failed to clear relay cookies:", e.message);
-      return;
-    }
-    if (reason) console.warn(`[LocalAPI] Cleared relay cookies: ${reason}`);
-  }
-
-  function captureSetCookies(headerValue) {
-    if (!headerValue) return;
-    const parts = headerValue.split(/,(?=\s*\w+=)/);
-    let changed = false;
-    for (const raw of parts) {
-      const eqIdx = raw.indexOf("=");
-      if (eqIdx < 1) continue;
-      const name = raw.substring(0, eqIdx).trim();
-      if (!name) continue;
-
-      // Basic sticky logic: if it's a deletion cookie (Max-Age=0 or past date),
-      // we only remove it if we have it.
-      const lower = raw.toLowerCase();
-      const isDeletion = lower.includes("max-age=0") || lower.includes("expires=thu, 01 jan 1970");
-      
-      if (isDeletion) {
-        if (relayCookies.has(name)) {
-          relayCookies.delete(name);
-          changed = true;
-          console.log(`[LocalAPI] Cookie deleted: ${name}`);
-        }
-      } else {
-        const oldVal = relayCookies.get(name);
-        if (oldVal !== raw.trim()) {
-          relayCookies.set(name, raw.trim());
-          changed = true;
-          console.log(`[LocalAPI] Cookie captured: ${name}`);
-        }
-      }
-    }
-    if (changed) persistRelayCookies();
-  }
-
-  function getRelayCookieValue(name, { decode = false } = {}) {
-    const raw = relayCookies.get(name);
-    if (!raw || typeof raw !== "string") return "";
-    const pair = raw.split(";")[0] || "";
-    const eqIdx = pair.indexOf("=");
-    if (eqIdx < 1) return "";
-    const value = pair.substring(eqIdx + 1).trim();
-    if (!decode) return value;
-    try {
-      return decodeURIComponent(value);
-    } catch {
-      return value;
-    }
-  }
-
-  function captureAuthTokensFromBody(bodyBuffer, contentType) {
-    if (!bodyBuffer || !String(contentType || "").toLowerCase().includes("application/json")) return;
-    let parsed = null;
-    try {
-      parsed = JSON.parse(bodyBuffer.toString("utf8"));
-    } catch {
-      return;
-    }
-    let changed = false;
-    const token = typeof parsed?.csrfToken === "string" ? parsed.csrfToken.trim() : "";
-    if (token) {
-      const cookie = `${csrfRelayCookieName}=${encodeURIComponent(token)}; Path=/; SameSite=Lax`;
-      if (relayCookies.get(csrfRelayCookieName) !== cookie) {
-        relayCookies.set(csrfRelayCookieName, cookie);
-        changed = true;
-      }
-    }
-    const refreshToken = typeof parsed?.refreshToken === "string" ? parsed.refreshToken.trim() : "";
-    if (refreshToken) {
-      const cookie = `insforge_refresh_token=${encodeURIComponent(refreshToken)}; Path=/; HttpOnly; SameSite=Lax`;
-      if (relayCookies.get("insforge_refresh_token") !== cookie) {
-        relayCookies.set("insforge_refresh_token", cookie);
-        changed = true;
-      }
-    }
-    if (changed) persistRelayCookies();
-  }
-
-  // --- Account (cross-device) view for the native popover ---------------
-  // The popover follows the dashboard: it shows aggregated cross-device data
-  // only when the user is signed in (a relayed refresh token exists) AND cloud
-  // sync is on. Cloud sync is a dashboard (WebView) preference persisted in
-  // localStorage; the dashboard mirrors it here via POST
-  // /functions/tokentracker-cloud-sync-pref so the auth-unaware popover can key
-  // off the same flag. Defaults ON, exactly like the dashboard toggle — every
-  // consumer additionally requires a relayed refresh token, so the default only
-  // takes effect for signed-in users; an explicit {enabled:false} still wins.
-  const cloudSyncPrefPath = path.join(trackerDataDir, "cloud-sync-pref.json");
-  let cloudSyncPrefCache;
-  function getCloudSyncPref() {
-    if (cloudSyncPrefCache === undefined) {
-      try {
-        cloudSyncPrefCache = JSON.parse(fs.readFileSync(cloudSyncPrefPath, "utf8"))?.enabled !== false;
-      } catch {
-        cloudSyncPrefCache = true;
-      }
-    }
-    return cloudSyncPrefCache;
-  }
-  function setCloudSyncPref(enabled) {
-    cloudSyncPrefCache = Boolean(enabled);
-    try {
-      if (!fs.existsSync(trackerDataDir)) fs.mkdirSync(trackerDataDir, { recursive: true });
-      fs.writeFileSync(
-        cloudSyncPrefPath,
-        JSON.stringify({ enabled: cloudSyncPrefCache, updatedAt: new Date().toISOString() }),
-        { encoding: "utf8", mode: 0o600 },
-      );
-    } catch (e) {
-      console.error("[LocalAPI] Failed to persist cloud sync pref:", e.message);
-    }
-  }
-
-  function getRefreshTokenForCloud() {
-    return getRelayCookieValue("insforge_refresh_token", { decode: true });
-  }
-  function setRelayRefreshToken(token) {
-    if (!token || typeof token !== "string") return;
-    const cookie = `insforge_refresh_token=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax`;
-    if (relayCookies.get("insforge_refresh_token") !== cookie) {
-      relayCookies.set("insforge_refresh_token", cookie);
-      persistRelayCookies();
-    }
-  }
-  function setRelayCsrfToken(token) {
-    if (!token || typeof token !== "string") return;
-    const cookie = `${csrfRelayCookieName}=${encodeURIComponent(token)}; Path=/; SameSite=Lax`;
-    if (relayCookies.get(csrfRelayCookieName) !== cookie) {
-      relayCookies.set(csrfRelayCookieName, cookie);
-      persistRelayCookies();
-    }
-  }
-
-  function localSyncDeviceTokenCacheKey(refreshToken, machineId, baseUrl) {
-    return `${baseUrl}\0${refreshToken}\0${machineId}`;
-  }
-
-  async function issueDeviceTokenForLocalSync(queuePathForMachineId, options = {}) {
-    if (!getCloudSyncPref()) return null;
-    const refreshToken = getRefreshTokenForCloud();
-    if (!refreshToken) return null;
-    const machineId = getOrCreateMachineId(queuePathForMachineId);
-    if (!machineId) return null;
-
-    const runtime = resolveRuntimeConfig();
-    const baseUrl =
-      normalizeRemoteHttpBaseUrl(options.baseUrl) ||
-      normalizeRemoteHttpBaseUrl(runtime.baseUrl) ||
-      normalizeRemoteHttpBaseUrl(DEFAULT_BASE_URL);
-    const cacheKey = localSyncDeviceTokenCacheKey(refreshToken, machineId, baseUrl);
-    const cachedToken = localSyncDeviceTokenCache.get(cacheKey);
-    if (cachedToken) return cachedToken;
-    const inflightToken = localSyncDeviceTokenInflight.get(cacheKey);
-    if (inflightToken) return inflightToken;
-
-    const issuePromise = (async () => {
-      const minted = await mintAccessToken({
-        baseUrl,
-        anonKey: runtime.anonKey,
-        refreshToken,
-        timeoutMs: runtime.httpTimeoutMs,
-      });
-      if (!minted?.accessToken) return null;
-      const rotatedRefreshToken =
-        typeof minted.refreshToken === "string" && minted.refreshToken.trim()
-          ? minted.refreshToken.trim()
-          : "";
-      if (rotatedRefreshToken) setRelayRefreshToken(rotatedRefreshToken);
-      if (minted.csrfToken) setRelayCsrfToken(minted.csrfToken);
-
-      const root = String(baseUrl || DEFAULT_BASE_URL).replace(/\/$/, "");
-      const headers = {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        Authorization: `Bearer ${minted.accessToken}`,
-      };
-      if (runtime.anonKey) headers.apikey = runtime.anonKey;
-
-      let timeoutId;
-      const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
-      if (controller && runtime.httpTimeoutMs > 0) {
-        timeoutId = setTimeout(() => controller.abort(), runtime.httpTimeoutMs);
-      }
-
-      const dashboardPlatform =
-        process.platform === "darwin" ? "MacIntel" :
-          process.platform === "win32" ? "Win32" :
-            process.platform === "linux" ? "Linux x86_64" :
-              "web";
-
-      const res = await fetch(`${root}/functions/tokentracker-device-token-issue`, {
-        method: "POST",
-        headers,
-        signal: controller ? controller.signal : undefined,
-        body: JSON.stringify({
-          // 必须和 dashboard/src/lib/cloud-sync.ts 使用同一个设备身份。
-          // 旧云端设备按 (platform, device_name) 认领；如果这里发明
-          // local-sync 身份，会多出一个 active device，账户视图会把历史求和两次。
-          device_name: getSystemDeviceName() || `Token Tracker (dashboard) #${machineId.slice(0, 8)}`,
-          platform: dashboardPlatform,
-          machine_id: machineId,
-        }),
-      }).finally(() => {
-        if (timeoutId) clearTimeout(timeoutId);
-      });
-      if (!res.ok) return null;
-      const data = await res.json().catch(() => null);
-      const token = typeof data?.token === "string" ? data.token.trim() : "";
-      if (token) {
-        const activeRefreshToken = rotatedRefreshToken || refreshToken;
-        localSyncDeviceTokenCache.set(localSyncDeviceTokenCacheKey(activeRefreshToken, machineId, baseUrl), token);
-      }
-      return token || null;
-    })();
-    localSyncDeviceTokenInflight.set(cacheKey, issuePromise);
-    try {
-      return await issuePromise;
-    } finally {
-      localSyncDeviceTokenInflight.delete(cacheKey);
-    }
-  }
-
-  // Returns "served" when the cross-device aggregate was written to `res`, or
-  // "fallthrough" when the caller should serve the local single-machine data.
-  // Any failure (not signed in, cloud sync off, network/auth error) falls
-  // through so the popover always renders something.
-  async function tryServeAccountView(usageSlug, url, res) {
-    if (!getCloudSyncPref()) return "fallthrough";
-    const refreshToken = getRefreshTokenForCloud();
-    if (!refreshToken) return "fallthrough";
-    const runtime = resolveRuntimeConfig();
-    const envTimeout = process.env.TOKENTRACKER_HTTP_TIMEOUT_MS
-      ? parseInt(process.env.TOKENTRACKER_HTTP_TIMEOUT_MS, 10)
-      : 0;
-    const timeoutMs = envTimeout > 0 ? envTimeout : 4000;
-    try {
-      const out = await fetchAccountUsage({
-        usageSlug,
-        searchParams: url.searchParams,
-        baseUrl: runtime.baseUrl || DEFAULT_BASE_URL,
-        anonKey: runtime.anonKey,
-        refreshToken,
-        timeoutMs,
-      });
-      if (!out || out.data == null) return "fallthrough";
-      if (out.rotatedRefreshToken) setRelayRefreshToken(out.rotatedRefreshToken);
-      if (out.rotatedCsrfToken) setRelayCsrfToken(out.rotatedCsrfToken);
-      res.writeHead(200, {
-        "Content-Type": "application/json",
-        "Cache-Control": "no-store",
-        "X-TokenTracker-Account-View": "1",
-      });
-      res.end(JSON.stringify(out.data));
-      return "served";
-    } catch (e) {
-      // Signed in + cloud sync on, but the cloud read failed (offline, token
-      // rejected, edge error, or timeout). Fall back to local data rather than erroring.
-      if (resolveRuntimeConfig().debug) {
-        console.warn(`[LocalAPI] account view fallback for ${usageSlug}:`, e?.message || e);
-      }
-      return "fallthrough";
-    }
-  }
-
-  function normalizeCookieHeader(value) {
-    if (Array.isArray(value)) return value.filter(Boolean).join("; ");
-    return typeof value === "string" ? value : "";
-  }
-
-  function buildRelayCookieHeader(clientCookieHeader, { relayPrecedenceNames = [] } = {}) {
-    const normalizedClientCookieHeader = normalizeCookieHeader(clientCookieHeader);
-    if (relayCookies.size === 0) return normalizedClientCookieHeader;
-    const relayPrecedence = new Set(relayPrecedenceNames);
-    const clientPairs = new Map();
-    if (normalizedClientCookieHeader) {
-      for (const part of normalizedClientCookieHeader.split(";")) {
-        const eqIdx = part.indexOf("=");
-        if (eqIdx < 1) continue;
-        const n = part.substring(0, eqIdx).trim();
-        if (n) clientPairs.set(n, part.trim());
-      }
-    }
-    // Merge relay cookies. Normal requests keep client precedence; refresh
-    // recovery can opt relay cookies into precedence over stale WebView cookies.
-    for (const [name, raw] of relayCookies) {
-      if (clientPairs.has(name) && !relayPrecedence.has(name)) continue;
-      const scIdx = raw.indexOf(";");
-      const pair = scIdx > 0 ? raw.substring(0, scIdx).trim() : raw;
-      clientPairs.set(name, pair);
-    }
-    return [...clientPairs.values()].join("; ");
-  }
-
-  // Ephemeral auth bridge: WebView sets a "native" flag before opening system browser
-  // for OAuth. The callback page (in browser) checks this flag to decide whether to
-  // relay the code back to the app or handle it as a normal web flow.
-  let _nativeAuthPending = false;
-  let _nativeAuthExpiry = 0;
 
   function isAuthorizedLocalMutation(req) {
     const headerToken = req?.headers?.["x-tokentracker-local-auth"];
@@ -1566,341 +1271,6 @@ function createLocalApiHandler({ queuePath }) {
       return true;
     }
 
-    // --- Auth bridge: native OAuth flag (WebView ↔ system browser) ---
-    if (p === "/api/auth-bridge/verifier") {
-      const method = String(req.method || "GET").toUpperCase();
-      if (method === "PUT" || method === "POST") {
-        if (!isAuthorizedLocalMutation(req)) {
-          json(res, { error: "Unauthorized" }, 401);
-          return true;
-        }
-        const body = await readJsonBody(req);
-        _nativeAuthPending = Boolean(body?.native);
-        _nativeAuthExpiry = Date.now() + 5 * 60 * 1000; // 5 min TTL
-        json(res, { ok: true });
-        return true;
-      }
-      if (method === "GET") {
-        const isNative = _nativeAuthPending && Date.now() < _nativeAuthExpiry;
-        _nativeAuthPending = false; // one-time read
-        _nativeAuthExpiry = 0;
-        json(res, { native: isNative });
-        return true;
-      }
-      json(res, { error: "Method Not Allowed" }, 405);
-      return true;
-    }
-
-    // --- auth proxy: forward /api/auth/* to InsForge cloud ---
-    if (p.startsWith("/api/auth/")) {
-      const runtime = resolveRuntimeConfig();
-      const insforgeBase = runtime.baseUrl || DEFAULT_BASE_URL;
-      try {
-        const targetUrl = `${insforgeBase.replace(/\/$/, "")}${p}${url.search || ""}`;
-        const proxyHeaders = buildProxyHeaders(req.headers);
-        const hasClientCookie = normalizeCookieHeader(proxyHeaders["cookie"]).trim().length > 0;
-        const hasCsrfHeader = typeof proxyHeaders["x-csrf-token"] === "string" && proxyHeaders["x-csrf-token"].trim().length > 0;
-        const relayCsrfToken = getRelayCookieValue(csrfRelayCookieName);
-        const relayRefreshToken = getRelayCookieValue("insforge_refresh_token", { decode: true });
-        // A cookie-less client (fresh WebView after an app update/restart) has no
-        // browser session to pair a CSRF token with — the persisted refresh token
-        // replayed through the mobile flow is the only viable recovery. The relay
-        // csrf token must NOT force the cookie/csrf path here: background mobile
-        // rotations (cloud-account.js) can leave it stale, and a stale csrf turns
-        // recovery into 403 Invalid CSRF and signs the user out.
-        const shouldUseRelayRefreshFallback =
-          p === "/api/auth/refresh" && !hasClientCookie && relayRefreshToken;
-        if (p === "/api/auth/refresh" && relayCsrfToken && !shouldUseRelayRefreshFallback) {
-          proxyHeaders["x-csrf-token"] = relayCsrfToken;
-        }
-        const hasEffectiveCsrfHeader =
-          hasCsrfHeader ||
-          (typeof proxyHeaders["x-csrf-token"] === "string" && proxyHeaders["x-csrf-token"].trim().length > 0);
-        let shouldInjectRelayCookies =
-          p !== "/api/auth/refresh" || hasClientCookie || hasEffectiveCsrfHeader;
-        if (shouldUseRelayRefreshFallback) {
-          shouldInjectRelayCookies = false;
-        }
-
-        // Inject relay cookies so WebView benefits from browser's login session.
-        // Refresh requests need either a browser cookie or an explicit CSRF token;
-        // otherwise replaying a stale persisted refresh cookie just manufactures
-        // Invalid CSRF errors on startup.
-        const originalCookieHeader = normalizeCookieHeader(proxyHeaders["cookie"]);
-        const mergedCookie = shouldInjectRelayCookies
-          ? buildRelayCookieHeader(originalCookieHeader, {
-              relayPrecedenceNames: p === "/api/auth/refresh"
-                ? [csrfRelayCookieName, "insforge_refresh_token"]
-                : [],
-            })
-          : originalCookieHeader;
-        const injectedRelayCookies =
-          shouldInjectRelayCookies && relayCookies.size > 0 && mergedCookie !== originalCookieHeader;
-        if (mergedCookie) proxyHeaders["cookie"] = mergedCookie;
-
-        const bodyChunks = [];
-        for await (const chunk of req) bodyChunks.push(chunk);
-        let proxyBody = bodyChunks.length > 0 ? Buffer.concat(bodyChunks) : undefined;
-        let effectiveTargetUrl = targetUrl;
-        if (shouldUseRelayRefreshFallback) {
-          effectiveTargetUrl = `${insforgeBase.replace(/\/$/, "")}/api/auth/refresh?client_type=mobile`;
-          proxyHeaders["content-type"] = "application/json";
-          delete proxyHeaders["content-length"];
-          proxyBody = Buffer.from(JSON.stringify({ refresh_token: relayRefreshToken }), "utf8");
-        }
-        let proxyRes = await fetch(effectiveTargetUrl, {
-          method: req.method || "GET",
-          headers: proxyHeaders,
-          body: proxyBody,
-          credentials: "include",
-          redirect: "manual",
-        });
-        let resBody = Buffer.from(await proxyRes.arrayBuffer());
-
-        // Stale-CSRF rescue: 403 Invalid CSRF on refresh does NOT mean the
-        // session is dead — background mobile rotations (cloud-account.js) can
-        // desync the relayed csrf from a still-valid refresh token. Replay the
-        // persisted refresh token through the csrf-free mobile flow before
-        // letting the client sign out.
-        const isStaleCsrf403 =
-          p === "/api/auth/refresh"
-          && proxyRes.status === 403
-          && /invalid csrf token/i.test(resBody.toString("utf8"));
-        if (isStaleCsrf403 && relayRefreshToken && !shouldUseRelayRefreshFallback) {
-          const rescueHeaders = { ...proxyHeaders, "content-type": "application/json" };
-          delete rescueHeaders["cookie"];
-          delete rescueHeaders["x-csrf-token"];
-          delete rescueHeaders["content-length"];
-          const rescueRes = await fetch(
-            `${insforgeBase.replace(/\/$/, "")}/api/auth/refresh?client_type=mobile`,
-            {
-              method: "POST",
-              headers: rescueHeaders,
-              body: JSON.stringify({ refresh_token: relayRefreshToken }),
-              credentials: "include",
-              redirect: "manual",
-            },
-          );
-          if (rescueRes.ok) {
-            proxyRes = rescueRes;
-            resBody = Buffer.from(await rescueRes.arrayBuffer());
-          }
-        }
-
-        // Error responses must not mutate relay state: a 403's deletion
-        // set-cookie (insforge_refresh_token=; Expires=1970) would otherwise
-        // destroy a still-valid persisted session.
-        const allowRelayCapture = proxyRes.status < 400;
-        const responseHeaders = [...proxyRes.headers.entries()]
-          .filter(([k]) => !["transfer-encoding", "connection"].includes(k.toLowerCase()))
-          .map(([k, v]) => {
-            if (k.toLowerCase() === "set-cookie") {
-              const rewritten = v.replace(/;\s*[Dd]omain=[^;]*/g, "; Domain=localhost");
-              if (allowRelayCapture) captureSetCookies(rewritten);
-              return [k, rewritten];
-            }
-            return [k, v];
-          });
-        res.writeHead(proxyRes.status, Object.fromEntries(responseHeaders));
-        if (proxyRes.status >= 200 && proxyRes.status < 300) {
-          if (p === "/api/auth/logout") {
-            clearRelayCookies("sign out");
-          } else {
-            captureAuthTokensFromBody(resBody, proxyRes.headers.get("content-type"));
-          }
-        }
-        if (
-          isStaleCsrf403
-          && proxyRes.status === 403
-          && injectedRelayCookies
-          && !hasClientCookie
-        ) {
-          clearRelayCookies("stale refresh cookie without local CSRF context");
-        }
-        res.end(resBody);
-      } catch (e) {
-        json(res, { error: `Auth proxy error: ${e?.message || e}` }, 502);
-      }
-      return true;
-    }
-
-    // --- ip-check proxy: reverse-proxy ip.net.coffee (issue #81) ---
-    // Lock-down: GET/HEAD only, restricted path prefixes, do not forward
-    // browser credentials or fingerprintable headers. Without these limits
-    // /proxy/ipcheck is an open reverse-proxy any local process can abuse
-    // (exfiltrate dashboard cookies, anonymously POST through user IP).
-    if (p.startsWith(`${IP_CHECK_PROXY_PREFIX}/`) || p === IP_CHECK_PROXY_PREFIX) {
-      const method = String(req.method || "GET").toUpperCase();
-      if (method !== "GET" && method !== "HEAD") {
-        json(res, { error: "Method Not Allowed" }, 405);
-        return true;
-      }
-      const targetPath = p === IP_CHECK_PROXY_PREFIX
-        ? "/"
-        : p.slice(IP_CHECK_PROXY_PREFIX.length) || "/";
-      const ALLOWED_PREFIXES = [
-        "/api/geoip/",
-        "/api/geoip-batch",
-        "/api/iprisk/",
-        "/api/dns/result/",
-        "/claude/status.json",
-        "/favicons/",
-        "/ip/",
-      ];
-      if (!ALLOWED_PREFIXES.some((prefix) => targetPath.startsWith(prefix))) {
-        json(res, { error: "Path not allowed" }, 403);
-        return true;
-      }
-      const targetUrl = `${IP_CHECK_TARGET}${targetPath}${url.search || ""}`;
-      try {
-        // Whitelist forwarded headers — no cookies, no auth, no fingerprintable
-        // identity. Only what the upstream needs to negotiate content. Do not
-        // set `host` explicitly: undici derives it from the URL, and some
-        // versions reject a manual host header on fetch() (same forbidden-
-        // header family that broke /api/auth/* in 5/13).
-        const proxyHeaders = {
-          accept: req.headers["accept"] || "*/*",
-          "accept-language": req.headers["accept-language"] || "en",
-          "accept-encoding": req.headers["accept-encoding"] || "gzip",
-          "user-agent": "TokenTracker/IPCheck (https://www.tokentracker.cc)",
-          referer: `${IP_CHECK_TARGET}${targetPath}`,
-        };
-
-        const proxyRes = await fetch(targetUrl, {
-          method,
-          headers: proxyHeaders,
-          redirect: "manual",
-        });
-
-        const stripped = new Set([
-          "transfer-encoding",
-          "connection",
-          "content-length",
-          "content-encoding",
-          "x-frame-options",
-          "content-security-policy",
-          "cross-origin-opener-policy",
-          "cross-origin-embedder-policy",
-          "cross-origin-resource-policy",
-        ]);
-        const responseHeaders = [...proxyRes.headers.entries()].filter(
-          ([k]) => !stripped.has(k.toLowerCase()),
-        );
-
-        const resBody = Buffer.from(await proxyRes.arrayBuffer());
-        res.writeHead(proxyRes.status, Object.fromEntries(responseHeaders));
-        res.end(resBody);
-      } catch (e) {
-        json(res, { error: `IP check proxy error: ${e?.message || e}` }, 502);
-      }
-      return true;
-    }
-
-    // --- avatar proxy: fetch third-party avatars server-side ---
-    // Why: WKWebView in TokenTrackerBar fails to load some users' Google /
-    // GitHub avatars directly (network-stack / proxy / TLS quirks vary by
-    // environment), even when the same URL renders fine in Safari. Proxying
-    // through Node's fetch — which honors system proxy + cookies-of-none —
-    // produces a same-origin <img> the WKWebView always accepts.
-    // Lock-down: GET only; host allowlist of well-known avatar CDNs (no open
-    // proxy); strip cookies/auth; small in-memory cache.
-    if (p === "/api/avatar-proxy") {
-      const method = String(req.method || "GET").toUpperCase();
-      if (method !== "GET" && method !== "HEAD") {
-        json(res, { error: "Method Not Allowed" }, 405);
-        return true;
-      }
-      const target = url.searchParams.get("url");
-      if (!target) {
-        json(res, { error: "Missing url" }, 400);
-        return true;
-      }
-      let parsed;
-      try {
-        parsed = new URL(target);
-      } catch {
-        json(res, { error: "Invalid url" }, 400);
-        return true;
-      }
-      if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
-        json(res, { error: "Only http(s) allowed" }, 400);
-        return true;
-      }
-      const AVATAR_HOST_ALLOWLIST = [
-        "lh3.googleusercontent.com",
-        "lh4.googleusercontent.com",
-        "lh5.googleusercontent.com",
-        "lh6.googleusercontent.com",
-        "avatars.githubusercontent.com",
-        "secure.gravatar.com",
-        "www.gravatar.com",
-        "gravatar.com",
-        "cdn.discordapp.com",
-        "pbs.twimg.com",
-        "abs.twimg.com",
-        "api.dicebear.com",
-      ];
-      const hostOk = AVATAR_HOST_ALLOWLIST.some(
-        (h) => parsed.hostname === h || parsed.hostname.endsWith(`.${h}`),
-      );
-      if (!hostOk) {
-        json(res, { error: "Host not allowed" }, 403);
-        return true;
-      }
-
-      const cacheKey = parsed.toString();
-      const now = Date.now();
-      const cached = avatarProxyCache.get(cacheKey);
-      if (cached && now - cached.fetchedAt < AVATAR_PROXY_TTL_MS) {
-        res.writeHead(200, {
-          "Content-Type": cached.contentType,
-          "Cache-Control": "public, max-age=3600",
-          "X-Avatar-Cache": "HIT",
-        });
-        res.end(method === "HEAD" ? undefined : cached.body);
-        return true;
-      }
-
-      try {
-        const upstream = await fetch(cacheKey, {
-          method,
-          redirect: "follow",
-          headers: {
-            accept: req.headers["accept"] || "image/*",
-            "accept-language": req.headers["accept-language"] || "en",
-            "user-agent": "TokenTracker/AvatarProxy (https://www.tokentracker.cc)",
-          },
-        });
-        if (!upstream.ok) {
-          json(res, { error: `Upstream ${upstream.status}` }, upstream.status);
-          return true;
-        }
-        const contentType = upstream.headers.get("content-type") || "image/png";
-        if (!contentType.toLowerCase().startsWith("image/")) {
-          json(res, { error: "Not an image" }, 415);
-          return true;
-        }
-        const body = Buffer.from(await upstream.arrayBuffer());
-        if (body.length <= AVATAR_PROXY_MAX_BYTES) {
-          // Simple LRU: drop oldest if over capacity.
-          if (avatarProxyCache.size >= AVATAR_PROXY_MAX_ENTRIES) {
-            const oldestKey = avatarProxyCache.keys().next().value;
-            if (oldestKey) avatarProxyCache.delete(oldestKey);
-          }
-          avatarProxyCache.set(cacheKey, { body, contentType, fetchedAt: now });
-        }
-        res.writeHead(200, {
-          "Content-Type": contentType,
-          "Cache-Control": "public, max-age=3600",
-          "X-Avatar-Cache": "MISS",
-        });
-        res.end(method === "HEAD" ? undefined : body);
-      } catch (e) {
-        json(res, { error: `Avatar proxy error: ${e?.message || e}` }, 502);
-      }
-      return true;
-    }
-
     // --- local-sync (POST) ---
     if (p === "/functions/tokentracker-local-sync") {
       if (String(req.method || "GET").toUpperCase() !== "POST") {
@@ -1918,54 +1288,14 @@ function createLocalApiHandler({ queuePath }) {
         } catch {
           body = {};
         }
-        const extraEnv = {};
         const drain = body.drain === true;
-        // Native Sync Now combines an incremental background scan with a full
-        // cloud drain. A plain {drain:true} request remains an exhaustive sync.
         const auto = body.auto === true;
         const background =
           auto && (body.background === true || body.lightweight === true);
-        // The local server is the trust boundary for cloud-sync preferences.
-        // A persisted device token must not let a native background request
-        // upload after the user has explicitly disabled cloud sync.
         const publishAccount =
-          background && body.publishAccount === true && getCloudSyncPref();
+          background && body.publishAccount === true;
         const allLocalSources = background && body.allLocalSources === true;
-        if (typeof body.deviceToken === "string" && body.deviceToken.trim()) {
-          extraEnv.TOKENTRACKER_DEVICE_TOKEN = body.deviceToken.trim();
-        }
-        let localSyncBaseUrl = null;
-        if (body.insforgeBaseUrl != null) {
-          const allowedBaseUrl = resolveAllowedInsforgeBaseUrl(body.insforgeBaseUrl);
-          if (!allowedBaseUrl) {
-            json(res, { ok: false, error: "Unsupported insforgeBaseUrl override" }, 400);
-            return true;
-          }
-          extraEnv.TOKENTRACKER_INSFORGE_BASE_URL = allowedBaseUrl;
-          localSyncBaseUrl = allowedBaseUrl;
-        }
-        if ((!background || publishAccount) &&
-            !extraEnv.TOKENTRACKER_DEVICE_TOKEN &&
-            getCloudSyncPref() &&
-            getRefreshTokenForCloud()) {
-          let issuedToken = null;
-          try {
-            issuedToken = await issueDeviceTokenForLocalSync(qp, { baseUrl: localSyncBaseUrl });
-          } catch (e) {
-            if (resolveRuntimeConfig().debug) {
-              console.warn("[LocalAPI] local sync device token issue failed:", e?.message || e);
-            }
-          }
-          if (!issuedToken) {
-            if (drain) {
-              json(res, { ok: false, error: "Unable to issue cloud device token for local sync" }, 502);
-              return true;
-            }
-          } else {
-            extraEnv.TOKENTRACKER_DEVICE_TOKEN = issuedToken;
-          }
-        }
-        const result = await runSyncCommand(extraEnv, {
+        const result = await runSyncCommand({}, {
           drain,
           auto,
           background,
@@ -1994,20 +1324,6 @@ function createLocalApiHandler({ queuePath }) {
       const summary = aggregateWrapped(rows, year ? { year } : {});
       json(res, { scope, excluded_sources: excludedSources, ...summary });
       return true;
-    }
-
-    // --- account (cross-device) view proxy for the native popover ---
-    // When ?account=1 and the user is signed in with cloud sync on, serve the
-    // same cross-device aggregate the dashboard shows; otherwise tag the
-    // response (X-TokenTracker-Account-View: 0) so the popover knows it got
-    // local single-machine data, and fall through to the local handler below.
-    if (url.searchParams.get("account") === "1") {
-      const usageSlug = p.startsWith("/functions/") ? p.slice("/functions/".length) : "";
-      if (accountSlugFor(usageSlug)) {
-        const result = await tryServeAccountView(usageSlug, url, res);
-        if (result === "served") return true;
-        res.setHeader("X-TokenTracker-Account-View", "0");
-      }
     }
 
     // --- usage-summary ---
@@ -2568,77 +1884,18 @@ function createLocalApiHandler({ queuePath }) {
         user_id: "local-user", email: "local@localhost", name: "Local User", is_public: false,
         created_at: new Date().toISOString(),
         pro: { active: true, sources: ["local"], expires_at: null, partial: false, as_of: new Date().toISOString() },
-        // Cross-device popover state: whether account aggregation can be served
-        // (signed in) and whether the dashboard's cloud-sync toggle is on.
+        // Local-only build: no cloud account exists. Native apps read this
+        // block harmlessly, so keep the shape pinned to local-only values.
         account: {
-          available: Boolean(getRefreshTokenForCloud()),
-          cloud_sync_enabled: getCloudSyncPref(),
-          account_view: Boolean(getRefreshTokenForCloud()) && getCloudSyncPref(),
+          available: false,
+          cloud_sync_enabled: false,
+          account_view: false,
         },
       });
       return true;
     }
 
-    // --- cloud-sync preference mirror ---
-    // The dashboard's Settings → Account → Cloud sync toggle (a WebView
-    // localStorage flag) is mirrored here so the auth-unaware native popover can
-    // gate its account (cross-device) view on the same preference.
-    if (p === "/functions/tokentracker-cloud-sync-pref") {
-      const method = String(req.method || "GET").toUpperCase();
-      if (method === "GET") {
-        json(res, {
-          enabled: getCloudSyncPref(),
-          account_available: Boolean(getRefreshTokenForCloud()),
-        });
-        return true;
-      }
-      if (method === "POST" || method === "PUT") {
-        if (!isAuthorizedLocalMutation(req)) {
-          json(res, { ok: false, error: "Unauthorized" }, 401);
-          return true;
-        }
-        let body = {};
-        try {
-          body = await readJsonBody(req);
-        } catch {
-          body = {};
-        }
-        // Reject malformed payloads rather than silently coercing them to a
-        // persisted `false` — this file is the shared cloud-sync preference, so
-        // a bad write would desync the popover from the dashboard.
-        if (typeof body?.enabled !== "boolean") {
-          json(res, { ok: false, error: "enabled must be a boolean" }, 400);
-          return true;
-        }
-        setCloudSyncPref(body.enabled);
-        json(res, { ok: true, enabled: getCloudSyncPref() });
-        return true;
-      }
-      json(res, { error: "Method Not Allowed" }, 405);
-      return true;
-    }
-
-    // --- telemetry preference (anonymous analytics opt-out mirror) ---
-    // The dashboard's analytics init on localhost / native-app surfaces asks
-    // this before sending anything, so TOKENTRACKER_NO_TELEMETRY /
-    // DO_NOT_TRACK / config.json `"telemetry": false` turn off dashboard
-    // analytics together with the daily heartbeat (src/lib/telemetry.js).
-    if (p === "/functions/tokentracker-telemetry-pref") {
-      const { isTelemetryDisabled } = require("./telemetry");
-      let config = {};
-      try {
-        config = JSON.parse(fs.readFileSync(path.join(path.dirname(qp), "config.json"), "utf8")) || {};
-      } catch {
-        config = {};
-      }
-      json(res, { disabled: isTelemetryDisabled({ env: process.env, config }) });
-      return true;
-    }
-
-    // --- machine-id (stable per-machine device identity for cloud sync) ---
-    // The dashboard reads this before issuing a cloud device token so the
-    // device_name keys on the MACHINE, not the browser — see
-    // getOrCreateMachineId above and dashboard/src/lib/cloud-sync.ts.
+    // --- machine-id (stable local machine identity) ---
     if (p === "/functions/tokentracker-machine-id") {
       json(res, {
         machineId: getOrCreateMachineId(qp),
@@ -2949,7 +2206,6 @@ function createLocalApiHandler({ queuePath }) {
 
 module.exports = {
   createLocalApiHandler,
-  resolveAllowedInsforgeBaseUrl,
   resolveQueuePath,
   // Exported for cross-consumer tests (pricing + native contract lock).
   MODEL_PRICING,
@@ -2959,8 +2215,8 @@ module.exports = {
   // Shared legacy-row correction so every queue reader (main queue, project
   // queue, wrapped aggregator) reports the same numbers for the same data.
   normalizeQueueRow,
-  // Machine-stable identity (config.json machineId) — shared with
-  // `tracker device-login`; the hostname is only a human-readable label.
+  // Machine-stable identity (config.json machineId); the hostname is only a
+  // human-readable label.
   getOrCreateMachineId,
   computeStableMachineId,
   getSystemDeviceName,

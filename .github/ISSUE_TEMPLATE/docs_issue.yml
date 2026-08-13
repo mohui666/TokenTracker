@@ -12,7 +12,6 @@ body:
         - README translations (zh-CN / ja / ko)
         - CONTRIBUTING.md
         - SECURITY.md
-        - Website (tokentracker.cc)
         - CLI help / output
         - In-app text (macOS / Windows)
         - Other

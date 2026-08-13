@@ -8,7 +8,7 @@ const { cmdDiagnostics } = require("../src/commands/diagnostics");
 const { collectTrackerDiagnostics } = require("../src/lib/diagnostics");
 const { withHome } = require("./helpers/with-home");
 
-test("diagnostics redacts device token and home paths", async () => {
+test("diagnostics redacts secrets and home paths", async () => {
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "tokentracker-diagnostics-"));
   let restoreHome = () => {};
   const prevCodexHome = process.env.CODEX_HOME;
@@ -64,27 +64,9 @@ test("diagnostics redacts device token and home paths", async () => {
       "utf8",
     );
 
-    const retryAtMs = Date.now() + 60_000;
     await fs.writeFile(
       path.join(trackerDir, "openclaw.signal"),
       "2026-02-12T00:00:00.000Z\n",
-      "utf8",
-    );
-    await fs.writeFile(
-      path.join(trackerDir, "auto.retry.json"),
-      JSON.stringify(
-        {
-          version: 1,
-          retryAtMs,
-          retryAt: new Date(retryAtMs).toISOString(),
-          reason: "throttled",
-          pendingBytes: 123,
-          scheduledAt: "2025-12-23T00:00:00.000Z",
-          source: "auto",
-        },
-        null,
-        2,
-      ) + "\n",
       "utf8",
     );
 
@@ -101,7 +83,10 @@ test("diagnostics redacts device token and home paths", async () => {
     assert.ok(!out.includes(tmp), "expected home path to be redacted");
 
     const data = JSON.parse(out);
-    assert.equal(data?.config?.device_token, "set");
+    // Local-only build: retired cloud config keys must not be reported.
+    assert.equal(data?.config?.installed_at, "2025-12-19T00:00:00.000Z");
+    assert.ok(!("device_token" in (data?.config || {})));
+    assert.ok(!("base_url" in (data?.config || {})));
     assert.equal(data?.notify?.last_openclaw_triggered_sync, "2026-02-12T00:00:00.000Z");
     assert.equal(data?.notify?.openclaw_session_plugin_conversation_access, false);
     assert.equal(data?.notify?.grok_hook_configured, true);
@@ -110,9 +95,8 @@ test("diagnostics redacts device token and home paths", async () => {
     assert.ok(String(data.paths.codex_home).startsWith("~"));
     assert.equal(typeof data?.paths?.grok_home, "string");
     assert.ok(String(data.paths.grok_home).startsWith("~"));
-    assert.equal(data?.auto_retry?.reason, "throttled");
-    assert.equal(data?.auto_retry?.pending_bytes, 123);
-    assert.equal(data?.auto_retry?.next_retry_at, new Date(retryAtMs).toISOString());
+    assert.ok(!("auto_retry" in data));
+    assert.ok(!("upload" in data));
   } finally {
     process.stdout.write = prevWrite;
     restoreHome();

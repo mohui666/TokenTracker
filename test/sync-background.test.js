@@ -342,7 +342,7 @@ test("all-local background sync includes Claude while preserving lightweight beh
   });
 });
 
-test("background auto sync skips full-source migration and backfill work", async () => {
+test("background auto sync skips full-source migration work", async () => {
   await withTempSyncEnv(async (home) => {
     const trackerDir = path.join(home, ".tokentracker", "tracker");
     const cursorsPath = path.join(trackerDir, "cursors.json");
@@ -373,174 +373,36 @@ test("background auto sync skips full-source migration and backfill work", async
 
     const cursors = await readCursors(home);
     assert.equal(cursors.migrations.rolloutCumulativeDeltaReparse_2026_05, undefined);
-    assert.equal(cursors.migrations.cloudConversationsBackfill_2026_06, undefined);
+    // Legacy upload-offset files are inert now; nothing may rewrite them.
     assert.deepEqual(JSON.parse(await fs.readFile(queueStatePath, "utf8")), { offset: 123 });
     await assert.rejects(readQueue(home), { code: "ENOENT" });
   });
 });
 
-test("background auto sync does not upload with cloud credentials", async () => {
+test("sync never performs cloud uploads, even with legacy credentials in env", async () => {
   await withTempSyncEnv(async (home) => {
     const codexHome = process.env.CODEX_HOME;
     await writeCodexRollout(codexHome, "2026-06-30", "019f16bd-1003-7000-8000-aaaaaaaaaaaa", 24);
+    // Local-only build: retired cloud env vars must be inert.
     process.env.TOKENTRACKER_DEVICE_TOKEN = "test-device-token";
     process.env.TOKENTRACKER_INSFORGE_BASE_URL = "https://example.invalid";
     const originalFetch = global.fetch;
     let fetchCalls = 0;
     global.fetch = async () => {
       fetchCalls += 1;
-      throw new Error("background sync should not upload");
+      throw new Error("sync must not upload");
     };
 
     try {
       await cmdSync(["--auto", "--background"]);
+      await cmdSync(["--auto", "--background", "--publish-account"]);
+      await cmdSync(["--drain"]);
     } finally {
       global.fetch = originalFetch;
     }
 
     assert.equal(fetchCalls, 0);
     assert.equal(await fs.stat(path.join(home, ".tokentracker", "tracker", "queue.state.json")).catch(() => null), null);
-  });
-});
-
-test("explicit account publication uploads after bounded background parsing", async () => {
-  await withTempSyncEnv(async (home) => {
-    const codexHome = process.env.CODEX_HOME;
-    await writeCodexRollout(codexHome, "2026-06-30", "019f16bd-1007-7000-8000-aaaaaaaaaaaa", 64);
-    process.env.TOKENTRACKER_DEVICE_TOKEN = "test-device-token";
-    process.env.TOKENTRACKER_INSFORGE_BASE_URL = "https://cloud.example";
-    const originalFetch = global.fetch;
-    let ingestCalls = 0;
-    global.fetch = async (url) => {
-      if (String(url).endsWith("/functions/tokentracker-ingest")) {
-        ingestCalls += 1;
-        return {
-          ok: true,
-          status: 200,
-          headers: { get() { return null; } },
-          text: async () => JSON.stringify({ inserted: 1, skipped: 0 }),
-        };
-      }
-      throw new Error(`unexpected fetch ${url}`);
-    };
-
-    try {
-      await cmdSync(["--auto", "--background", "--publish-account"]);
-    } finally {
-      global.fetch = originalFetch;
-    }
-
-    assert.equal(ingestCalls, 1);
-    const queueState = JSON.parse(
-      await fs.readFile(path.join(home, ".tokentracker", "tracker", "queue.state.json"), "utf8"),
-    );
-    assert.ok(queueState.offset > 0);
-  });
-});
-
-test("background account publication respects persisted upload failure backoff", async () => {
-  await withTempSyncEnv(async (home) => {
-    const codexHome = process.env.CODEX_HOME;
-    await writeCodexRollout(codexHome, "2026-06-30", "019f16bd-1008-7000-8000-aaaaaaaaaaaa", 65);
-    const trackerDir = path.join(home, ".tokentracker", "tracker");
-    await fs.mkdir(trackerDir, { recursive: true });
-    await fs.writeFile(
-      path.join(trackerDir, "upload.throttle.json"),
-      JSON.stringify({
-        version: 1,
-        nextAllowedAtMs: Date.now() + 60_000,
-        backoffUntilMs: Date.now() + 60_000,
-      }),
-      "utf8",
-    );
-    await fs.writeFile(
-      path.join(trackerDir, "auto.retry.json"),
-      JSON.stringify({ version: 1, retryAtMs: Date.now() + 60_000 }),
-      "utf8",
-    );
-    process.env.TOKENTRACKER_DEVICE_TOKEN = "test-device-token";
-    process.env.TOKENTRACKER_INSFORGE_BASE_URL = "https://cloud.example";
-    const originalFetch = global.fetch;
-    let ingestCalls = 0;
-    global.fetch = async (url) => {
-      if (String(url).endsWith("/functions/tokentracker-ingest")) ingestCalls += 1;
-      throw new Error(`unexpected fetch ${url}`);
-    };
-
-    try {
-      await cmdSync(["--auto", "--background", "--publish-account"]);
-    } finally {
-      global.fetch = originalFetch;
-    }
-
-    assert.equal(ingestCalls, 0);
-    assert.equal(
-      await fs.stat(path.join(trackerDir, "queue.state.json")).catch(() => null),
-      null,
-    );
-    assert.equal(
-      await fs.stat(path.join(trackerDir, "auto.retry.json")).catch(() => null),
-      null,
-    );
-  });
-});
-
-test("bounded native publication leaves backlog for the next native tick without spawning full retry", async () => {
-  await withTempSyncEnv(async (home) => {
-    const trackerDir = path.join(home, ".tokentracker", "tracker");
-    const queuePath = path.join(trackerDir, "queue.jsonl");
-    await fs.mkdir(trackerDir, { recursive: true });
-    await fs.writeFile(
-      path.join(trackerDir, "auto.retry.json"),
-      JSON.stringify({ version: 1, retryAtMs: Date.now() + 60_000 }),
-      "utf8",
-    );
-    const rows = Array.from({ length: 1_001 }, (_, index) => ({
-      source: "codex",
-      model: `benchmark-model-${index}`,
-      hour_start: "2026-06-30T00:00:00.000Z",
-      input_tokens: 1,
-      cached_input_tokens: 0,
-      cache_creation_input_tokens: 0,
-      output_tokens: 0,
-      reasoning_output_tokens: 0,
-      total_tokens: 1,
-      billable_total_tokens: 1,
-      conversation_count: 1,
-    }));
-    await fs.writeFile(queuePath, `${rows.map(JSON.stringify).join("\n")}\n`, "utf8");
-    process.env.TOKENTRACKER_DEVICE_TOKEN = "test-device-token";
-    process.env.TOKENTRACKER_INSFORGE_BASE_URL = "https://cloud.example";
-    const originalFetch = global.fetch;
-    let ingestCalls = 0;
-    global.fetch = async (url) => {
-      if (String(url).endsWith("/functions/tokentracker-ingest")) {
-        ingestCalls += 1;
-        return {
-          ok: true,
-          status: 200,
-          headers: { get() { return null; } },
-          text: async () => JSON.stringify({ inserted: 200, skipped: 0 }),
-        };
-      }
-      throw new Error(`unexpected fetch ${url}`);
-    };
-
-    try {
-      await cmdSync(["--auto", "--background", "--publish-account"]);
-    } finally {
-      global.fetch = originalFetch;
-    }
-
-    const queueState = JSON.parse(
-      await fs.readFile(path.join(trackerDir, "queue.state.json"), "utf8"),
-    );
-    assert.equal(ingestCalls, 5);
-    assert.ok(queueState.offset < (await fs.stat(queuePath)).size);
-    assert.equal(
-      await fs.stat(path.join(trackerDir, "auto.retry.json")).catch(() => null),
-      null,
-    );
   });
 });
 

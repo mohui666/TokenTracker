@@ -332,7 +332,7 @@ struct DynamicIslandView: View {
         let appIcon = NSApp.applicationIconImage ?? NSImage(named: NSImage.applicationIconName) ?? NSImage()
         return HStack(spacing: 0) {
             Button(action: {
-                if let url = URL(string: "https://www.tokentracker.cc") {
+                if let url = URL(string: "https://github.com/mohui666/TokenTracker") {
                     NSWorkspace.shared.open(url)
                 }
             }) {
@@ -362,7 +362,7 @@ struct DynamicIslandView: View {
             Spacer()
 
             Button(action: {
-                if let url = URL(string: "https://github.com/xiufengsun/TokenTracker") {
+                if let url = URL(string: "https://github.com/mohui666/TokenTracker") {
                     NSWorkspace.shared.open(url)
                 }
             }) {
@@ -553,7 +553,7 @@ final class GitHubStarStore: ObservableObject {
     }
 
     func fetchStars() {
-        guard let url = URL(string: "https://api.github.com/repos/xiufengsun/TokenTracker") else { return }
+        guard let url = URL(string: "https://api.github.com/repos/mohui666/TokenTracker") else { return }
         var request = URLRequest(url: url, timeoutInterval: 10)
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         Task {

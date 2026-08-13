@@ -114,7 +114,7 @@ test("repairWorkbuddyContextUsage retracts context-only SQLite history and rebui
     const staleRetraction = rows.find((row) => row.model === "auto");
     assert.equal(rebuiltRow.total_tokens, 1100);
     assert.equal(staleRetraction.total_tokens, 0);
-    assert.equal(JSON.parse(await fs.readFile(queueStatePath, "utf8")).offset, 0);
+    assert.equal(JSON.parse(await fs.readFile(queueStatePath, "utf8")).offset, 42);
 
     const changedAgain = await repairWorkbuddyContextUsage({
       cursors,

@@ -83,7 +83,7 @@ test("reincludeClaudeMemObserverFiles resets observer cursors, removes hashes, a
   }
 });
 
-test("reincludeClaudeMemObserverFiles remaps the upload offset to a line boundary in the rewritten queue", async () => {
+test("reincludeClaudeMemObserverFiles relabels the queue and leaves the retired upload offset untouched", async () => {
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "tt-claude-mem-reinclude-offset-"));
   try {
     const queuePath = path.join(tmp, "queue.jsonl");
@@ -94,11 +94,8 @@ test("reincludeClaudeMemObserverFiles remaps the upload offset to a line boundar
     const row3 = JSON.stringify({ source: "claude-mem", model: "claude-sonnet-4-5", input_tokens: 7 });
     await fs.writeFile(queuePath, [row1, row2, row3].join("\n") + "\n", "utf8");
 
-    // Old offset points mid-row3 (rows 1+2 uploaded, row3 partially "read" —
-    // a non-boundary position must round DOWN so no row is ever skipped).
-    const boundaryAfterRow2 = Buffer.byteLength(row1 + "\n" + row2 + "\n", "utf8");
-    const midRow3 = boundaryAfterRow2 + 5;
-    await fs.writeFile(queueStatePath, JSON.stringify({ offset: midRow3 }), "utf8");
+    // Legacy cloud-upload cursor file: inert in the local-only build.
+    await fs.writeFile(queueStatePath, JSON.stringify({ offset: 42 }), "utf8");
 
     const cursors = { version: 1, files: {}, claudeHashes: [], migrations: {} };
     const changed = await reincludeClaudeMemObserverFiles({
@@ -109,22 +106,12 @@ test("reincludeClaudeMemObserverFiles remaps the upload offset to a line boundar
     });
     assert.equal(changed, true);
 
-    const rewrittenRaw = await fs.readFile(queuePath, "utf8");
-    const rewritten = rewrittenRaw.split("\n").filter(Boolean).map((l) => JSON.parse(l));
+    const rewritten = (await fs.readFile(queuePath, "utf8")).split("\n").filter(Boolean).map((l) => JSON.parse(l));
     assert.deepEqual(rewritten.map((r) => r.source), ["claude", "claude", "claude"]);
     assert.deepEqual(rewritten.map((r) => r.input_tokens), [10, 5, 7]);
 
-    const state = JSON.parse(await fs.readFile(queueStatePath, "utf8"));
-    // New offset must land exactly on the rewritten rows-1+2 boundary...
-    const newRow1 = JSON.stringify({ source: "claude", model: "claude-sonnet-4-5", input_tokens: 10 });
-    const expectedOffset = Buffer.byteLength(newRow1 + "\n" + row2 + "\n", "utf8");
-    assert.equal(state.offset, expectedOffset);
-    // ...so the unsent remainder is exactly the relabeled row3 — nothing lost.
-    const remainder = Buffer.from(rewrittenRaw, "utf8").subarray(state.offset).toString("utf8");
-    assert.deepEqual(
-      remainder.split("\n").filter(Boolean).map((l) => JSON.parse(l)),
-      [{ source: "claude", model: "claude-sonnet-4-5", input_tokens: 7 }],
-    );
+    // The relabel no longer maintains the upload offset — the file stays as-is.
+    assert.deepEqual(JSON.parse(await fs.readFile(queueStatePath, "utf8")), { offset: 42 });
   } finally {
     await fs.rm(tmp, { recursive: true, force: true });
   }

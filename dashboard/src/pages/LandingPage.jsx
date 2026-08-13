@@ -42,7 +42,7 @@ function useDeferredMount(delayMs = 0, shouldDefer = true) {
   return mounted;
 }
 
-export function LandingPage({ signInUrl, signUpUrl }) {
+export function LandingPage() {
   const reduceMotion = usePrefersReducedMotion();
   const screenshotMode = useMemo(() => {
     if (typeof window === "undefined") return false;
@@ -97,8 +97,6 @@ export function LandingPage({ signInUrl, signUpUrl }) {
       reduceMotion={reduceMotion}
       screenshotMode={screenshotMode}
       effectsReady={effectsReady}
-      signInUrl={signInUrl}
-      signUpUrl={signUpUrl}
       installCommand={installCommand}
       installCopied={installCopied}
       onCopyInstallCommand={handleCopyInstall}

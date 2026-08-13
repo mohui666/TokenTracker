@@ -4,12 +4,12 @@ Guidance for Claude Code working in this repository. Every line here is loaded i
 
 ## Project shape
 
-Token Tracker is a local-first AI token usage tracker.
+Token Tracker is a local-first AI token usage tracker. This is a local-only fork — the canonical repository is [mohui666/TokenTracker](https://github.com/mohui666/TokenTracker) (forked from xiufengsun/TokenTracker). It has no cloud backend, no leaderboard, no login, and no telemetry, and it is not published to npm or Homebrew.
 
 - **CLI** (`src/`, CommonJS, Node ≥20) — entry `bin/tracker.js` → `src/cli.js`. `serve` runs a local HTTP server on `:7680`, `sync` parses logs into `~/.tokentracker/queue.jsonl`.
-- **Dashboard** (`dashboard/`, React 18 + Vite 7 + TS strict + Tailwind) — built to `dashboard/dist/`, served by the CLI locally and by Vercel at `www.tokentracker.cc`.
+- **Dashboard** (`dashboard/`, React 18 + Vite 7 + TS strict + Tailwind) — built to `dashboard/dist/`, served locally by the CLI.
 - **macOS app** (`TokenTrackerBar/`, Swift 5.9, XcodeGen) — menu bar + WidgetKit. `EmbeddedServer/` bundles the CLI runtime + built dashboard so the `.app` is self-contained.
-- **Windows app** (`TokenTrackerWin/`, .NET 8 WinForms + WPF + WebView2) — system-tray counterpart of the macOS app. Launches the bundled CLI `serve` on a dynamic loopback port (avoids the DoSvc-held `:7680`), hosts the dashboard in WebView2, registers the `tokentracker://` deep-link for OAuth. Built `EmbeddedServer/` (Node + CLI + dashboard) is bundled by `scripts/bundle-node.ps1` so the `.exe` is self-contained. Dashboard adaptations are gated behind `isNativeWindowsApp()` (`dashboard/src/lib/native-bridge.js`) so macOS/web paths are untouched.
+- **Windows app** (`TokenTrackerWin/`, .NET 8 WinForms + WPF + WebView2) — system-tray counterpart of the macOS app. Launches the bundled CLI `serve` on a dynamic loopback port (avoids the DoSvc-held `:7680`), hosts the dashboard in WebView2, and registers the `tokentracker://` deep-link. Built `EmbeddedServer/` (Node + CLI + dashboard) is bundled by `scripts/bundle-node.ps1` so the `.exe` is self-contained. Dashboard adaptations are gated behind `isNativeWindowsApp()` (`dashboard/src/lib/native-bridge.js`) so macOS/web paths are untouched.
 
 Data flow: AI CLI runs → hook fires → `rollout.js` parses → `queue.jsonl` → local API → dashboard.
 
@@ -39,9 +39,9 @@ node bin/tracker.js serve --no-sync       # local dashboard server on :7680
 | Install / uninstall a provider hook | `src/lib/<provider>-hook.js` + register in `src/commands/init.js` + `uninstall.js` |
 | Add a local API endpoint | `src/lib/local-api.js` — search `/functions/tokentracker-` |
 | Wire a provider into sync | `src/commands/sync.js` (call site + totals aggregation) + `src/commands/status.js` (status reporting) |
-| Add pricing for a model | `src/lib/pricing/curated-overrides.json` **+ the canonical edge block in `dashboard/edge-patches/tokentracker-leaderboard-refresh.ts`, copied verbatim into the other 4 edge files** (account-daily / account-summary / account-model-breakdown / leaderboard-profile). `test/edge-pricing-parity.test.js` fails on any drift. Deploy the touched edge functions after editing. |
+| Add pricing for a model | `src/lib/pricing/curated-overrides.json` |
 | Add an OpenCode Go usage-limits row | `src/lib/opencode-go-limits.js` + provider entry in `src/lib/usage-limits.js` + `PROVIDER_LIMIT_SPECS.opencodeGo` in `dashboard/src/ui/dashboard/components/usage-limits-provider-specs.js`. **Authoritative source = the official Go usage API** (`source:'api'`) using `OPENCODE_GO_API_KEY`; the signed-in dashboard scrape (`source:'web'`) remains a legacy compatibility fallback. Local `opencode.db` cost ÷ Go's dollar caps ($12/5h, $30/wk, $60/mo) is only an explicit `TOKENTRACKER_OPENCODE_GO_LOCAL_ESTIMATE=1` estimate because history cannot prove an active subscription. Reads via `readSqliteJsonRowsAsync` so the limits poll never blocks the event loop. |
-| Add a dashboard page | `dashboard/src/pages/` (lazy-loaded via `React.lazy()` in `App.jsx` — **except `NativeAuthCallbackPage`, which must stay eager-imported**, see Lessons learned) |
+| Add a dashboard page | `dashboard/src/pages/` (lazy-loaded via `React.lazy()` in `App.jsx`) |
 | Add UI components | `dashboard/src/ui/dashboard/components/` |
 | Add a provider icon | `dashboard/src/ui/dashboard/components/ProviderIcon.jsx` (`PROVIDER_ICON_MAP` keyed by `source.toUpperCase()`) |
 | Add user-facing text | `dashboard/src/content/copy.csv` — never hardcode |
@@ -89,9 +89,9 @@ UTC, half-hour buckets, append-only — readers take the latest entry per `(sour
 
 ## Release workflow
 
-**Any change under `src/` or `dashboard/` ships npm + DMG + Windows + Linux**, because `TokenTrackerBar/EmbeddedServer/` (macOS), `TokenTrackerWin/EmbeddedServer/` (Windows) and `TokenTrackerLinux/EmbeddedServer/` (Linux AppImage) all bundle the CLI runtime and built dashboard. Bumping only `package.json` leaves desktop-app users on the stale embedded copy.
+**Any change under `src/` or `dashboard/` ships in the macOS DMG + Windows + Linux desktop apps**, because `TokenTrackerBar/EmbeddedServer/` (macOS), `TokenTrackerWin/EmbeddedServer/` (Windows) and `TokenTrackerLinux/EmbeddedServer/` (Linux AppImage) all bundle the CLI runtime and built dashboard. Bumping only `package.json` leaves desktop-app users on the stale embedded copy.
 
-The macOS + Windows + Linux release is **one workflow**: `release-dmg.yml` (display name **`release (macOS + Windows + Linux)`**). A `create-release` job validates every version file (via the shared `scripts/version-files.cjs` registry) and makes the `vX.Y.Z` release as a **draft** pinned to the workflow commit, then a macOS `build` job, a `windows` job (which calls the reusable `release-windows.yml` via `workflow_call`) and a `linux` job all `needs: create-release` and run **in parallel**, each checking out that immutable version tag and uploading its assets to the draft with `--clobber`. The `linux` job bundles the embedded runtime (**must** precede `tauri build` — `tauri-build` hard-fails on the missing `EmbeddedServer` resource path), builds a **single AppImage**, and verifies the extracted payload actually contains the runtime before uploading. A final `publish` job (`needs: [build, windows, linux]`) verifies all four assets, flips the draft live (`gh release edit --draft=false`), and notifies the Homebrew tap. The draft stays invisible until then, so `releases/latest` never serves a half-published release (and a failed platform leaves it unpublished rather than half-public). Published releases are immutable: a same-version dispatch fails instead of replacing public assets; only a draft pointing to the exact same commit may be resumed. A **single** `gh workflow run "release (macOS + Windows + Linux)" -f version=X.Y.Z` ships **all three** platforms. `release-windows.yml` can still be dispatched standalone to rebuild Windows assets, but only into an existing matching draft created by the combined workflow.
+The macOS + Windows + Linux release is **one workflow**: `release-dmg.yml` (display name **`release (macOS + Windows + Linux)`**). A `create-release` job validates every version file (via the shared `scripts/version-files.cjs` registry) and makes the `vX.Y.Z` release as a **draft** pinned to the workflow commit, then a macOS `build` job, a `windows` job (which calls the reusable `release-windows.yml` via `workflow_call`) and a `linux` job all `needs: create-release` and run **in parallel**, each checking out that immutable version tag and uploading its assets to the draft with `--clobber`. The `linux` job bundles the embedded runtime (**must** precede `tauri build` — `tauri-build` hard-fails on the missing `EmbeddedServer` resource path), builds a **single AppImage**, and verifies the extracted payload actually contains the runtime before uploading. A final `publish` job (`needs: [build, windows, linux]`) verifies all four assets, flips the draft live (`gh release edit --draft=false`). The draft stays invisible until then, so `releases/latest` never serves a half-published release (and a failed platform leaves it unpublished rather than half-public). Published releases are immutable: a same-version dispatch fails instead of replacing public assets; only a draft pointing to the exact same commit may be resumed. A **single** `gh workflow run "release (macOS + Windows + Linux)" -f version=X.Y.Z` ships **all three** platforms. `release-windows.yml` can still be dispatched standalone to rebuild Windows assets, but only into an existing matching draft created by the combined workflow.
 
 | Change scope | Bump `package.json` (→ `npm run sync-versions` propagates the rest) | Trigger release workflow (→ builds macOS + Windows + Linux) |
 |---|---|---|
@@ -99,7 +99,7 @@ The macOS + Windows + Linux release is **one workflow**: `release-dmg.yml` (disp
 | `TokenTrackerBar/` Swift only | ✅ | ✅ |
 | `TokenTrackerWin/` only | ✅ | ✅ |
 | `TokenTrackerLinux/` only | ✅ | ✅ |
-| `dashboard/edge-patches/`, scripts, docs, CI | — | — |
+| scripts, docs, CI | — | — |
 
 **All nine** managed version locations must match or the workflows' "Verify version" steps fail. The authoritative list lives in `scripts/version-files.cjs` (`VERSION_FILES`) — that registry is what `sync-versions` writes, `validate:versions` checks, and the release workflow's `create-release` job verifies, so adding a platform means editing one array rather than several workflows. Beyond `package.json` it covers `TokenTrackerBar/project.yml` (×2 `MARKETING_VERSION`), `TokenTrackerWin/TokenTrackerWin.csproj`, and the six Linux files (`TokenTrackerLinux/package.json`, its `package-lock.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, `src-tauri/tauri.conf.json`, `packaging/arch/.../PKGBUILD`). The root `package-lock.json` is not in the registry because `npm version` maintains it, but the release workflow verifies it too.
 
@@ -108,9 +108,8 @@ When the user says "release" or "发 release", that is explicit approval for the
 ### Steps
 
 1. Bump the version in **one** place — `package.json` is the single source of truth. Run `npm version <X.Y.Z|patch|minor>` (or, if you edited `package.json` by hand, `npm run sync-versions`): the `version` npm-lifecycle hook runs `scripts/sync-versions.cjs`, which syncs the version into every file listed in `scripts/version-files.cjs` (`project.yml`'s two `MARKETING_VERSION` entries, the Windows `<Version>`, and the Linux `package.json` / `package-lock.json` / `Cargo.toml` / `Cargo.lock` / `tauri.conf.json` / `PKGBUILD`), then `git add`s them so they land in the version commit. They all stay in lockstep automatically — don't hand-edit any of them. (`npm version` also creates a local `vX.Y.Z` tag and a `vX.Y.Z`-style commit message rather than `chore(release): vX.Y.Z`; CI triggers on the package.json version change, not the message.)
-2. `git commit && git push origin main` → the canonical `CI` workflow runs. Only after that exact main-branch commit passes the full Linux validators + macOS tests + Windows build does `npm-publish.yml` check out the tested SHA and publish when the version is new. A failed or cancelled CI never reaches npm.
+2. `git commit && git push origin main` → the canonical `CI` workflow runs the full Linux validators + macOS tests + Windows build on that commit. This fork does not publish to npm (no `npm-publish.yml`, no `NPM_TOKEN`) — the GitHub Release below is the only distribution channel.
 3. For DMG-eligible changes: `gh workflow run "release (macOS + Windows + Linux)" -f version=X.Y.Z` → cloud builds the DMG, the Windows zip + installer, **and** the Linux AppImage (all in parallel), attaching them to the GitHub Release.
-4. Homebrew tap `xiufengsun/homebrew-tokentracker` self-updates via dispatch (~40s if `HOMEBREW_DISPATCH_TOKEN` set) or hourly cron (≤1h fallback). **Never edit the tap repo manually for routine releases.**
 
 Release notes: one English line, no markdown sections (`Fix token stats inflation caused by duplicate queue entries`).
 
@@ -134,9 +133,8 @@ bash scripts/create-dmg.sh "$APP"
 
 ### Dashboard layout
 
-- **`AppLayout`-wrapped pages use `flex flex-col flex-1`** as the outer wrapper, not `min-h-screen` + own sticky header/footer. Reference: `LimitsPage.jsx` / `LeaderboardPage.jsx` / `SettingsPage.jsx`. `LeaderboardProfilePage.jsx` is intentionally excluded via `isLeaderboardIndexPath` in `App.jsx`.
+- **`AppLayout`-wrapped pages use `flex flex-col flex-1`** as the outer wrapper, not `min-h-screen` + own sticky header/footer. Reference: `LimitsPage.jsx` / `SettingsPage.jsx`.
 - **Motion height animations clip box-shadow focus rings.** Use `focus:ring-inset` on inputs inside `AnimatePresence` height-collapsing containers (see `SettingsPage.jsx` Account section).
-- **`NativeAuthCallbackPage` must stay eager-imported in `App.jsx`** (do NOT convert it to `React.lazy()` even when adding other lazy pages). Its module captures the OAuth `insforge_code` query param synchronously at module-load time, BEFORE the InsForge SDK's `detectAuthCallback()` runs `cleanUrlParams("insforge_code")` to strip it. Lazy-loading delays the module until the route mounts, by which point the SDK has already wiped the URL — the captured code is `null` and the page falls through to the "Sign-in incomplete" failure state. Regression history: PR splitting the 1.9MB main bundle broke OAuth callback for every user until reverted for this one page.
 
 ### Native ↔ web bridge
 

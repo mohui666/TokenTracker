@@ -20,18 +20,19 @@ const earned = (id, tier) => ({
 describe("AchievementsSection", () => {
   it("own view renders the full catalog for the scope (earned + locked)", () => {
     render(
-      <AchievementsSection achievements={[earned("streak", 2)]} isOwn scope="cloud" />,
+      <AchievementsSection achievements={[earned("streak", 2)]} isOwn scope="local" />,
     );
-    const cloudCount = BADGE_CATALOG.filter((b) => b.scope === "cloud").length;
-    expect(screen.getAllByRole("button")).toHaveLength(cloudCount);
+    const localCount = BADGE_CATALOG.filter((b) => b.scope === "local").length;
+    expect(localCount).toBe(13);
+    expect(screen.getAllByRole("button")).toHaveLength(localCount);
   });
 
   it("visitor view renders earned badges only", () => {
     render(
       <AchievementsSection
-        achievements={[earned("streak", 2), earned("podium", 0)]}
+        achievements={[earned("streak", 2), earned("veteran", 0)]}
         isOwn={false}
-        scope="cloud"
+        scope="local"
       />,
     );
     expect(screen.getAllByRole("button")).toHaveLength(1);
@@ -39,14 +40,14 @@ describe("AchievementsSection", () => {
 
   it("visitor view with nothing earned renders nothing", () => {
     const { container } = render(
-      <AchievementsSection achievements={[]} isOwn={false} scope="cloud" />,
+      <AchievementsSection achievements={[]} isOwn={false} scope="local" />,
     );
     expect(container.firstChild).toBeNull();
   });
 
   it("tolerates a missing achievements payload (older backends)", () => {
     const { container } = render(
-      <AchievementsSection achievements={undefined} isOwn={false} scope="cloud" />,
+      <AchievementsSection achievements={undefined} isOwn={false} scope="local" />,
     );
     expect(container.firstChild).toBeNull();
   });
@@ -85,7 +86,7 @@ describe("badge helpers", () => {
 
   it("highestBadge ignores unearned entries", () => {
     expect(highestBadge([{ id: "streak", tier: 0 }])).toBeNull();
-    expect(highestBadge([{ id: "streak", tier: 1 }, { id: "podium", tier: 3 }])?.id).toBe("podium");
+    expect(highestBadge([{ id: "streak", tier: 1 }, { id: "veteran", tier: 3 }])?.id).toBe("veteran");
   });
 
   it("badgeProgress inverts for lower_is_better metrics and clamps", () => {

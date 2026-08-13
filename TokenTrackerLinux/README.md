@@ -15,7 +15,7 @@ Two distribution paths are supported:
 ## Install (AppImage)
 
 Download `TokenTracker-linux-x86_64.AppImage` from the
-[latest release](https://github.com/xiufengsun/TokenTracker/releases/latest),
+[latest release](https://github.com/mohui666/TokenTracker/releases/latest),
 then:
 
 ```bash
@@ -90,19 +90,6 @@ Cinnamon and MATE show the icon with no extra setup.
 Until the extension is installed, closing the window hides the app with no way to
 get it back from the tray — quit it from the launcher or with `pkill
 tokentracker-linux`.
-
-## Sign-in
-
-The app prefers a **fixed loopback port, 17680**, because OAuth redirect URLs
-have to be registered server-side. Email sign-in works on any port; browser-based
-Google/GitHub sign-in needs `http://127.0.0.1:17680/auth/callback`, so if
-something else already holds 17680 the app falls back to a random port and OAuth
-will not complete until 17680 is free again.
-
-The AppImage registers a per-user `.desktop` handler for the
-`tokentracker://` OAuth callback on first launch and refreshes it whenever the
-AppImage moves. This requires `xdg-mime` (normally provided by `xdg-utils`). The
-Arch package installs the equivalent handler system-wide.
 
 ## Logs
 

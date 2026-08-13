@@ -4,14 +4,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { copy } from "../lib/copy";
 import {
   addSkillRepo,
-  getAccountSkillInventories,
   deleteLocalSkill,
   discoverSkills,
   getInstalledSkills,
   getSkillRepos,
   importLocalSkill,
   installSkill,
-  publishSkillInventory,
   removeSkillRepo,
   restoreSkill,
   searchSkills,
@@ -22,14 +20,12 @@ import { buildLocallyInstalledKeys, SkillsPage } from "./SkillsPage.jsx";
 
 vi.mock("../lib/skills-api", () => ({
   addSkillRepo: vi.fn(),
-  getAccountSkillInventories: vi.fn(),
   deleteLocalSkill: vi.fn(),
   discoverSkills: vi.fn(),
   getInstalledSkills: vi.fn(),
   getSkillRepos: vi.fn(),
   importLocalSkill: vi.fn(),
   installSkill: vi.fn(),
-  publishSkillInventory: vi.fn(),
   removeSkillRepo: vi.fn(),
   restoreSkill: vi.fn(),
   searchSkills: vi.fn(),
@@ -37,18 +33,8 @@ vi.mock("../lib/skills-api", () => ({
   uninstallSkill: vi.fn(),
 }));
 
-const testAuth = vi.hoisted(() => ({
-  signedIn: true,
-  getAccessToken: async () => "test-access-token",
-}));
-
-vi.mock("../contexts/InsforgeAuthContext.jsx", () => ({
-  useInsforgeAuth: () => testAuth,
-}));
-
 beforeEach(() => {
   window.history.replaceState({}, "", "/skills");
-  localStorage.removeItem("tokentracker_cloud_device_id_v1");
   vi.mocked(getInstalledSkills).mockResolvedValue({
     targets: [
       { id: "claude", label: "Claude" },
@@ -78,8 +64,6 @@ beforeEach(() => {
   vi.mocked(discoverSkills).mockResolvedValue({ skills: [] });
   vi.mocked(searchSkills).mockResolvedValue({ skills: [] });
   vi.mocked(installSkill).mockResolvedValue({ ok: true });
-  vi.mocked(getAccountSkillInventories).mockResolvedValue({ devices: [] });
-  vi.mocked(publishSkillInventory).mockResolvedValue({ ok: true });
   vi.mocked(uninstallSkill).mockResolvedValue({ ok: true });
   vi.mocked(restoreSkill).mockResolvedValue({ ok: true });
   vi.mocked(setSkillTargets).mockResolvedValue({ ok: true });
@@ -282,30 +266,4 @@ describe("SkillsPage", () => {
     expect(keys.has("dir:installed")).toBe(true);
   });
 
-  it("keeps the other-device view when publishing this device inventory fails", async () => {
-    localStorage.setItem("tokentracker_cloud_device_id_v1", "this-device");
-    vi.mocked(getInstalledSkills).mockResolvedValue({
-      targets: [{ id: "codex", label: "Codex" }],
-      skills: [],
-    });
-    vi.mocked(getAccountSkillInventories).mockResolvedValue({
-      devices: [{
-        id: "other-device",
-        device_name: "Other PC",
-        skills: [{
-          key: "local/local:remote-only",
-          name: "Remote Only Skill",
-          directory: "remote-only",
-          targets: ["codex"],
-        }],
-      }],
-    });
-    vi.mocked(publishSkillInventory).mockRejectedValue(new Error("device revoked"));
-
-    render(<SkillsPage />);
-
-    expect(await screen.findByText("Remote Only Skill")).toBeInTheDocument();
-    await waitFor(() => expect(getAccountSkillInventories).toHaveBeenCalledWith("test-access-token"));
-    expect(screen.getByText(copy("skills.inventory.remote"))).toBeInTheDocument();
-  });
 });

@@ -3,19 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>__TOKENTRACKER_TITLE__</title>
-    <meta name="description" content="__TOKENTRACKER_DESCRIPTION__" />
-    <meta property="og:site_name" content="__TOKENTRACKER_OG_SITE_NAME__" />
-    <meta property="og:title" content="__TOKENTRACKER_OG_TITLE__" />
-    <meta property="og:description" content="__TOKENTRACKER_OG_DESCRIPTION__" />
-    <meta property="og:image" content="__TOKENTRACKER_OG_IMAGE__" />
-    <meta property="og:type" content="__TOKENTRACKER_OG_TYPE__" />
-    <meta property="og:url" content="__TOKENTRACKER_OG_URL__" />
-    <meta name="twitter:card" content="__TOKENTRACKER_TWITTER_CARD__" />
-    <meta name="twitter:title" content="__TOKENTRACKER_TWITTER_TITLE__" />
-    <meta name="twitter:description" content="__TOKENTRACKER_TWITTER_DESCRIPTION__" />
-    <meta name="twitter:image" content="__TOKENTRACKER_TWITTER_IMAGE__" />
-    <link rel="canonical" href="__TOKENTRACKER_OG_URL__" />
+    <title>Token Tracker — AI Token Usage & Cost Tracker for Coding CLIs</title>
+    <meta name="description" content="Free, open-source, local-first tracker that monitors AI token usage and cost across 29 AI coding tools including Claude Code, Codex, Cursor, and Gemini. One-command install, privacy-first." />
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <link rel="icon" href="/favicon.ico" sizes="any" />
     <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
@@ -103,10 +92,9 @@
           {
             "@type": "Organization",
             "name": "Token Tracker",
-            "url": "https://www.tokentracker.cc/",
-            "logo": "https://www.tokentracker.cc/icon-512.png",
+            "url": "https://github.com/mohui666/TokenTracker",
             "sameAs": [
-              "https://github.com/xiufengsun/TokenTracker",
+              "https://github.com/mohui666/TokenTracker",
               "https://www.npmjs.com/package/tokentracker-cli"
             ]
           },
@@ -115,7 +103,7 @@
             "name": "Token Tracker",
             "applicationCategory": "DeveloperApplication",
             "operatingSystem": "macOS, Linux, Windows",
-            "url": "https://www.tokentracker.cc/",
+            "url": "https://github.com/mohui666/TokenTracker",
             "downloadUrl": "https://www.npmjs.com/package/tokentracker-cli",
             "installUrl": "https://www.npmjs.com/package/tokentracker-cli",
             "offers": {
@@ -124,41 +112,6 @@
               "priceCurrency": "USD"
             },
             "description": "Local-first AI coding usage tracker for 29 tools, with a desktop pet, four widgets, achievements, native macOS and Windows apps, accurate cross-provider deduplication, and no prompt collection."
-          },
-          {
-            "@type": "WebSite",
-            "name": "Token Tracker",
-            "url": "https://www.tokentracker.cc/",
-            "description": "Track token usage across AI coding agent CLIs with auditable, privacy-respecting metrics."
-          },
-          {
-            "@type": "WebPage",
-            "name": "Token Tracker Homepage",
-            "url": "https://www.tokentracker.cc/",
-            "description": "Install Token Tracker in one command and monitor token usage across AI coding agent CLIs."
-          },
-          {
-            "@type": "BreadcrumbList",
-            "itemListElement": [
-              {
-                "@type": "ListItem",
-                "position": 1,
-                "name": "Home",
-                "item": "https://www.tokentracker.cc/"
-              },
-              {
-                "@type": "ListItem",
-                "position": 2,
-                "name": "Leaderboard",
-                "item": "https://www.tokentracker.cc/leaderboard"
-              },
-              {
-                "@type": "ListItem",
-                "position": 3,
-                "name": "Claude IP Check",
-                "item": "https://www.tokentracker.cc/ip-check"
-              }
-            ]
           },
           {
             "@type": "ItemList",
@@ -219,7 +172,7 @@
                 "name": "Is Token Tracker free and open source?",
                 "acceptedAnswer": {
                   "@type": "Answer",
-                  "text": "Yes. Token Tracker is free and open source on GitHub at https://github.com/xiufengsun/TokenTracker and published on npm as tokentracker-cli. The macOS menu bar app is also available via Homebrew tap xiufengsun/tokentracker."
+                  "text": "Yes. Token Tracker is free and open source on GitHub at https://github.com/mohui666/TokenTracker and published on npm as tokentracker-cli. The macOS menu bar app is available as a DMG from GitHub Releases."
                 }
               },
               {
@@ -251,7 +204,7 @@
                 "name": "Does Token Tracker work offline?",
                 "acceptedAnswer": {
                   "@type": "Answer",
-                  "text": "Yes. Token Tracker is local-first. All parsing, aggregation, and dashboard rendering happens on your machine. Cloud sync is optional and used only for the public leaderboard."
+                  "text": "Yes. Token Tracker is fully local. All parsing, aggregation, and dashboard rendering happen on your machine, and your data never leaves it."
                 }
               }
             ]
@@ -276,20 +229,20 @@
       <p>
         On first run, the CLI auto-detects installed AI coding tools, installs the appropriate hooks
         (SessionEnd hooks, TOML notify arrays, plugins, or passive log readers depending on the tool), and
-        starts a local dashboard at <code>http://localhost:7680</code>. macOS users can also install the
-        native menu bar app via <code>brew install --cask xiufengsun/tokentracker/tokentracker</code>.
+        starts a local dashboard at <code>http://localhost:7680</code>. macOS users can also download the
+        native menu bar app (<code>TokenTrackerBar.dmg</code>) from GitHub Releases.
       </p>
 
       <h2>What you get after installing</h2>
       <p>
         Token Tracker runs entirely on your machine. After <code>npx tokentracker-cli</code>, a local
         dashboard at <code>http://localhost:7680</code> exposes the following views — none of them require an
-        account, and your data never leaves your device unless you opt into cloud sync.
+        account, and your data never leaves your device.
       </p>
       <ul>
         <li><strong>Desktop pet</strong> — a pixel companion that reacts to real token burn, streaks, and rest.</li>
         <li><strong>Four desktop widgets</strong> — usage, activity heatmap, top models, and limits at a glance.</li>
-        <li><strong>Achievements</strong> — unlock milestones from local and optional account-wide activity.</li>
+        <li><strong>Achievements</strong> — unlock milestones from your local coding activity.</li>
         <li><strong>Unified usage dashboard</strong> — input, output, cached, and cache-creation tokens across 29 AI coding tools.</li>
         <li><strong>Cost analysis</strong> — per-model pricing across 2,200+ models with an offline snapshot.</li>
         <li><strong>Usage limits view</strong> — live quota and subscription status for 13 providers, with last-good caching for local providers such as Antigravity and Qoder.</li>
@@ -299,7 +252,7 @@
         <li><strong>Skills browser</strong> — discover and install agent skills from the open ecosystem.</li>
         <li><strong>Native desktop apps</strong> — a macOS menu bar app and Windows system tray app.</li>
       </ul>
-      <p><em>Privacy by design</em>: token counts only, never prompts or conversation content. Local-first; cloud sync is optional and powers only the public leaderboard.</p>
+      <p><em>Privacy by design</em>: token counts only, never prompts or conversation content. Fully local — nothing leaves your machine.</p>
 
       <h2>Supported AI coding tools (29)</h2>
       <p>
@@ -358,8 +311,7 @@
         (<code>src/lib/rollout.js</code>) normalizes provider-specific log formats into a unified schema: half-hour
         UTC buckets keyed by <code>(source, model, hour_start)</code>. Aggregated buckets are written to
         <code>queue.jsonl</code> and served from a local HTTP API on port 7680. The React dashboard reads
-        from those endpoints; cloud sync (optional) uploads bucketed counts to InsForge for the public
-        leaderboard.
+        from those endpoints.
       </p>
 
       <h2>Frequently asked questions</h2>
@@ -370,7 +322,7 @@
       <p>Token Tracker supports 29 tools: Claude Code, Codex CLI, Cursor, Gemini CLI, Antigravity, Kiro, OpenCode, OpenClaw, Every Code, Hermes Agent, GitHub Copilot, Kimi Code, CodeBuddy, WorkBuddy, Grok Build, oh-my-pi, pi, Craft Agents, Kilo CLI, Kilo Code, Roo Code, Zed Agent, Goose, Droid, Mimo Code, ZCode, Qoder, AnythingLLM Desktop, and Claude Science.</p>
 
       <h3>Is Token Tracker free and open source?</h3>
-      <p>Yes. Source on GitHub at <a href="https://github.com/xiufengsun/TokenTracker">github.com/xiufengsun/TokenTracker</a>; npm package <code>tokentracker-cli</code>.</p>
+      <p>Yes. Source on GitHub at <a href="https://github.com/mohui666/TokenTracker">github.com/mohui666/TokenTracker</a>; npm package <code>tokentracker-cli</code>.</p>
 
       <h3>Does Token Tracker collect my prompts or conversations?</h3>
       <p>No. Only token counts, model names, timestamps, and project attribution are recorded. Prompts and completions are never read or uploaded.</p>
@@ -382,16 +334,13 @@
       <p>Token Tracker is an AI token usage and cost tracker: install it with <code>npx tokentracker-cli</code>, and it monitors token consumption and spend across all 29 tools in one dashboard, with per-model pricing across 2,200+ models so you can see cost by model, project, and time window without manual tracking.</p>
 
       <h3>Does Token Tracker work offline?</h3>
-      <p>Yes. Token Tracker is local-first. All parsing, aggregation, and dashboard rendering happen on your machine. Cloud sync is optional and powers only the public leaderboard.</p>
+      <p>Yes. Token Tracker is fully local. All parsing, aggregation, and dashboard rendering happen on your machine, and your data never leaves it.</p>
 
       <h2>Resources</h2>
       <ul>
-        <li><a href="https://www.tokentracker.cc/">Homepage and install instructions</a></li>
-        <li><a href="https://www.tokentracker.cc/leaderboard">AI coding token usage leaderboard — Claude, Codex, Cursor</a></li>
-        <li><a href="https://www.tokentracker.cc/ip-check">Claude IP check — exit IP reputation &amp; risk (纯净度) score</a></li>
         <li><a href="https://www.npmjs.com/package/tokentracker-cli">npm: tokentracker-cli</a></li>
-        <li><a href="https://github.com/xiufengsun/TokenTracker">GitHub: xiufengsun/TokenTracker</a></li>
-        <li><a href="https://github.com/xiufengsun/TokenTracker/issues">Report an issue</a></li>
+        <li><a href="https://github.com/mohui666/TokenTracker">GitHub: mohui666/TokenTracker</a></li>
+        <li><a href="https://github.com/mohui666/TokenTracker/issues">Report an issue</a></li>
       </ul>
       <p>
         <strong>Note:</strong> The usage dashboard, rate-limit panel, project attribution, skills browser,

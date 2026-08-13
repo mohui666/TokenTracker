@@ -3,34 +3,30 @@ import { Link } from "react-router-dom";
 import { cn } from "../../lib/cn";
 import { getDashboardEntryPath } from "../../lib/host-mode";
 import { HeaderGithubStar } from "../components/HeaderGithubStar.jsx";
-import { InsforgeUserHeaderControls } from "../../components/InsforgeUserHeaderControls.jsx";
-import { useInsforgeAuth } from "../../contexts/InsforgeAuthContext.jsx";
-import { useLoginModal } from "../../contexts/LoginModalContext.jsx";
 import { STATUSPAGE_URL } from "../../lib/config";
 import { LV3_CSS_VARS } from "./v3/palette.js";
 import { PRIVACY_URL, REPO_URL } from "../../lib/config";
-import { useCommunityStats } from "../../hooks/use-community-stats.js";
 import { HeroSection } from "./v3/HeroSection.jsx";
 import { ToolsStrip } from "./v3/ToolsStrip.jsx";
 import { HowItWorksSection } from "./v3/HowItWorksSection.jsx";
 import { CapabilitiesSection } from "./v3/CapabilitiesSection.jsx";
 import { PrivacySection } from "./v3/PrivacySection.jsx";
-import { LeaderboardSection } from "./v3/LeaderboardSection.jsx";
 import { DownloadSection } from "./v3/DownloadSection.jsx";
+
+// Local-only build: there is no community backend, so the hero counters always
+// render their static fallback figures.
+const STATIC_STATS = { status: "idle" };
 
 /**
  * Landing v3 — "token galaxy". A dark, deep-space purple marketing page:
- * WebGL particle hero, GSAP ScrollTrigger storytelling, and live community
- * stats. Section markup lives under ./v3/; this file orchestrates them plus
- * the auth-aware header and the footer.
+ * WebGL particle hero and GSAP ScrollTrigger storytelling. Section markup
+ * lives under ./v3/; this file orchestrates them plus the header and footer.
  */
 export function MarketingLanding({
   copy,
   reduceMotion,
   screenshotMode,
   effectsReady,
-  signInUrl,
-  signUpUrl,
   installCommand,
   installCopied,
   onCopyInstallCommand,
@@ -46,13 +42,7 @@ export function MarketingLanding({
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const isLocalMode =
-    typeof window !== "undefined" &&
-    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
-  const { signedIn, loading: authLoading } = useInsforgeAuth();
-  const { openLoginModal } = useLoginModal();
-
-  const stats = useCommunityStats();
+  const stats = STATIC_STATS;
   const tokenFallback = Number(copy("landing.v3.stats.fallback_tokens")) || 0;
   const devsFallback = Number(copy("landing.v3.stats.fallback_devs")) || 0;
   const githubLabel = copy("landing.cta.secondary");
@@ -73,7 +63,7 @@ export function MarketingLanding({
         <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-3 sm:gap-5">
             <Link
-              to={signUpUrl || "/"}
+              to="/"
               className="flex items-center gap-3 no-underline outline-none rounded focus-visible:ring-2 focus-visible:ring-oai-brand-500 focus-visible:ring-offset-2 dark:ring-offset-oai-gray-950 transition-opacity hover:opacity-80"
             >
               <img src="/app-icon.png" alt="" width={24} height={24} className="rounded-md" />
@@ -86,51 +76,12 @@ export function MarketingLanding({
             </div>
           </div>
           <div className="flex items-center justify-end gap-3 sm:gap-5 md:gap-6">
-            {/* Leaderboard 纯文字导航链接 — 移动端收起（正文有醒目的榜单 CTA 兜底） */}
             <Link
-              to="/leaderboard"
-              className="hidden select-none text-sm font-medium text-oai-gray-400 outline-none transition-colors duration-200 hover:text-white focus-visible:underline sm:inline"
+              to={getDashboardEntryPath()}
+              className="inline-flex h-8 select-none items-center justify-center rounded-[8px] bg-white px-3.5 text-xs font-bold text-oai-gray-950 no-underline shadow-sm transition-all duration-200 hover:bg-oai-gray-100 active:scale-[0.98]"
             >
-              {copy("nav.leaderboard")}
+              {copy("landing.v2.cta.primary")}
             </Link>
-
-            {/* 未登录场景下，Open Dashboard 应该作为次级文字导航链接并排展示 */}
-            {!signedIn && !authLoading && (
-              <Link
-                to={getDashboardEntryPath()}
-                className="hidden select-none text-sm font-medium text-oai-gray-400 outline-none transition-colors duration-200 hover:text-white focus-visible:underline sm:inline"
-              >
-                {copy("landing.v2.cta.primary")}
-              </Link>
-            )}
-
-            {/* Dashboard / Sign In 按钮及头像区 */}
-            <div className="flex items-center gap-2.5 sm:gap-3.5">
-              {authLoading ? (
-                <div className="h-8 w-16 animate-pulse rounded-[8px] bg-white/10" aria-hidden />
-              ) : signedIn ? (
-                // 已登录：Open Dashboard 升级为主行动实色按钮
-                <>
-                  <Link
-                    to={getDashboardEntryPath()}
-                    className="inline-flex h-8 select-none items-center justify-center rounded-[8px] bg-white px-3.5 text-xs font-bold text-oai-gray-950 shadow-sm transition-all duration-200 hover:bg-oai-gray-100 active:scale-[0.98]"
-                  >
-                    {copy("landing.v2.cta.primary")}
-                  </Link>
-                  {/* 已登录时，优雅挂载头像控件 */}
-                  <InsforgeUserHeaderControls />
-                </>
-              ) : (
-                // 未登录：Sign In 展示为主行动实色按钮，点击唤起 Modal
-                <button
-                  type="button"
-                  onClick={openLoginModal}
-                  className="inline-flex h-8 min-w-[80px] select-none items-center justify-center rounded-[8px] bg-white px-3.5 text-xs font-bold text-oai-gray-950 shadow-sm transition-all duration-200 hover:bg-oai-gray-100 active:scale-[0.98]"
-                >
-                  {copy("header.auth.sign_in_aria")}
-                </button>
-              )}
-            </div>
           </div>
         </div>
       </header>
@@ -159,13 +110,6 @@ export function MarketingLanding({
         <ToolsStrip copy={copy} animate={animate} />
         <HowItWorksSection copy={copy} animate={animate} />
         <PrivacySection copy={copy} animate={animate} />
-        <LeaderboardSection
-          copy={copy}
-          animate={animate}
-          stats={stats}
-          tokenFallback={tokenFallback}
-          devsFallback={devsFallback}
-        />
         <DownloadSection
           copy={copy}
           animate={animate}
@@ -204,14 +148,6 @@ export function MarketingLanding({
             >
               {copy("landing.v2.nav.privacy")}
             </a>
-            {isLocalMode && (
-              <Link
-                to={signInUrl}
-                className="font-medium text-[color:var(--lv3-accent-soft)] transition-colors hover:text-white"
-              >
-                {copy("landing.cta.primary")} &rarr;
-              </Link>
-            )}
           </div>
         </div>
       </footer>

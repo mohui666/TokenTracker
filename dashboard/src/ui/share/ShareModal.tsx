@@ -1,8 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { copy } from "../../lib/copy";
 import { safeWriteClipboardImage } from "../../lib/safe-browser";
-import { useInsforgeAuth } from "../../contexts/InsforgeAuthContext.jsx";
+import { REPO_URL } from "../../lib/config";
 import {
   saveShareImageToDownloads,
   copyShareImageToClipboard,
@@ -75,16 +75,9 @@ export function ShareModal({ open, onClose, data, twitterText }: any) {
   const cardRef = useRef<HTMLDivElement | null>(null);
   const { toast, push } = useToast();
 
-  // Grab avatar URL from auth context for share card
-  const insforge = useInsforgeAuth();
-  const avatarUrl = useMemo(() => {
-    const user = insforge?.user;
-    if (!user || typeof user !== "object") return null;
-    const meta = (user as any).user_metadata || {};
-    const prof = (user as any).profile || {};
-    const u = meta.avatar_url || meta.picture || prof.avatar_url || (user as any).avatar_url;
-    return typeof u === "string" && u.trim() ? u.trim() : null;
-  }, [insforge?.user]);
+  // Local-only build: there is no account identity, so the card renders
+  // without an avatar.
+  const avatarUrl = null;
 
   // Reset state on open
   useEffect(() => {
@@ -205,13 +198,9 @@ export function ShareModal({ open, onClose, data, twitterText }: any) {
     }
     const intentUrl = new URL("https://twitter.com/intent/tweet");
     if (twitterText) intentUrl.searchParams.set("text", twitterText);
-    // Attach a clickable link so the tweet drives traffic back (and is
-    // attributable via ?ref=share). Point at the sharer's own profile when
-    // signed in so it lands on their stats + badge, not the generic homepage.
-    // Without `url` the X intent only carries the pasted image.
-    const shareUserId = (insforge?.user as any)?.id;
-    const sharePath = typeof shareUserId === "string" && shareUserId ? `/u/${shareUserId}` : "/";
-    intentUrl.searchParams.set("url", `https://www.tokentracker.cc${sharePath}?ref=share`);
+    // Attach a clickable link so the tweet carries more than the pasted
+    // image — without `url` the X intent only carries the image.
+    intentUrl.searchParams.set("url", REPO_URL);
     // Use location.href in native embed so WKUIDelegate.createWebView
     // (which intercepts window.open and opens in system browser) fires.
     // window.open with _blank sometimes navigates the WKWebView itself.
@@ -227,7 +216,7 @@ export function ShareModal({ open, onClose, data, twitterText }: any) {
       window.open(intentUrl.toString(), "_blank", "noopener,noreferrer");
     }
     setBusy(null);
-  }, [busy, ensureCardBlob, push, twitterText, buildFilename, insforge]);
+  }, [busy, ensureCardBlob, push, twitterText, buildFilename]);
 
 
   if (!open) return null;

@@ -6,10 +6,8 @@ import {
   getUsageLimitsPreloadContextKey,
   getDashboardPreloadSnapshot,
   preloadDashboardPageResource,
-  publishLeaderboardPreloadState,
   publishReusablePageState,
   publishUsageLimitsPreloadState,
-  readLeaderboardPreloadState,
   readReusablePageState,
   readUsageLimitsPreloadState,
   resetDashboardPreload,
@@ -39,14 +37,9 @@ describe("dashboard preload state", () => {
     expect(getDashboardPreloadSnapshot()).toMatchObject({
       cache: {
         limits: null,
-        leaderboard: {
-          maxEntries: 20,
-          size: 0,
-        },
       },
       targets: {
         limits: { resourceStatus: "idle", stateStatus: "idle", error: null },
-        leaderboard: { resourceStatus: "idle", stateStatus: "idle", error: null },
       },
     });
   });
@@ -163,74 +156,22 @@ describe("dashboard preload state", () => {
     expect(readUsageLimitsPreloadState()).toBeNull();
   });
 
-  it("keeps preloaded leaderboard state readable inside the same window session", () => {
-    const data = { rows: [{ user_id: "user-1", total_tokens: 100 }] };
-    const contextKey = buildDashboardPreloadContextKey("leaderboard", {
-      offset: 0,
-      pageSize: 20,
-      period: "total",
-      userId: "user-1",
-    });
-
-    publishLeaderboardPreloadState(data, {
-      contextKey,
-      generatedAt: Date.now() - 30_000,
-    });
-
-    expect(readLeaderboardPreloadState(contextKey)).toMatchObject({
-      status: "fulfilled",
-      data,
-    });
-  });
-
-  it("keeps leaderboard state scoped by context key", () => {
-    const contextKey = buildDashboardPreloadContextKey("leaderboard", {
-      offset: 0,
-      pageSize: 50,
-      period: "week",
-      userId: "user-1",
-    });
-    const data = { rows: [{ user_id: "user-1", total_tokens: 100 }] };
-
-    publishLeaderboardPreloadState(data, { contextKey, source: "silent-preload" });
-
-    expect(readLeaderboardPreloadState(contextKey)).toMatchObject({
-      targetKey: "leaderboard",
-      status: "fulfilled",
-      data,
-      source: "silent-preload",
-      contextKey,
-    });
-    expect(
-      readLeaderboardPreloadState(
-        buildDashboardPreloadContextKey("leaderboard", {
-          offset: 50,
-          pageSize: 50,
-          period: "week",
-          userId: "user-1",
-        }),
-      ),
-    ).toBeNull();
-  });
-
   it("uses state.context when publishing generic reusable page state", () => {
     const context = {
-      offset: 0,
-      pageSize: 50,
-      period: "week",
-      userId: "user-1",
+      baseUrl: "http://localhost:7680",
+      mode: "local",
     };
-    const contextKey = buildDashboardPreloadContextKey("leaderboard", context);
-    const data = { rows: [{ user_id: "user-1", total_tokens: 100 }] };
+    const contextKey = buildDashboardPreloadContextKey("limits", context);
+    const data = { usage: { daily: 10 } };
 
-    publishReusablePageState("leaderboard", { data, context });
+    publishReusablePageState("limits", { data, context });
 
-    expect(readReusablePageState("leaderboard", contextKey)).toMatchObject({
+    expect(readReusablePageState("limits", contextKey)).toMatchObject({
       status: "fulfilled",
       data,
       contextKey,
     });
-    expect(readReusablePageState("leaderboard", buildDashboardPreloadContextKey("leaderboard"))).toBeNull();
+    expect(readReusablePageState("limits", buildDashboardPreloadContextKey("limits"))).toBeNull();
   });
 
   it("reuses pending and fulfilled resource preloads for duplicate calls", async () => {
@@ -257,34 +198,32 @@ describe("dashboard preload state", () => {
   it("records resource failures internally without throwing to callers", async () => {
     const loader = vi.fn(() => Promise.reject(new Error("chunk unavailable")));
 
-    await expect(preloadDashboardPageResource("leaderboard", { loader })).resolves.toBeNull();
+    await expect(preloadDashboardPageResource("limits", { loader })).resolves.toBeNull();
 
-    expect(getDashboardPreloadSnapshot().targets.leaderboard).toMatchObject({
+    expect(getDashboardPreloadSnapshot().targets.limits).toMatchObject({
       resourceStatus: "rejected",
       error: "chunk unavailable",
     });
   });
 
   it("does not let skipped state overwrite existing fulfilled page data cache", () => {
-    const contextKey = buildDashboardPreloadContextKey("leaderboard", {
-      offset: 0,
-      pageSize: 20,
-      period: "total",
+    const contextKey = buildDashboardPreloadContextKey("limits", {
+      baseUrl: "http://localhost:7680",
     });
-    const data = { rows: [{ user_id: "user-1", total_tokens: 100 }] };
+    const data = { usage: { daily: 10 } };
 
-    publishLeaderboardPreloadState(data, { contextKey });
-    publishLeaderboardPreloadState(null, {
+    publishUsageLimitsPreloadState(data, { contextKey });
+    publishUsageLimitsPreloadState(null, {
       contextKey,
       status: "skipped",
       error: "auth-loading",
     });
 
-    expect(getDashboardPreloadSnapshot().targets.leaderboard).toMatchObject({
+    expect(getDashboardPreloadSnapshot().targets.limits).toMatchObject({
       stateStatus: "skipped",
       error: "auth-loading",
     });
-    expect(readLeaderboardPreloadState(contextKey)).toMatchObject({
+    expect(readUsageLimitsPreloadState(contextKey)).toMatchObject({
       status: "fulfilled",
       data,
     });
@@ -309,28 +248,26 @@ describe("dashboard preload state", () => {
   });
 
   it("clears stale target errors when window-session cache becomes fulfilled", () => {
-    const contextKey = buildDashboardPreloadContextKey("leaderboard", {
-      offset: 0,
-      pageSize: 50,
-      period: "week",
+    const contextKey = buildDashboardPreloadContextKey("limits", {
+      baseUrl: "http://localhost:7680",
     });
 
-    publishLeaderboardPreloadState(null, {
+    publishUsageLimitsPreloadState(null, {
       contextKey,
       status: "rejected",
       error: "network down",
     });
-    expect(getDashboardPreloadSnapshot().targets.leaderboard.error).toBe("network down");
+    expect(getDashboardPreloadSnapshot().targets.limits.error).toBe("network down");
 
-    publishLeaderboardPreloadState({ rows: [] }, { contextKey });
+    publishUsageLimitsPreloadState({ usage: { daily: 12 } }, { contextKey });
 
-    expect(getDashboardPreloadSnapshot().targets.leaderboard).toMatchObject({
+    expect(getDashboardPreloadSnapshot().targets.limits).toMatchObject({
       stateStatus: "fulfilled",
       error: null,
     });
-    expect(readLeaderboardPreloadState(contextKey)).toMatchObject({
+    expect(readUsageLimitsPreloadState(contextKey)).toMatchObject({
       status: "fulfilled",
-      data: { rows: [] },
+      data: { usage: { daily: 12 } },
       error: null,
     });
   });
@@ -346,16 +283,6 @@ describe("dashboard preload state", () => {
     vi.stubGlobal("indexedDB", indexedDB);
 
     publishUsageLimitsPreloadState({ usage: { daily: 12 } });
-    publishLeaderboardPreloadState(
-      { rows: [{ user_id: "user-1", total_tokens: 100 }] },
-      {
-        contextKey: buildDashboardPreloadContextKey("leaderboard", {
-          offset: 0,
-          pageSize: 20,
-          period: "total",
-        }),
-      },
-    );
 
     expect(readUsageLimitsPreloadState()).toMatchObject({ status: "fulfilled" });
     expect(localStorageSetItem).not.toHaveBeenCalled();
@@ -366,12 +293,12 @@ describe("dashboard preload state", () => {
 });
 
 describe("dashboard preload route boundary", () => {
-  it("keeps NativeAuthCallbackPage eager-imported while target pages stay lazy-loaded", () => {
+  it("keeps target pages lazy-loaded and free of removed cloud routes", () => {
     const appSource = readFileSync(join(process.cwd(), "src/App.jsx"), "utf8");
 
-    expect(appSource).toContain('import { NativeAuthCallbackPage } from "./pages/NativeAuthCallbackPage.jsx";');
-    expect(appSource).not.toMatch(/const\s+NativeAuthCallbackPage\s*=\s*lazy\(/);
     expect(appSource).toContain('import("./pages/LimitsPage.jsx")');
-    expect(appSource).toContain('import("./pages/LeaderboardPage.jsx")');
+    expect(appSource).not.toContain("LeaderboardPage");
+    expect(appSource).not.toContain("NativeAuthCallbackPage");
+    expect(appSource).not.toContain("LoginPage");
   });
 });

@@ -101,7 +101,7 @@ test("repairCodebuddyLogJsonlOverlap rebuilds old log+JSONL double counts atomic
     const codebuddyRows = lines.filter((row) => row.source === "codebuddy");
     assert.equal(codebuddyRows.length, 1);
     assert.equal(codebuddyRows[0].total_tokens, 110);
-    assert.equal(JSON.parse(await fs.readFile(queueStatePath, "utf8")).offset, 0);
+    assert.equal(JSON.parse(await fs.readFile(queueStatePath, "utf8")).offset, 123);
 
     const changedAgain = await repairCodebuddyLogJsonlOverlap({
       cursors,
@@ -201,7 +201,7 @@ test("repairCodebuddyLogJsonlOverlap preserves distinct legacy log rounds", asyn
     );
     const rows = (await fs.readFile(queuePath, "utf8")).trim().split("\n").map((line) => JSON.parse(line));
     assert.equal(rows.filter((row) => row.source === "codebuddy")[0].total_tokens, 1650);
-    assert.equal(JSON.parse(await fs.readFile(queueStatePath, "utf8")).offset, 0);
+    assert.equal(JSON.parse(await fs.readFile(queueStatePath, "utf8")).offset, 42);
   } finally {
     await fs.rm(tmp, { recursive: true, force: true });
   }

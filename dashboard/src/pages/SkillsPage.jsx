@@ -34,23 +34,18 @@ import {
   checkSkillUpdates,
   deleteLocalSkill,
   discoverSkills,
-  getAccountSkillInventories,
   getInstalledSkills,
   getPopularSkills,
   getSkillRepos,
   getSkillUsage,
   importLocalSkill,
   installSkill,
-  publishSkillInventory,
   removeSkillRepo,
   restoreSkill,
   searchSkills,
   setSkillTargets,
   uninstallSkill,
 } from "../lib/skills-api";
-import { mergeSkillInventories } from "../lib/skills-inventory";
-import { useInsforgeAuth } from "../contexts/InsforgeAuthContext.jsx";
-import { getCloudSyncEnabled, getCurrentDeviceId } from "../lib/cloud-sync-prefs";
 
 const DEFAULT_TARGETS = ["claude", "codex"];
 const SOURCE_POPULAR = "popular";
@@ -812,9 +807,6 @@ function readTabFromUrl() {
 }
 
 export function SkillsPage() {
-  const auth = useInsforgeAuth() || {};
-  const signedIn = Boolean(auth.signedIn);
-  const getAccessToken = auth.getAccessToken;
   const [tab, setTab] = useState(readTabFromUrl);
   const [installedData, setInstalledData] = useState({ skills: [], targets: [] });
   const [discoverData, setDiscoverData] = useState([]);
@@ -841,43 +833,15 @@ export function SkillsPage() {
   const [popularData, setPopularData] = useState([]);
   const [popularLoading, setPopularLoading] = useState(false);
   const appliedSkillParam = useRef(false);
-  const cloudInventoryRequest = useRef(0);
 
   const installedKeys = useMemo(() => {
     return buildLocallyInstalledKeys(installedData.skills);
   }, [installedData.skills]);
 
   const loadInstalled = useCallback(async () => {
-    const requestId = ++cloudInventoryRequest.current;
     const data = await getInstalledSkills();
-    if (cloudInventoryRequest.current !== requestId) return;
-    const localData = { skills: data.skills || [], targets: data.targets || [] };
-    setInstalledData(localData);
-
-    const deviceId = getCurrentDeviceId();
-    if (!signedIn || !getCloudSyncEnabled() || !deviceId || typeof getAccessToken !== "function") return;
-    // Cloud inventory is a best-effort enrichment. Local Skills render
-    // immediately and remain usable if auth/network/backend sync is unavailable.
-    void (async () => {
-      try {
-        const accessToken = await getAccessToken();
-        if (!accessToken || cloudInventoryRequest.current !== requestId) return;
-        const [cloudResult] = await Promise.allSettled([
-          getAccountSkillInventories(accessToken),
-          publishSkillInventory({ accessToken, deviceId, skills: localData.skills }),
-        ]);
-        if (cloudResult.status !== "fulfilled") return;
-        const cloud = cloudResult.value;
-        if (cloudInventoryRequest.current !== requestId) return;
-        setInstalledData({
-          targets: localData.targets,
-          skills: mergeSkillInventories(localData.skills, cloud, deviceId),
-        });
-      } catch (_e) {
-        // Deliberately silent: a cloud outage must not break local management.
-      }
-    })();
-  }, [getAccessToken, signedIn]);
+    setInstalledData({ skills: data.skills || [], targets: data.targets || [] });
+  }, []);
 
   const loadRepos = useCallback(async () => {
     const data = await getSkillRepos();

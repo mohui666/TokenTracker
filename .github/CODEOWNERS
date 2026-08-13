@@ -4,21 +4,21 @@
 # advisory until there are additional collaborators.
 
 # Default owner for everything not matched below.
-*                                         @xiufengsun
+*                                         @mohui666
 
 # Token parsing & dedup — correctness-critical (see CLAUDE.md "Parser correctness").
-/src/lib/rollout.js                       @xiufengsun
-/src/commands/sync.js                     @xiufengsun
-/src/lib/cursor-config.js                 @xiufengsun
+/src/lib/rollout.js                       @mohui666
+/src/commands/sync.js                     @mohui666
+/src/lib/cursor-config.js                 @mohui666
 
 # Pricing tables — must stay in sync across all locations or the cloud bills $0.
-/src/lib/pricing/                         @xiufengsun
+/src/lib/pricing/                         @mohui666
 
 # Local API surface (public-exposure risk layer).
-/src/lib/local-api.js                     @xiufengsun
+/src/lib/local-api.js                     @mohui666
 
 # Release & CI plumbing.
-/.github/                                 @xiufengsun
-/package.json                             @xiufengsun
-/TokenTrackerBar/project.yml              @xiufengsun
-/TokenTrackerWin/TokenTrackerWin.csproj   @xiufengsun
+/.github/                                 @mohui666
+/package.json                             @mohui666
+/TokenTrackerBar/project.yml              @mohui666
+/TokenTrackerWin/TokenTrackerWin.csproj   @mohui666

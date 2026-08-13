@@ -33,9 +33,6 @@ const {
   describeCopilotOtelStatus,
   readCopilotOauthToken,
 } = require("../lib/usage-limits");
-const {
-  normalizeState: normalizeUploadState,
-} = require("../lib/upload-throttle");
 const { collectTrackerDiagnostics } = require("../lib/diagnostics");
 const { detectPassiveProviders, isPassiveModeActive } = require("../lib/passive-mode");
 const { probeOpenclawHookState } = require("../lib/openclaw-hook");
@@ -150,15 +147,11 @@ async function cmdStatus(argv = []) {
 
   const home = os.homedir();
   const { trackerDir, binDir } = await resolveTrackerPaths({ home });
-  const configPath = path.join(trackerDir, "config.json");
   const queuePath = path.join(trackerDir, "queue.jsonl");
-  const queueStatePath = path.join(trackerDir, "queue.state.json");
   const cursorsPath = path.join(trackerDir, "cursors.json");
   const notifySignalPath = path.join(trackerDir, "notify.signal");
   const openclawSignalPath = path.join(trackerDir, "openclaw.signal");
   const throttlePath = path.join(trackerDir, "sync.throttle");
-  const uploadThrottlePath = path.join(trackerDir, "upload.throttle.json");
-  const autoRetryPath = path.join(trackerDir, "auto.retry.json");
   const syncSkipPath = path.join(trackerDir, "sync.skip.json");
   const codexHome = process.env.CODEX_HOME || path.join(home, ".codex");
   const codexConfigPath = path.join(codexHome, "config.toml");
@@ -188,19 +181,12 @@ async function cmdStatus(argv = []) {
   const workbuddyHookCommand = buildHookCommand(notifyPath, "workbuddy");
   const geminiHookCommand = buildGeminiHookCommand(notifyPath);
 
-  const config = await readJson(configPath);
   const { cursors } = await readCursorStateSummary({ trackerDir, cursorsPath });
-  const queueState = (await readJson(queueStatePath)) || { offset: 0 };
-  const uploadThrottle = normalizeUploadState(
-    await readJson(uploadThrottlePath),
-  );
-  const autoRetry = await readJson(autoRetryPath);
   // Written by sync whenever it had to skip a run. Present here so a stalled
   // parse has a visible cause instead of only a frozen "Last parse".
   const syncSkip = await readJson(syncSkipPath);
 
   const queueSize = await safeStatSize(queuePath);
-  const pendingBytes = Math.max(0, queueSize - (queueState.offset || 0));
 
   const lastNotify = (await safeReadText(notifySignalPath))?.trim() || null;
   const lastOpenclawSync =
@@ -247,26 +233,10 @@ async function cmdStatus(argv = []) {
     env: process.env,
   });
 
-  const lastUpload = uploadThrottle.lastSuccessMs
-    ? parseEpochMsToIso(uploadThrottle.lastSuccessMs)
-    : typeof queueState.updatedAt === "string"
-      ? queueState.updatedAt
-      : null;
-  const nextUpload = parseEpochMsToIso(uploadThrottle.nextAllowedAtMs || null);
-  const backoffUntil = parseEpochMsToIso(uploadThrottle.backoffUntilMs || null);
-  const lastUploadError = uploadThrottle.lastError
-    ? `${uploadThrottle.lastErrorAt || "unknown"} ${uploadThrottle.lastError}`
-    : null;
   const syncSkipLine = syncSkip?.at
     ? `- Last sync skipped: ${syncSkip.at} (${syncSkip.reason || "unknown"}${
         syncSkip.detail ? `, ${syncSkip.detail}` : ""
       })`
-    : null;
-  const autoRetryAt = parseEpochMsToIso(autoRetry?.retryAtMs || null);
-  const autoRetryLine = autoRetryAt
-    ? `- Auto retry after: ${autoRetryAt} (${autoRetry?.reason || "scheduled"}, pending ${Number(
-        autoRetry?.pendingBytes || 0,
-      )} bytes)`
     : null;
 
   const subscriptions = await collectLocalSubscriptions({
@@ -794,23 +764,14 @@ async function cmdStatus(argv = []) {
     const summary = {
       version: pkg.version,
       generated_at: new Date().toISOString(),
-      base_url: config?.baseUrl || null,
-      device_token_set: Boolean(config?.deviceToken),
       queue: {
-        pending_bytes: pendingBytes,
         size_bytes: queueSize,
-        offset: queueState.offset || 0,
       },
       last_parse: cursors?.updatedAt || null,
       last_notify: lastNotify || null,
       last_openclaw_sync: lastOpenclawSync || null,
       last_notify_spawn: lastNotifySpawn || null,
-      last_upload: lastUpload || null,
-      next_upload_after: nextUpload || null,
-      backoff_until: backoffUntil || null,
-      last_upload_error: lastUploadError || null,
       last_sync_skipped: syncSkip?.at ? syncSkip : null,
-      auto_retry: autoRetry || null,
       hooks: {
         codex_notify: notifyConfigured,
         every_code_notify: everyCodeConfigured,
@@ -953,19 +914,12 @@ async function cmdStatus(argv = []) {
     [
       `TokenTracker v${pkg.version}`,
       "Status:",
-      `- Base URL: ${config?.baseUrl || "unset"}`,
-      `- Device token: ${config?.deviceToken ? "set" : "unset"}`,
-      `- Queue: ${pendingBytes} bytes pending`,
+      `- Queue size: ${queueSize} bytes`,
       `- Last parse: ${cursors?.updatedAt || "never"}`,
       `- Last notify: ${lastNotify || "never"}`,
       `- Last OpenClaw-triggered sync: ${lastOpenclawSync || "never"}`,
       `- Last notify-triggered sync: ${lastNotifySpawn || "never"}`,
-      `- Last upload: ${lastUpload || "never"}`,
-      `- Next upload after: ${nextUpload || "never"}`,
-      `- Backoff until: ${backoffUntil || "never"}`,
-      lastUploadError ? `- Last upload error: ${lastUploadError}` : null,
       syncSkipLine,
-      autoRetryLine,
       `- Codex notify: ${notifyConfigured ? JSON.stringify(codexNotify) : "unset"}`,
       `- Every Code notify: ${everyCodeConfigured ? JSON.stringify(everyCodeNotify) : "unset"}`,
       `- Claude hooks: ${claudeHookConfigured ? "set" : "unset"}`,
@@ -1227,16 +1181,9 @@ function renderLightTable(summary) {
   const push = (k, v) => rows.push([k, v == null || v === "" ? "—" : String(v)]);
 
   push("Version", summary.version);
-  push("Base URL", summary.base_url);
-  push("Device token", summary.device_token_set ? "set" : "unset");
-  push("Queue pending (bytes)", summary.queue.pending_bytes);
   push("Queue size (bytes)", summary.queue.size_bytes);
   push("Last parse", summary.last_parse);
   push("Last notify", summary.last_notify);
-  push("Last upload", summary.last_upload);
-  push("Next upload after", summary.next_upload_after);
-  push("Backoff until", summary.backoff_until);
-  if (summary.last_upload_error) push("Last upload error", summary.last_upload_error);
   if (summary.last_sync_skipped) {
     push(
       "Last sync skipped",

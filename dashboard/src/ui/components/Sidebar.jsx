@@ -4,11 +4,9 @@ import {
   Award,
   BarChart3,
   Gauge,
-  Trophy,
   History,
   LayoutGrid,
   PawPrint,
-  Globe,
   Puzzle,
   Activity,
   Settings as SettingsIcon,
@@ -25,7 +23,6 @@ import { cn } from "../../lib/cn";
 import { useTheme } from "../../hooks/useTheme.js";
 import { useLocale } from "../../hooks/useLocale.js";
 import { shouldFetchGithubStars } from "../dashboard/util/should-fetch-github-stars.js";
-import { InsforgeUserHeaderControls } from "../../components/InsforgeUserHeaderControls.jsx";
 import { isNativeApp, isNativeEmbed, isNativeWindowsApp } from "../../lib/native-bridge.js";
 
 const STORAGE_KEY = "tt.sidebarCollapsed";
@@ -41,7 +38,6 @@ export function getNavGroups() {
         { id: "usage", to: "/dashboard", icon: BarChart3, label: copy("nav.usage") },
         { id: "sessions", to: "/sessions", icon: History, label: copy("nav.sessions") },
         { id: "limits", to: "/limits", icon: Gauge, label: copy("nav.limits") },
-        { id: "leaderboard", to: "/leaderboard", icon: Trophy, label: copy("nav.leaderboard") },
         { id: "achievements", to: "/achievements", icon: Award, label: copy("nav.achievements") },
       ],
     },
@@ -52,7 +48,6 @@ export function getNavGroups() {
         { id: "widgets", to: "/widgets", icon: LayoutGrid, label: copy("nav.widgets") },
         { id: "pet", to: "/pet-settings", icon: PawPrint, label: copy("nav.pet") },
         { id: "skills", to: "/skills", icon: Puzzle, label: copy("nav.skills") },
-        { id: "ip-check", to: "/ip-check", icon: Globe, label: copy("nav.ip_check") },
         { id: "service-status", to: "/service-status", icon: Activity, label: copy("nav.service_status") },
       ],
     },
@@ -109,9 +104,6 @@ function isActive(pathname, to) {
   const normalized = pathname.replace(/\/+$/, "") || "/";
   if (to === "/dashboard") {
     return normalized === "/dashboard" || normalized === "/";
-  }
-  if (to === "/leaderboard") {
-    return normalized === "/leaderboard" || normalized.startsWith("/leaderboard/");
   }
   return normalized === to;
 }
@@ -183,7 +175,7 @@ function IconButton({ as = "button", title, onClick, href, children, className: 
  * Refined GitHub Star pill — Linear "Free plan" style: bordered, tight, with text + count.
  * `glassChrome`: Mac 侧栏毛玻璃上：gray-500 描边 — 亮色 /20 更淡，暗色 dark:/30 保持可见。
  */
-function StarPill({ repo = "xiufengsun/TokenTracker", glassChrome = false }) {
+function StarPill({ repo = "mohui666/TokenTracker", glassChrome = false }) {
   const [stars, setStars] = useState(null);
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -304,6 +296,29 @@ function ThemePill({ theme, resolvedTheme, onSetTheme, glassChrome = false }) {
 }
 
 /**
+ * SidebarBrand — local-only replacement for the old account header controls:
+ * just the app icon + name, linking back to the dashboard.
+ */
+function SidebarBrand({ collapsed, onClick }) {
+  const brandName = "Token Tracker";
+  return (
+    <Link
+      to="/dashboard"
+      onClick={onClick}
+      aria-label={brandName}
+      className="flex h-10 items-center gap-2 rounded-md px-2 no-underline transition-colors hover:bg-oai-gray-200/50 dark:hover:bg-oai-gray-800/60"
+    >
+      <img src="/app-icon.png" alt="" width={20} height={20} className="shrink-0 rounded" />
+      {!collapsed && (
+        <span className="truncate text-[13px] font-semibold text-oai-black dark:text-oai-white">
+          {brandName}
+        </span>
+      )}
+    </Link>
+  );
+}
+
+/**
  * SidebarBody — shared markup used by both desktop sticky Sidebar and mobile Drawer.
  *
  * @param {boolean} collapsed - desktop collapsed state (always false in mobile drawer)
@@ -323,16 +338,12 @@ function SidebarBody({ collapsed, onToggleCollapsed, onItemClick, showCloseButto
 
   return (
     <>
-      {/* Top: identity only — full-width, aligned with nav items (px-2) */}
+      {/* Top: brand only — full-width, aligned with nav items (px-2) */}
       <div className={cn("px-2 pt-2 pb-2", collapsed && "flex justify-center")}>
         {showCloseButton ? (
           <div className="flex items-center gap-2">
             <div className="flex-1 min-w-0">
-              <InsforgeUserHeaderControls
-                variant="sidebar"
-                collapsed={collapsed}
-                onAfterAction={onItemClick}
-              />
+              <SidebarBrand collapsed={collapsed} onClick={onItemClick} />
             </div>
             <button
               type="button"
@@ -345,11 +356,7 @@ function SidebarBody({ collapsed, onToggleCollapsed, onItemClick, showCloseButto
             </button>
           </div>
         ) : (
-          <InsforgeUserHeaderControls
-            variant="sidebar"
-            collapsed={collapsed}
-            onAfterAction={onItemClick}
-          />
+          <SidebarBrand collapsed={collapsed} onClick={onItemClick} />
         )}
       </div>
 

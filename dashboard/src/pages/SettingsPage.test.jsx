@@ -19,7 +19,6 @@ const LABELS = {
   "settings.page.subtitle": "Manage your preferences",
   "settings.section.appearance": "Appearance",
   "settings.section.menubar": "Menu Bar App",
-  "settings.section.account": "Account",
   "settings.section.limits": "Limits Display",
   "settings.section.labs": "Labs",
   "settings.limits.providers": "Providers",
@@ -62,10 +61,6 @@ vi.mock("../components/settings/AppearanceSection.jsx", () => ({
 vi.mock("../components/settings/MenuBarSection.jsx", () => ({
   MenuBarSection: () => <div data-testid="native-content" />,
   NativeAppFooter: () => <footer data-testid="settings-footer" />,
-}));
-
-vi.mock("../components/settings/AccountSection.jsx", () => ({
-  AccountSection: () => <div data-testid="account-content" />,
 }));
 
 vi.mock("../components/settings/LabsSection.jsx", () => ({
@@ -124,24 +119,24 @@ describe("SettingsPage category navigation", () => {
     const { container } = renderSettings();
 
     const appearanceButton = screen.getByRole("button", { name: "Appearance" });
-    const accountButton = screen.getByRole("button", { name: "Account" });
+    const labsButton = screen.getByRole("button", { name: "Labs" });
     const appearancePanel = container.querySelector('[data-settings-panel="appearance"]');
-    const accountPanel = container.querySelector('[data-settings-panel="account"]');
+    const labsPanel = container.querySelector('[data-settings-panel="labs"]');
 
     expect(appearanceButton).toHaveAttribute("aria-current", "page");
     expect(appearancePanel).not.toHaveAttribute("hidden");
-    expect(accountPanel).toHaveAttribute("hidden");
+    expect(labsPanel).toHaveAttribute("hidden");
     expect(screen.getByTestId("appearance-content")).toBeInTheDocument();
-    expect(screen.getByTestId("account-content")).toBeInTheDocument();
+    expect(screen.getByTestId("labs-content")).toBeInTheDocument();
 
     await act(async () => {
-      await user.click(accountButton);
+      await user.click(labsButton);
     });
 
-    expect(accountButton).toHaveAttribute("aria-current", "page");
+    expect(labsButton).toHaveAttribute("aria-current", "page");
     expect(appearanceButton).not.toHaveAttribute("aria-current");
     expect(appearancePanel).toHaveAttribute("hidden");
-    expect(accountPanel).not.toHaveAttribute("hidden");
+    expect(labsPanel).not.toHaveAttribute("hidden");
   });
 
   it("omits the native-app category when the native bridge is unavailable", () => {

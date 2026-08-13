@@ -28,7 +28,7 @@ internal sealed class UpdateChecker
     public enum UpdateState { Idle, Checking, UpdateAvailable, Downloading, Installing }
     public enum CheckOutcome { UpToDate, UpdateAvailable, Failed, Skipped }
 
-    private const string Repo = "xiufengsun/TokenTracker";
+    private const string Repo = "mohui666/TokenTracker";
 
     // External host (github.com): keep the DEFAULT proxy behaviour so CN proxy/VPN
     // users can reach it. The long timeout covers the installer download; the quick

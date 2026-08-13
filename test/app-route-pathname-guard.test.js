@@ -15,28 +15,78 @@ async function parseDashboardFile(relativePath) {
   });
 }
 
+function readAppSource() {
+  return fs.readFileSync(path.join(repoRoot, "dashboard/src/App.jsx"), "utf8");
+}
+
 test("App.jsx parses without duplicate identifier errors", async () => {
   await assert.doesNotReject(parseDashboardFile("dashboard/src/App.jsx"));
 });
 
-test("App.jsx routes to /leaderboard page", () => {
-  const appPath = path.join(repoRoot, "dashboard/src/App.jsx");
-  const source = fs.readFileSync(appPath, "utf8");
-  assert.equal(source.includes('"/rankings"'), false, "Removed /rankings route should not exist");
-  assert.equal(source.includes('"/leaderboard"'), true, "/leaderboard route should exist");
-  assert.equal(source.includes("LeaderboardPage"), true, "LeaderboardPage should be referenced");
+test("App.jsx no longer routes to removed cloud/hosted pages", () => {
+  const source = readAppSource();
+  for (const gone of [
+    '"/leaderboard"',
+    '"/login"',
+    '"/reset-password"',
+    '"/auth/callback"',
+    '"/auth/native-callback"',
+    '"/device"',
+    '"/ip-check"',
+    '"/share',
+    '"/u/',
+  ]) {
+    assert.equal(source.includes(gone), false, `Removed route ${gone} should not exist`);
+  }
+  for (const gone of [
+    "LeaderboardPage",
+    "LeaderboardProfilePage",
+    "LoginPage",
+    "ResetPasswordPage",
+    "NativeAuthCallbackPage",
+    "DevicePage",
+    "IpCheckPage",
+  ]) {
+    assert.equal(source.includes(gone), false, `${gone} should not be referenced`);
+  }
 });
 
-test("App.jsx routes to /login page", () => {
-  const appPath = path.join(repoRoot, "dashboard/src/App.jsx");
-  const source = fs.readFileSync(appPath, "utf8");
-  assert.equal(source.includes('"/login"'), true, "/login route should exist");
-  assert.equal(source.includes("LoginPage"), true, "LoginPage should be referenced");
+test("App.jsx keeps the local route set", () => {
+  const source = readAppSource();
+  for (const route of [
+    '"/dashboard"',
+    '"/landing"',
+    '"/limits"',
+    '"/settings"',
+    '"/skills"',
+    '"/sessions"',
+    '"/widgets"',
+    '"/pet-settings"',
+    '"/service-status"',
+    '"/achievements"',
+    '"/wrapped"',
+  ]) {
+    assert.equal(source.includes(route), true, `${route} route should exist`);
+  }
+  for (const page of [
+    "DashboardPage",
+    "LimitsPage",
+    "SettingsPage",
+    "SkillsPage",
+    "SessionsPage",
+    "WidgetsPage",
+    "PetPage",
+    "ServiceStatusPage",
+    "AchievementsPage",
+    "WrappedPage",
+    "LandingPage",
+  ]) {
+    assert.equal(source.includes(page), true, `${page} should be referenced`);
+  }
 });
 
 test("App.jsx keeps menu bar configuration inside /widgets", () => {
-  const appPath = path.join(repoRoot, "dashboard/src/App.jsx");
-  const source = fs.readFileSync(appPath, "utf8");
+  const source = readAppSource();
   assert.equal(source.includes('"/widgets"'), true, "/widgets route should exist");
   assert.equal(source.includes("WidgetsPage"), true, "WidgetsPage should be referenced");
   assert.equal(source.includes('"/menubar"'), false, "/menubar should not be a separate route");
@@ -44,8 +94,7 @@ test("App.jsx keeps menu bar configuration inside /widgets", () => {
 });
 
 test("App.jsx routes to the desktop pet settings page", () => {
-  const appPath = path.join(repoRoot, "dashboard/src/App.jsx");
-  const source = fs.readFileSync(appPath, "utf8");
+  const source = readAppSource();
   assert.equal(source.includes('"/pet-settings"'), true, "/pet-settings route should exist");
   assert.equal(source.includes("PetPage"), true, "PetPage should be lazy-loaded and referenced");
 });

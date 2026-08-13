@@ -30,23 +30,6 @@ const MOCK_PROJECT_REPOS = [
   "lumen/core",
   "delta/horizon",
 ];
-const MOCK_LEADERBOARD_NAMES = [
-  "NEO",
-  "TRINITY",
-  "MORPHEUS",
-  "ORACLE",
-  "CYPHER",
-  "SWITCH",
-  "APOC",
-  "TANK",
-  "SMITH",
-  "SERAPH",
-  "NIOBE",
-  "MOUSE",
-  "DOZER",
-  "LINK",
-  "BLADE",
-];
 
 export function isMockEnabled() {
   if (typeof window !== "undefined") {
@@ -584,56 +567,6 @@ export function getMockProjectUsageDetail({ projectKey, from, to }: AnyRecord = 
   };
 }
 
-function computeLeaderboardWindow(period: string) {
-  const today = parseUtcDate(formatDateLocal(new Date())) || new Date();
-  const safe =
-    String(period || "week")
-      .trim()
-      .toLowerCase() || "week";
-
-  if (safe === "total") {
-    return { from: "1970-01-01", to: "9999-12-31" };
-  }
-
-  if (safe === "month") {
-    const fromDate = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
-    const toDate = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 0));
-    return { from: formatDateUTC(fromDate), to: formatDateUTC(toDate) };
-  }
-
-  const dow = today.getUTCDay(); // 0=Sunday
-  const from = formatDateUTC(addUtcDays(today, -dow));
-  const to = formatDateUTC(addUtcDays(today, -dow + 6));
-  return { from, to };
-}
-
-const MOCK_BADGE_IDS = [
-  "token_titan",
-  "big_day",
-  "wordsmith",
-  "marathoner",
-  "streak",
-  "weekend_warrior",
-  "momentum",
-  "polyglot",
-  "trendsetter",
-  "multitool",
-  "podium",
-  "veteran",
-];
-
-/** Deterministic compact badge list (0–3 entries) for a mock leaderboard row. */
-function mockCompactBadges(id: number): Array<{ id: string; tier: number }> {
-  const count = id % 4; // 0..3 badges
-  const badges: Array<{ id: string; tier: number }> = [];
-  for (let i = 0; i < count; i += 1) {
-    const badgeId = MOCK_BADGE_IDS[(id * 3 + i * 5) % MOCK_BADGE_IDS.length];
-    if (badges.some((b) => b.id === badgeId)) continue;
-    badges.push({ id: badgeId, tier: 4 - i > 0 ? ((id + i) % 4) + 1 : 1 });
-  }
-  return badges.sort((a, b) => b.tier - a.tier);
-}
-
 /** Local achievements payload for dashboard:dev — mixed tiers + progress. */
 export function getMockAchievements() {
   const now = Date.now();
@@ -645,13 +578,12 @@ export function getMockAchievements() {
     thresholds: number[],
     meta: AnyRecord = {},
   ) => {
-    const isCloud = !["project_hopper", "project_devotion", "night_owl"].includes(id);
     return {
       id,
       tier,
       metric_value: value,
       thresholds,
-      lower_is_better: id === "podium",
+      lower_is_better: false,
       next_threshold: tier >= 4 ? null : thresholds[tier],
       achieved: {
         bronze: tier >= 1 ? iso(90) : null,
@@ -659,14 +591,6 @@ export function getMockAchievements() {
         gold: tier >= 3 ? iso(12) : null,
         diamond: tier >= 4 ? iso(2) : null,
       },
-      serials: isCloud
-        ? {
-            bronze: tier >= 1 ? 127 + id.length : null,
-            silver: tier >= 2 ? 64 + id.length : null,
-            gold: tier >= 3 ? 18 + id.length : null,
-            diamond: tier >= 4 ? 3 + id.length : null,
-          }
-        : undefined,
       meta,
     };
   };
@@ -681,183 +605,12 @@ export function getMockAchievements() {
       make("weekend_warrior", 2, 26, [5, 20, 50, 100]),
       make("momentum", 0, 1.2, [2, 6, 15, 40]),
       make("polyglot", 1, 11, [5, 15, 30, 60], { favorite_model: "claude-opus-4-7" }),
-      make("trendsetter", 2, 7, [2, 5, 10, 20]),
       make("multitool", 3, 7, [2, 4, 6, 10]),
-      make("podium", 1, 42, [100, 30, 10, 3]),
       make("veteran", 2, 132, [30, 90, 180, 365], { first_day: iso(132).slice(0, 10) }),
       make("project_hopper", 2, 6, [3, 5, 10, 20]),
       make("project_devotion", 3, 240_000_000, [1_000_000, 10_000_000, 100_000_000, 1_000_000_000], { project_key: "mock" }),
       make("night_owl", 1, 9, [5, 20, 60, 150]),
     ],
-  };
-}
-
-export function getMockLeaderboard({
-  seed,
-  period: rawPeriod,
-  metric,
-  limit = 20,
-  offset = 0,
-}: AnyRecord = {}) {
-  const seedValue = toSeed(seed);
-  const safeLimit = Math.max(1, Math.min(100, Math.floor(Number(limit) || 20)));
-  const safeOffset = Math.max(0, Math.min(10_000, Math.floor(Number(offset) || 0)));
-  const safeMetric =
-    String(metric || "all")
-      .trim()
-      .toLowerCase() || "all";
-  const safePeriod =
-    String(rawPeriod || "week")
-      .trim()
-      .toLowerCase() || "week";
-  const period =
-    safePeriod === "month" || safePeriod === "total" || safePeriod === "week" ? safePeriod : "week";
-  const { from, to } = computeLeaderboardWindow(period);
-  const totalEntries = 250;
-  const totalPages = totalEntries > 0 ? Math.ceil(totalEntries / safeLimit) : 0;
-  const page = Math.floor(safeOffset / safeLimit) + 1;
-
-  const raw = Array.from({ length: totalEntries }, (_, index) => {
-    const id = index + 1;
-    const userId = `00000000-0000-0000-0000-${String(id).padStart(12, "0")}`;
-    const name = MOCK_LEADERBOARD_NAMES[id % MOCK_LEADERBOARD_NAMES.length];
-    const hash = hashString(`${seedValue}:${name}:${id}`);
-    const base = 180000 + (hash % 900000);
-    const total = Math.max(0, base + id * 1200);
-    const gpt = Math.floor(total * 0.28);
-    const claude = Math.floor(total * 0.18);
-    const gemini = Math.floor(total * 0.1);
-    const cursor = Math.floor(total * 0.1);
-    const opencode = Math.floor(total * 0.08);
-    const hermes = Math.floor(total * 0.03);
-    const kiro = Math.floor(total * 0.02);
-    const copilot = Math.floor(total * 0.04);
-    const kimi = Math.floor(total * 0.03);
-    const openclaw = Math.max(0, total - gpt - claude - gemini - cursor - opencode - hermes - kiro - copilot - kimi);
-    const isPublic = id % 7 !== 0;
-    return {
-      id,
-      user_id: userId,
-      is_public: isPublic,
-      is_me: false,
-      display_name: isPublic ? name : "Anonymous",
-      avatar_url: null,
-      gpt_tokens: gpt,
-      claude_tokens: claude,
-      gemini_tokens: gemini,
-      cursor_tokens: cursor,
-      opencode_tokens: opencode,
-      openclaw_tokens: openclaw,
-      hermes_tokens: hermes,
-      kiro_tokens: kiro,
-      copilot_tokens: copilot,
-      kimi_tokens: kimi,
-      other_tokens: 0,
-      total_tokens: total,
-    };
-  });
-
-  const meIndex = Math.max(0, Math.min(totalEntries - 1, Math.floor(totalEntries * 0.8)));
-  if (raw[meIndex]) raw[meIndex].is_me = true;
-
-  const metricKey =
-    safeMetric === "gpt" || safeMetric === "codex"
-      ? "gpt_tokens"
-      : safeMetric === "claude"
-        ? "claude_tokens"
-        : safeMetric === "gemini"
-          ? "gemini_tokens"
-          : safeMetric === "cursor"
-            ? "cursor_tokens"
-            : safeMetric === "opencode"
-              ? "opencode_tokens"
-              : safeMetric === "openclaw"
-                ? "openclaw_tokens"
-                : safeMetric === "hermes"
-                  ? "hermes_tokens"
-                  : safeMetric === "kiro"
-                    ? "kiro_tokens"
-                    : safeMetric === "copilot"
-                      ? "copilot_tokens"
-                      : safeMetric === "kimi"
-                        ? "kimi_tokens"
-                        : "total_tokens";
-
-  const sorted = raw
-    .slice()
-    .sort((a: any, b: any) => Number(b[metricKey]) - Number(a[metricKey]) || a.id - b.id)
-    .map((entry: any, index: number) => ({
-      user_id: entry.is_public ? entry.user_id : null,
-      rank: index + 1,
-      is_me: Boolean(entry.is_me),
-      display_name: entry.display_name,
-      avatar_url: entry.avatar_url,
-      gpt_tokens: String(entry.gpt_tokens),
-      claude_tokens: String(entry.claude_tokens),
-      gemini_tokens: String(entry.gemini_tokens),
-      cursor_tokens: String(entry.cursor_tokens),
-      opencode_tokens: String(entry.opencode_tokens),
-      openclaw_tokens: String(entry.openclaw_tokens),
-      hermes_tokens: String(entry.hermes_tokens ?? 0),
-      kiro_tokens: String(entry.kiro_tokens ?? 0),
-      copilot_tokens: String(entry.copilot_tokens ?? 0),
-      kimi_tokens: String(entry.kimi_tokens ?? 0),
-      other_tokens: String(entry.other_tokens ?? 0),
-      total_tokens: String(entry.total_tokens),
-      is_public: Boolean(entry.is_public),
-      github_url: entry.id % 3 === 0 ? "https://github.com/xiufengsun/TokenTracker" : null,
-      badges: mockCompactBadges(entry.id),
-      badge_count: mockCompactBadges(entry.id).length,
-    }));
-
-  const meRow = sorted.find((entry: any) => entry?.is_me) || null;
-  const me = meRow
-    ? {
-        rank: meRow.rank,
-        gpt_tokens: meRow.gpt_tokens,
-        claude_tokens: meRow.claude_tokens,
-        gemini_tokens: meRow.gemini_tokens,
-        cursor_tokens: meRow.cursor_tokens,
-        opencode_tokens: meRow.opencode_tokens,
-        openclaw_tokens: meRow.openclaw_tokens,
-        hermes_tokens: meRow.hermes_tokens,
-        kiro_tokens: meRow.kiro_tokens,
-        copilot_tokens: meRow.copilot_tokens,
-        kimi_tokens: meRow.kimi_tokens,
-        other_tokens: meRow.other_tokens,
-        total_tokens: meRow.total_tokens,
-      }
-    : {
-        rank: null,
-        gpt_tokens: "0",
-        claude_tokens: "0",
-        gemini_tokens: "0",
-        cursor_tokens: "0",
-        opencode_tokens: "0",
-        openclaw_tokens: "0",
-        hermes_tokens: "0",
-        kiro_tokens: "0",
-        copilot_tokens: "0",
-        kimi_tokens: "0",
-        other_tokens: "0",
-        total_tokens: "0",
-      };
-
-  const entries = sorted.slice(safeOffset, safeOffset + safeLimit);
-
-  return {
-    period,
-    metric: safeMetric,
-    from,
-    to,
-    generated_at: new Date().toISOString(),
-    page,
-    limit: safeLimit,
-    offset: safeOffset,
-    total_entries: totalEntries,
-    total_pages: totalPages,
-    entries,
-    me,
   };
 }
 

@@ -179,7 +179,7 @@ describe("repairCodexRescanInflation (#187) — atomic guarded rebuild", () => {
     });
   });
 
-  it("rebuilds inflated codex to the true value, preserves other sources, strips+rebuilds the queue, resets the offset", async () => {
+  it("rebuilds inflated codex to the true value, preserves other sources, strips+rebuilds the queue", async () => {
     const home = await makeTempHome();
     try {
       const codexFile = await writeCodexFile(home);
@@ -231,8 +231,9 @@ describe("repairCodexRescanInflation (#187) — atomic guarded rebuild", () => {
       assert.equal(q.claude.rows, 1);
       assert.equal(q.claude.total, 5000);
 
-      // offset reset, codexHashes rebuilt (2 events), file cursor reinstalled at EOF, key set
-      assert.equal(JSON.parse(await fs.readFile(queueStatePath, "utf8")).offset, 0);
+      // Local-only build: the retired upload offset is never touched; the
+      // repair is a pure local queue/cursor fix.
+      assert.equal(JSON.parse(await fs.readFile(queueStatePath, "utf8")).offset, 99999);
       assert.equal(cursors.codexHashes.length, 2);
       assert.ok(cursors.files[codexFile] && cursors.files[codexFile].offset > 5);
       assert.ok(cursors.migrations[CODEX_RESCAN_DEDUP_REPAIR_KEY]);
@@ -423,8 +424,8 @@ describe("repairCodexRescanInflation (#187) — atomic guarded rebuild", () => {
       assert.equal(pq.codex.total, TRUE_CODEX_TOTAL);
       assert.equal(pq.claude.total, 5000);
 
-      assert.equal(JSON.parse(await fs.readFile(queueStatePath, "utf8")).offset, 0);
-      assert.equal(JSON.parse(await fs.readFile(projectQueueStatePath, "utf8")).offset, 0);
+      assert.equal(JSON.parse(await fs.readFile(queueStatePath, "utf8")).offset, 99999);
+      assert.equal(JSON.parse(await fs.readFile(projectQueueStatePath, "utf8")).offset, 88888);
       assert.equal(cursors.files[codexFile].projectOffset, cursors.files[codexFile].offset);
       assert.equal(
         cursors.files[codexFile].projectFileContext.configPath.endsWith(path.join(".git", "config")),
@@ -895,7 +896,7 @@ describe("repairCodexRescanInflation (#187) — atomic guarded rebuild", () => {
       assert.equal(ran, true, "prior skip must not block the retry");
       assert.equal(codexBucketTotal(cursors), TRUE_CODEX_TOTAL, "de-inflated to true value");
       assert.equal((await queueRowsBySource(queuePath)).codex.total, TRUE_CODEX_TOTAL);
-      assert.equal(JSON.parse(await fs.readFile(queueStatePath, "utf8")).offset, 0);
+      assert.equal(JSON.parse(await fs.readFile(queueStatePath, "utf8")).offset, 1234);
       // Success now records a string timestamp (final), replacing the skip object.
       assert.equal(typeof cursors.migrations[CODEX_RESCAN_DEDUP_REPAIR_KEY], "string");
     } finally {
@@ -1075,7 +1076,7 @@ describe("repairCodexForkReplayInflation (#169 follow-up) — fork replay histor
       assert.equal(q.codex.total, FORK_TRUE_TOTAL, "queue codex rebuilt without replay phantom");
       assert.equal(q.claude.total, 5000);
 
-      assert.equal(JSON.parse(await fs.readFile(queueStatePath, "utf8")).offset, 0);
+      assert.equal(JSON.parse(await fs.readFile(queueStatePath, "utf8")).offset, 4321);
       assert.ok(cursors.migrations[CODEX_FORK_REPLAY_REPAIR_KEY]);
       // #187 key untouched
       assert.equal(cursors.migrations[CODEX_RESCAN_DEDUP_REPAIR_KEY], "2026-06-15T00:00:00.000Z");
@@ -1847,10 +1848,11 @@ describe("repairCodexInterleavedUsageInflation — cumulative lineage repair", (
 
       const uploadState = JSON.parse(await fs.readFile(queueStatePath, "utf8"));
       const projectUploadState = JSON.parse(await fs.readFile(projectQueueStatePath, "utf8"));
-      assert.equal(uploadState.offset, 0);
-      assert.equal(projectUploadState.offset, 0);
-      assert.equal(uploadState.note, "reset_after_codex_usage_lineage_2026_07_v2");
-      assert.equal(projectUploadState.note, "reset_after_codex_usage_lineage_2026_07_v2");
+      // Local-only build: retired upload offsets stay untouched by repairs.
+      assert.equal(uploadState.offset, 999);
+      assert.equal(projectUploadState.offset, 888);
+      assert.equal(uploadState.note, undefined);
+      assert.equal(projectUploadState.note, undefined);
       assert.equal(cursors.files[codexFile].tokenUsageBaselines.length, 2);
       assert.equal(typeof cursors.migrations[CODEX_USAGE_LINEAGE_REPAIR_KEY], "string");
 
@@ -2086,9 +2088,10 @@ describe("repairCodexInterleavedUsageInflation — cumulative lineage repair", (
         "string",
       );
       assert.equal((await queueRowsBySource(queuePath)).codex.total, LINEAGE_TRUE_TOTAL);
-      assert.equal(
-        JSON.parse(await fs.readFile(queueStatePath, "utf8")).note,
-        "reset_after_codex_usage_lineage_2026_07_v2",
+      // Retired upload-offset file is left as-is (no repair notes, no resets).
+      assert.deepEqual(
+        JSON.parse(await fs.readFile(queueStatePath, "utf8")),
+        { offset: 777 },
       );
 
       const archiveRoot = path.join(home, ".codex", "archived_sessions");

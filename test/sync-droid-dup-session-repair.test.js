@@ -7,7 +7,8 @@
  *   - removes the stale duplicate's separate half-hour bucket (E3, no residual)
  *   - preserves clean sessions AND deleted-session history byte-for-byte
  *   - preserves non-droid rows + unparseable lines verbatim
- *   - resets the upload offset, drops stale droid group markers
+ *   - drops stale droid group markers (and no longer touches the retired
+ *     cloud upload offset — local-only build)
  *   - is idempotent (run-twice: guard short-circuits) and stable in the same sync
  *   - touches nothing on a clean install (no duplicate session ids on disk)
  */
@@ -250,10 +251,9 @@ describe("repairDroidDuplicateSessionInflation (#204)", () => {
     assert.equal(rows.filter((r) => r.source === "codex").length, 1, "codex row preserved");
     assert.ok(rawLines.includes("{ this is not valid json"), "unparseable line preserved");
 
-    // Upload offset reset.
+    // Retired upload-offset file is left untouched by the repair.
     const upload = JSON.parse(await fs.readFile(t.queueStatePath, "utf8"));
-    assert.equal(upload.offset, 0);
-    assert.match(upload.note, /droid_dup_session/);
+    assert.equal(upload.offset, 999);
 
     // Cursor: dup overwritten with canonical truth, clean untouched.
     assert.equal(t.cursors.droid.sessionTotals.dup.input, t.consts.CANON);

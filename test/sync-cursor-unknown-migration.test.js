@@ -314,18 +314,19 @@ describe("repairGrokQueueFromSessionSnapshots", () => {
     assert.equal(cursors.hourly.groupQueued["codex|2026-04-05T14:00:00.000Z"], "keep-codex-group");
     assert.ok(cursors.hourly.buckets["codex|gpt-5.5|2026-04-05T14:00:00.000Z"]);
 
-    const queueState = JSON.parse(await fs.readFile(queueStatePath, "utf8"));
-    assert.equal(queueState.offset, 0);
-    assert.equal(queueState.note, "reset_after_grok_append_only_repair_2026_05_v4");
+    // Local-only build: the retired upload-offset file is left byte-for-byte
+    // untouched by repairs (no resets, no notes, no backups).
+    assert.equal(
+      await fs.readFile(queueStatePath, "utf8"),
+      JSON.stringify({ offset: 4096, updatedAt: "2026-04-05T16:00:00.000Z" }),
+    );
     const migration = cursors.grok.migrations[GROK_APPEND_ONLY_REPAIR_MIGRATION_KEY];
     assert.equal(migration.status, "applied");
     assert.equal(migration.existingGrokRows, 2);
     assert.equal(migration.rowsWritten, 3);
     assert.equal(migration.staleRowsRetracted, 0);
     assert.match(migration.queueBackupPath, /queue\.jsonl\.bak\./);
-    assert.match(migration.queueStateBackupPath, /queue\.state\.json\.bak\./);
     await fs.stat(migration.queueBackupPath);
-    await fs.stat(migration.queueStateBackupPath);
 
     const queueAfterFirstRepair = await fs.readFile(queuePath, "utf8");
     const secondRepair = await repairGrokQueueFromSessionSnapshots({

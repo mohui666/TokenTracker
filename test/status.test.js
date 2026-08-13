@@ -14,7 +14,7 @@ function runSql(dbPath, sql) {
   });
 }
 
-test("status prints last upload timestamps from upload.throttle.json", async () => {
+test("status prints local queue size and parse timestamps", async () => {
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "tokentracker-status-"));
   const prevHome = process.env.HOME;
   const prevUserProfile = process.env.USERPROFILE;
@@ -38,11 +38,7 @@ test("status prints last upload timestamps from upload.throttle.json", async () 
 
     await fs.writeFile(
       path.join(trackerDir, "config.json"),
-      JSON.stringify(
-        { baseUrl: "https://config.example", deviceToken: "t", deviceId: "d" },
-        null,
-        2,
-      ) + "\n",
+      JSON.stringify({ installedAt: "2025-12-01T00:00:00.000Z" }, null, 2) + "\n",
       "utf8",
     );
     await fs.writeFile(
@@ -52,25 +48,8 @@ test("status prints last upload timestamps from upload.throttle.json", async () 
     );
     await fs.writeFile(path.join(trackerDir, "queue.jsonl"), "", "utf8");
     await fs.writeFile(
-      path.join(trackerDir, "queue.state.json"),
-      JSON.stringify({ offset: 0 }) + "\n",
-      "utf8",
-    );
-    await fs.writeFile(
       path.join(trackerDir, "openclaw.signal"),
       "2026-02-12T00:00:00.000Z\n",
-      "utf8",
-    );
-
-    const lastSuccessMs = 1766053145522; // 2025-12-18T10:19:05.522Z
-    const nextAllowedAtMs = lastSuccessMs + 1000;
-    await fs.writeFile(
-      path.join(trackerDir, "upload.throttle.json"),
-      JSON.stringify(
-        { version: 1, lastSuccessMs, nextAllowedAtMs, backoffUntilMs: 0, backoffStep: 0 },
-        null,
-        2,
-      ) + "\n",
       "utf8",
     );
 
@@ -83,10 +62,11 @@ test("status prints last upload timestamps from upload.throttle.json", async () 
 
     await cmdStatus();
 
-    assert.match(out, /- Base URL: https:\/\/config\.example/);
-    assert.match(out, /- Last upload: 2025-12-18T10:19:05\.522Z/);
+    assert.match(out, /- Queue size: 0 bytes/);
+    assert.match(out, /- Last parse: 2025-12-18T00:00:00\.000Z/);
     assert.match(out, /- Last OpenClaw-triggered sync: 2026-02-12T00:00:00.000Z/);
-    assert.match(out, /- Next upload after: 2025-12-18T10:19:06\.522Z/);
+    // Local-only build: no cloud upload bookkeeping may leak into status.
+    assert.doesNotMatch(out, /Base URL|Device token|Last upload|Backoff/);
   } finally {
     process.stdout.write = prevWrite;
     if (prevHome === undefined) delete process.env.HOME;
@@ -121,7 +101,7 @@ test("status reports Codex notify unset when config points to another command", 
     );
     await fs.writeFile(
       path.join(trackerDir, "config.json"),
-      JSON.stringify({ baseUrl: "https://config.example", deviceToken: "t" }) + "\n",
+      JSON.stringify({ installedAt: "2025-12-01T00:00:00.000Z" }) + "\n",
       "utf8",
     );
 
@@ -319,11 +299,7 @@ test("status does not migrate legacy tracker directory", async () => {
 
     await fs.writeFile(
       path.join(legacyTrackerDir, "config.json"),
-      JSON.stringify(
-        { baseUrl: "https://example.invalid", deviceToken: "t", deviceId: "d" },
-        null,
-        2,
-      ) + "\n",
+      JSON.stringify({ installedAt: "2025-12-01T00:00:00.000Z" }, null, 2) + "\n",
       "utf8",
     );
     await fs.writeFile(
@@ -332,23 +308,6 @@ test("status does not migrate legacy tracker directory", async () => {
       "utf8",
     );
     await fs.writeFile(path.join(legacyTrackerDir, "queue.jsonl"), "", "utf8");
-    await fs.writeFile(
-      path.join(legacyTrackerDir, "queue.state.json"),
-      JSON.stringify({ offset: 0 }) + "\n",
-      "utf8",
-    );
-
-    const lastSuccessMs = 1766053145522; // 2025-12-18T10:19:05.522Z
-    const nextAllowedAtMs = lastSuccessMs + 1000;
-    await fs.writeFile(
-      path.join(legacyTrackerDir, "upload.throttle.json"),
-      JSON.stringify(
-        { version: 1, lastSuccessMs, nextAllowedAtMs, backoffUntilMs: 0, backoffStep: 0 },
-        null,
-        2,
-      ) + "\n",
-      "utf8",
-    );
 
     let out = "";
     process.stdout.write = (chunk, enc, cb) => {
@@ -359,8 +318,8 @@ test("status does not migrate legacy tracker directory", async () => {
 
     await cmdStatus();
 
-    assert.match(out, /- Base URL: unset/);
-    assert.match(out, /- Last upload: never/);
+    assert.match(out, /- Queue size: 0 bytes/);
+    assert.match(out, /- Last parse: never/);
     const newTrackerDir = path.join(tmp, ".tokentracker", "tracker");
     await assert.rejects(fs.stat(newTrackerDir));
     await fs.stat(legacyTrackerDir);
@@ -416,16 +375,11 @@ test("status renders the Trae SOLO entitlement snapshot from Local State", async
     await fs.mkdir(trackerDir, { recursive: true });
     await fs.writeFile(
       path.join(trackerDir, "config.json"),
-      JSON.stringify({ baseUrl: "https://config.example", deviceToken: "t" }) + "\n",
+      JSON.stringify({ installedAt: "2026-08-01T00:00:00.000Z" }) + "\n",
       "utf8",
     );
     // No source=trae queue row is needed: the entitlement render path reads
     // the Trae Local State storage.json directly (queue is token-count-only).
-    await fs.writeFile(
-      path.join(trackerDir, "queue.state.json"),
-      JSON.stringify({ offset: 0 }) + "\n",
-      "utf8",
-    );
     await fs.writeFile(
       path.join(trackerDir, "cursors.json"),
       JSON.stringify({ updatedAt: "2026-08-07T01:30:00.000Z" }) + "\n",

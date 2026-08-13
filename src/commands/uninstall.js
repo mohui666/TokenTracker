@@ -114,8 +114,7 @@ async function cmdUninstall(argv) {
   await fs.rm(path.join(trackerDir, "app"), { recursive: true, force: true }).catch(() => {});
 
   // Deliberately NOT removed by --purge: the machine-identity seed lets a
-  // reinstall reuse the same cloud device row instead of double-counting the
-  // replayed history under a new device (issue #176).
+  // reinstall reuse the same local machine identity (issue #176).
   const machineIdSeedPath = path.join(home, ".config", "tokentracker", "machine-id");
   let machineIdSeedKept = false;
   if (opts.purge) {
@@ -200,7 +199,7 @@ async function cmdUninstall(argv) {
       formatOmpHookRemoveLine(ompHookRemove),
       opts.purge ? `- Purged: ${path.join(home, ".tokentracker")}` : "- Purge: skipped (use --purge)",
       ...(machineIdSeedKept
-        ? [`- Kept: ${machineIdSeedPath} (cloud device identity — a reinstall reuses the same device; delete it to fully reset)`]
+        ? [`- Kept: ${machineIdSeedPath} (local machine identity — a reinstall reuses it; delete it to fully reset)`]
         : []),
       "",
     ].join("\n"),

@@ -10,14 +10,12 @@ An accurate, local-first token usage and cost dashboard for **29 AI coding tools
 
 [![npm version](https://img.shields.io/npm/v/tokentracker-cli.svg?color=blue)](https://www.npmjs.com/package/tokentracker-cli)
 [![npm downloads](https://img.shields.io/npm/dm/tokentracker-cli.svg?color=brightgreen)](https://www.npmjs.com/package/tokentracker-cli)
-[![Homebrew](https://img.shields.io/github/v/release/xiufengsun/TokenTracker?label=brew&color=F8B73E&logo=homebrew&logoColor=white)](https://github.com/xiufengsun/homebrew-tokentracker)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 [![CLI](https://img.shields.io/badge/CLI-macOS%20%C2%B7%20Linux%20%C2%B7%20Windows-lightgrey.svg)](https://www.npmjs.com/package/tokentracker-cli)
-[![macOS app](https://img.shields.io/badge/macOS%20app-menu%20bar%20%2B%20widgets-lightgrey.svg?logo=apple&logoColor=white)](https://github.com/xiufengsun/TokenTracker/releases/latest)
-[![Windows app](https://img.shields.io/badge/Windows%20app-system%20tray-lightgrey.svg?logo=windows&logoColor=white)](https://github.com/xiufengsun/TokenTracker/releases/latest)
-[![GitHub stars](https://img.shields.io/github/stars/xiufengsun/TokenTracker?style=social)](https://github.com/xiufengsun/TokenTracker/stargazers)
+[![macOS app](https://img.shields.io/badge/macOS%20app-menu%20bar%20%2B%20widgets-lightgrey.svg?logo=apple&logoColor=white)](https://github.com/mohui666/TokenTracker/releases/latest)
+[![Windows app](https://img.shields.io/badge/Windows%20app-system%20tray-lightgrey.svg?logo=windows&logoColor=white)](https://github.com/mohui666/TokenTracker/releases/latest)
+[![GitHub stars](https://img.shields.io/github/stars/mohui666/TokenTracker?style=social)](https://github.com/mohui666/TokenTracker/stargazers)
 [![Featured in 阮一峰周刊 #393](https://img.shields.io/badge/Featured%20in-%E9%98%AE%E4%B8%80%E5%B3%B0%E5%91%A8%E5%88%8A%20%23393-FF6B35?logo=rss&logoColor=white)](https://github.com/ruanyf/weekly/blob/master/docs/issue-393.md)
-[![Author tokens](https://srctyff5.us-east.insforge.app/functions/tokentracker-badge-svg?user_id=0652839f-d19f-4f67-af85-6b7675875443&metric=tokens&compact=1&label=author%20tokens)](https://github.com/xiufengsun/TokenTracker)
 
 <br/>
 
@@ -25,7 +23,7 @@ An accurate, local-first token usage and cost dashboard for **29 AI coding tools
 
 <br/><br/>
 
-<video src="https://github.com/user-attachments/assets/3275979d-bbed-4639-83e2-8b7d83bed6af" controls muted playsinline poster="https://raw.githubusercontent.com/xiufengsun/tokentracker/main/docs/screenshots/dashboard-light.png" width="820"></video>
+<video src="https://github.com/user-attachments/assets/3275979d-bbed-4639-83e2-8b7d83bed6af" controls muted playsinline poster="https://raw.githubusercontent.com/mohui666/TokenTracker/main/docs/screenshots/dashboard-light.png" width="820"></video>
 
 <br/><br/>
 
@@ -56,13 +54,13 @@ An accurate, local-first token usage and cost dashboard for **29 AI coding tools
 
 <br/><br/>
 
-<video src="https://github.com/user-attachments/assets/5e709422-5af8-4e4c-8109-f5bb711eb3f8" controls muted playsinline poster="https://raw.githubusercontent.com/xiufengsun/tokentracker/main/docs/screenshots/dashboard-dark.png" width="820">
-  <img src="https://raw.githubusercontent.com/xiufengsun/tokentracker/main/docs/screenshots/dashboard-dark.png" alt="Token Tracker Dashboard" width="820" />
+<video src="https://github.com/user-attachments/assets/5e709422-5af8-4e4c-8109-f5bb711eb3f8" controls muted playsinline poster="https://raw.githubusercontent.com/mohui666/TokenTracker/main/docs/screenshots/dashboard-dark.png" width="820">
+  <img src="https://raw.githubusercontent.com/mohui666/TokenTracker/main/docs/screenshots/dashboard-dark.png" alt="Token Tracker Dashboard" width="820" />
 </video>
 
 <br/><br/>
 
-⭐ **If TokenTracker saves you time, please [star it on GitHub](https://github.com/xiufengsun/TokenTracker) — it helps other developers find it.**
+⭐ **If TokenTracker saves you time, please [star it on GitHub](https://github.com/mohui666/TokenTracker) — it helps other developers find it.**
 
 <br/>
 
@@ -85,13 +83,13 @@ That's it. First run installs hooks, syncs your data, and opens the dashboard at
 **What you get in 30 seconds:**
 - 📊 A local dashboard at `localhost:7680` with usage trends, model breakdown, cost analysis
 - 🔌 Auto-detected hooks for every supported AI tool you have installed
-- 🏠 100% local — no account, no API keys, no network calls (except optional leaderboard)
+- 🏠 100% local — no account, no API keys, no network calls
 - 🧩 *Optional:* a Skills tab that browses 250+ public skills and syncs them across Claude · Codex · Grok · Antigravity · Gemini · OpenCode · Hermes
 
 > **Want a native desktop app?**
-> - **macOS** — [Download `TokenTrackerBar.dmg`](https://github.com/xiufengsun/TokenTracker/releases/latest/download/TokenTrackerBar.dmg) → drag to Applications. Menu bar status icon, desktop widgets, and the dashboard in a WKWebView.
-> - **Windows** — [Download `TokenTracker-Setup.exe`](https://github.com/xiufengsun/TokenTracker/releases/latest/download/TokenTracker-Setup.exe) → run the per-user installer (no admin needed). System-tray app with the dashboard in WebView2. Portable zip also on the [releases page](https://github.com/xiufengsun/TokenTracker/releases/latest).
-> - **Linux** — [Download `TokenTracker-linux-x86_64.AppImage`](https://github.com/xiufengsun/TokenTracker/releases/latest/download/TokenTracker-linux-x86_64.AppImage) → `chmod +x` and run. Tray app with the dashboard in a WebKitGTK window. Needs `webkit2gtk-4.1`, `gtk3` and `libayatana-appindicator` from your distro; on GNOME the tray icon also needs the [AppIndicator extension](https://extensions.gnome.org/extension/615/appindicator-support/).
+> - **macOS** — [Download `TokenTrackerBar.dmg`](https://github.com/mohui666/TokenTracker/releases/latest/download/TokenTrackerBar.dmg) → drag to Applications. Menu bar status icon, desktop widgets, and the dashboard in a WKWebView.
+> - **Windows** — [Download `TokenTracker-Setup.exe`](https://github.com/mohui666/TokenTracker/releases/latest/download/TokenTracker-Setup.exe) → run the per-user installer (no admin needed). System-tray app with the dashboard in WebView2. Portable zip also on the [releases page](https://github.com/mohui666/TokenTracker/releases/latest).
+> - **Linux** — [Download `TokenTracker-linux-x86_64.AppImage`](https://github.com/mohui666/TokenTracker/releases/latest/download/TokenTracker-linux-x86_64.AppImage) → `chmod +x` and run. Tray app with the dashboard in a WebKitGTK window. Needs `webkit2gtk-4.1`, `gtk3` and `libayatana-appindicator` from your distro; on GNOME the tray icon also needs the [AppIndicator extension](https://extensions.gnome.org/extension/615/appindicator-support/).
 
 Install globally for shorter commands:
 
@@ -105,20 +103,6 @@ tokentracker status --json     # Machine-readable summary (pipe to jq, ingest fr
 tokentracker status --light    # Plain ASCII table (CI / SSH, no spinner)
 tokentracker doctor       # Health check
 ```
-
-### 🍺 Homebrew (macOS)
-
-Prefer `brew`? Install directly — no extra tap step needed:
-
-```bash
-# macOS menu bar app (DMG)
-brew install --cask xiufengsun/tokentracker/tokentracker
-
-# CLI only
-brew install xiufengsun/tokentracker/tokentracker
-```
-
-Upgrade with `brew upgrade --cask xiufengsun/tokentracker/tokentracker`. The tap auto-bumps within an hour of every new release.
 
 ### 🐧 Linux (AppImage)
 
@@ -149,8 +133,6 @@ An Arch `PKGBUILD` for a local pacman install lives in `TokenTrackerLinux/packag
 - 📈 **Real-time usage limits** — Claude / Codex / Cursor / Gemini / Kimi / Kiro / Grok / Copilot / Antigravity / ZCode / OpenCode Go / Qoder / Qoder CN quota windows, with last-good caching when a local provider app is temporarily closed
 - 🟢 **Service Status page** — live operational and incident status from 8 official provider status pages
 - 💰 **Cost engine** — 2,200+ models priced via [LiteLLM](https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json) (auto-refreshed daily) + curated overrides for niche tools (Kiro, Cursor Composer, Kimi, CodeBuddy hy3); 24h disk cache + bundled offline snapshot mean accurate USD without an internet connection. Models without published vendor pricing (e.g. Tencent hy3-preview) are tracked by tokens but show $0 cost until the vendor publishes a rate.
-- 🌐 **Optional leaderboard** — Compare with developers worldwide; drag-to-reorder columns to focus on the providers you care about (opt-in, sign in to participate)
-- 🔄 **Cross-device account view** — Opt in to cloud sync and the dashboard merges your usage across every machine you work on (laptop + desktop + server) into one combined view — totals, trends, heatmap and model breakdown all device-aggregated (opt-in, sign in; the default local-only experience stays instant and offline)
 - 🧩 **Optional Skills tab** — browse 250+ public skills from `anthropics/skills`, `ComposioHQ/awesome-claude-skills`, `skills.sh` and any GitHub repo you add; sync them across Claude / Codex / Grok / Antigravity / Gemini / OpenCode / Hermes with named targets and one-click Undo
 - 🔒 **Privacy-first** — Only token counts and timestamps. Never prompts, responses, or file contents.
 
@@ -164,30 +146,23 @@ An Arch `PKGBUILD` for a local pacman install lives in `TokenTrackerLinux/packag
 
 **Dashboard** — usage trends, model breakdown, cost analysis
 
-<img src="https://raw.githubusercontent.com/xiufengsun/tokentracker/main/docs/screenshots/dashboard-light.png" alt="Dashboard" />
+<img src="https://raw.githubusercontent.com/mohui666/TokenTracker/main/docs/screenshots/dashboard-light.png" alt="Dashboard" />
 
 </td>
 <td width="50%">
 
 **Desktop Widgets** — pin usage to your desktop
 
-<img src="https://raw.githubusercontent.com/xiufengsun/tokentracker/main/docs/screenshots/widgets-overview.png" alt="Desktop Widgets" />
+<img src="https://raw.githubusercontent.com/mohui666/TokenTracker/main/docs/screenshots/widgets-overview.png" alt="Desktop Widgets" />
 
 </td>
 </tr>
 <tr>
-<td width="50%">
+<td colspan="2">
 
 **Menu Bar App** — animated Clawd companion + native panels
 
-<img src="https://raw.githubusercontent.com/xiufengsun/tokentracker/main/docs/screenshots/menubar.gif" alt="Menu Bar App" />
-
-</td>
-<td width="50%">
-
-**Global Leaderboard** — compare with developers worldwide
-
-<img src="https://raw.githubusercontent.com/xiufengsun/tokentracker/main/docs/screenshots/leaderboard.png" alt="Leaderboard" />
+<img src="https://raw.githubusercontent.com/mohui666/TokenTracker/main/docs/screenshots/menubar.gif" alt="Menu Bar App" />
 
 </td>
 </tr>
@@ -196,7 +171,7 @@ An Arch `PKGBUILD` for a local pacman install lives in `TokenTrackerLinux/packag
 
 **Skills Manager** — browse 250+ public skills from GitHub & `skills.sh`, install once, sync to Claude / Codex / Grok / Antigravity / Gemini / OpenCode / Hermes. Per-target toggles, one-click Undo, no manual file copying.
 
-<img src="https://raw.githubusercontent.com/xiufengsun/tokentracker/main/docs/screenshots/skills.png" alt="Skills Manager" />
+<img src="https://raw.githubusercontent.com/mohui666/TokenTracker/main/docs/screenshots/skills.png" alt="Skills Manager" />
 
 </td>
 </tr>
@@ -205,7 +180,7 @@ An Arch `PKGBUILD` for a local pacman install lives in `TokenTrackerLinux/packag
 
 **Desktop Pet** — a pixel companion that floats on your desktop and reacts to your real token burn: it codes when you code, celebrates streaks, and sleeps when you rest. Import community pets from [codex-pets.net](https://codex-pets.net) with a link or a `.codex-pet.zip` — V2 pets even turn their head to follow your cursor in 16 directions. macOS, Windows, and web.
 
-<img src="https://raw.githubusercontent.com/xiufengsun/tokentracker/main/docs/screenshots/pet.png" alt="Desktop Pet" />
+<img src="https://raw.githubusercontent.com/mohui666/TokenTracker/main/docs/screenshots/pet.png" alt="Desktop Pet" />
 
 </td>
 </tr>
@@ -214,7 +189,7 @@ An Arch `PKGBUILD` for a local pacman install lives in `TokenTrackerLinux/packag
 
 **Achievements** — 15 tracks turn usage milestones, streaks, tools, and models into collectible badges — with progress visible before each unlock.
 
-<img src="https://raw.githubusercontent.com/xiufengsun/tokentracker/main/docs/screenshots/achievements.png" alt="TokenTracker Achievements" />
+<img src="https://raw.githubusercontent.com/mohui666/TokenTracker/main/docs/screenshots/achievements.png" alt="TokenTracker Achievements" />
 
 </td>
 </tr>
@@ -268,7 +243,7 @@ An Arch `PKGBUILD` for a local pacman install lives in `TokenTrackerLinux/packag
 >
 > Deeper dives: [OpenClaw integration & troubleshooting](docs/openclaw-integration.md).
 
-Missing your tool? [Open an issue](https://github.com/xiufengsun/TokenTracker/issues/new) — adding new providers is usually one parser file away.
+Missing your tool? [Open an issue](https://github.com/mohui666/TokenTracker/issues/new) — adding new providers is usually one parser file away.
 
 ---
 
@@ -299,7 +274,6 @@ flowchart LR
     C --> D[Web Dashboard]
     C --> E[Menu Bar App]
     C --> F[Desktop Widgets]
-    C -.->|opt-in| G[(Cloud Leaderboard)]
 ```
 
 1. AI CLI tools generate logs during normal use
@@ -317,9 +291,9 @@ flowchart LR
 | Protection | Description |
 |---|---|
 | **No content upload** | Only token counts and timestamps. Never prompts, responses, or file contents. |
-| **Local-only by default** | All data stays on your machine. The leaderboard is fully opt-in. |
+| **Local-only by default** | All data stays on your machine. |
 | **Auditable** | Open source. Read [`src/lib/rollout.js`](src/lib/rollout.js) — only numbers and timestamps. |
-| **Anonymous usage stats only** | Two things phone home, both anonymous: (1) at most one daily heartbeat — a one-way hash of the machine id, app version, OS platform, and app shell (cli/mac/win); (2) anonymous dashboard pageview/feature events (PostHog — autocapture and session recording disabled, browser Do-Not-Track respected). Never token counts, model names, prompts, or paths. Audit [`src/lib/telemetry.js`](src/lib/telemetry.js) and [`dashboard/src/lib/analytics.js`](dashboard/src/lib/analytics.js); one switch disables both on your machine: `TOKENTRACKER_NO_TELEMETRY=1` (or `DO_NOT_TRACK=1`). |
+| **Nothing phones home** | This fork has no hosted backend: no heartbeat, no analytics, no uploads. Token counts, model names, prompts, and paths never leave your device. |
 
 ---
 
@@ -330,7 +304,6 @@ Most users never need this — defaults are sensible. For advanced setups:
 | Variable | Description | Default |
 |---|---|---|
 | `TOKENTRACKER_DEBUG` | Enable debug output (`1` to enable) | — |
-| `TOKENTRACKER_NO_TELEMETRY` | Disable all anonymous telemetry — daily heartbeat and dashboard analytics (`1` to disable; the `DO_NOT_TRACK` standard is also respected) | — |
 | `TOKENTRACKER_HTTP_TIMEOUT_MS` | HTTP timeout in milliseconds | `20000` |
 | `TOKENTRACKER_DISABLE_GIT_ATTRIBUTION` | Skip Git commit attribution (`1` to disable). Attribution runs `git log` inside the working directory of each recent session. Disabling keeps TokenTracker out of your project directories entirely — the Outcomes view then shows only manually recorded outcomes | — |
 | `TOKENTRACKER_GIT_ATTRIBUTION_PROTECTED_DIRS` | Let Git attribution enter macOS TCC-protected locations (`1` to allow). By default sessions under `~/Documents`, `~/Downloads`, `~/Desktop`, `~/Library`, the media folders and `/Volumes` are skipped, because macOS raises a separate folder-access prompt for each one. Enable this only if you keep repositories there and don't mind granting access | — |
@@ -367,7 +340,7 @@ Supported providers for WSL auto-discovery and aggregation:
 ## 🛠️ Development
 
 ```bash
-git clone https://github.com/xiufengsun/TokenTracker.git
+git clone https://github.com/mohui666/TokenTracker.git
 cd TokenTracker
 npm install
 
@@ -452,7 +425,7 @@ Then run the doctor for a deeper health check:
 tokentracker doctor
 ```
 
-If a provider shows as not configured even though you use it, try `tokentracker activate-if-needed` to re-run hook detection. If still missing, [open an issue](https://github.com/xiufengsun/TokenTracker/issues/new) with the `doctor` output attached.
+If a provider shows as not configured even though you use it, try `tokentracker activate-if-needed` to re-run hook detection. If still missing, [open an issue](https://github.com/mohui666/TokenTracker/issues/new) with the `doctor` output attached.
 
 </details>
 
@@ -518,46 +491,13 @@ Once granted, the permission is remembered. Note that ad-hoc signed builds re-pr
 
 ---
 
-## 🪪 README Badges
-
-Show off your token usage on your GitHub profile or project README.
-
-To get `YOUR_USER_ID`:
-1. Run `tokentracker`, open the dashboard, and sign in to the leaderboard.
-2. Go to **Settings → Account**.
-3. Use the **User ID** shown there. On headless machines, `tokentracker device-login` also writes the same `user_id` to `~/.tokentracker/tracker/config.json`.
-
-Then drop one of these in:
-
-```markdown
-[![tokens](https://srctyff5.us-east.insforge.app/functions/tokentracker-badge-svg?user_id=YOUR_USER_ID&metric=tokens)](https://github.com/xiufengsun/TokenTracker)
-[![cost](https://srctyff5.us-east.insforge.app/functions/tokentracker-badge-svg?user_id=YOUR_USER_ID&metric=cost)](https://github.com/xiufengsun/TokenTracker)
-[![rank](https://srctyff5.us-east.insforge.app/functions/tokentracker-badge-svg?user_id=YOUR_USER_ID&metric=rank)](https://github.com/xiufengsun/TokenTracker)
-```
-
-> The link target defaults to the TokenTracker repo so every click helps other developers discover the tool. Swap it for your leaderboard profile, personal site, or `https://www.tokentracker.cc` if you'd rather route clicks elsewhere.
-
-Renders shields.io-compatible badges with your current totals (60s cache):
-
-| Param | Values | Default |
-|---|---|---|
-| `metric` | `tokens` / `cost` / `rank` | `tokens` |
-| `period` | `week` / `month` / `total` | `total` |
-| `style` | `flat` / `flat-square` | `flat` |
-| `label` | any short string | metric name |
-| `color` | hex, e.g. `ff6b35` | brand green |
-
-> **Privacy**: badges only resolve for profiles where leaderboard sharing is **on** (`Settings → Account → Public profile`). Private profiles get a "private" placeholder.
-
----
-
 ## ⭐ Star History
 
-<a href="https://www.star-history.com/?repos=xiufengsun%2FTokenTracker&type=date&legend=top-left">
+<a href="https://www.star-history.com/?repos=mohui666%2FTokenTracker&type=date&legend=top-left">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=xiufengsun/TokenTracker&type=date&theme=dark&legend=top-left&sealed_token=Vr7qbPNqOTtzQEdtkxS2yArAReX2QkBZKNJgs3n32Q5oJa1iXddLlrT201teNSnt7QnsXtDcHy_T387xvXJ_HXHrPtvH2QQ1xqQZ67N_HV45ulWrt3j6hziDW5eshRCmu8CAT_W31PY0-WVZpFv7NQD-acv1stVK8ndribTokIp9ukSYAedx3icuUrOu" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=xiufengsun/TokenTracker&type=date&legend=top-left&sealed_token=Vr7qbPNqOTtzQEdtkxS2yArAReX2QkBZKNJgs3n32Q5oJa1iXddLlrT201teNSnt7QnsXtDcHy_T387xvXJ_HXHrPtvH2QQ1xqQZ67N_HV45ulWrt3j6hziDW5eshRCmu8CAT_W31PY0-WVZpFv7NQD-acv1stVK8ndribTokIp9ukSYAedx3icuUrOu" />
-    <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=xiufengsun/TokenTracker&type=date&legend=top-left&sealed_token=Vr7qbPNqOTtzQEdtkxS2yArAReX2QkBZKNJgs3n32Q5oJa1iXddLlrT201teNSnt7QnsXtDcHy_T387xvXJ_HXHrPtvH2QQ1xqQZ67N_HV45ulWrt3j6hziDW5eshRCmu8CAT_W31PY0-WVZpFv7NQD-acv1stVK8ndribTokIp9ukSYAedx3icuUrOu" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=mohui666/TokenTracker&type=date&theme=dark&legend=top-left&sealed_token=Vr7qbPNqOTtzQEdtkxS2yArAReX2QkBZKNJgs3n32Q5oJa1iXddLlrT201teNSnt7QnsXtDcHy_T387xvXJ_HXHrPtvH2QQ1xqQZ67N_HV45ulWrt3j6hziDW5eshRCmu8CAT_W31PY0-WVZpFv7NQD-acv1stVK8ndribTokIp9ukSYAedx3icuUrOu" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=mohui666/TokenTracker&type=date&legend=top-left&sealed_token=Vr7qbPNqOTtzQEdtkxS2yArAReX2QkBZKNJgs3n32Q5oJa1iXddLlrT201teNSnt7QnsXtDcHy_T387xvXJ_HXHrPtvH2QQ1xqQZ67N_HV45ulWrt3j6hziDW5eshRCmu8CAT_W31PY0-WVZpFv7NQD-acv1stVK8ndribTokIp9ukSYAedx3icuUrOu" />
+    <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=mohui666/TokenTracker&type=date&legend=top-left&sealed_token=Vr7qbPNqOTtzQEdtkxS2yArAReX2QkBZKNJgs3n32Q5oJa1iXddLlrT201teNSnt7QnsXtDcHy_T387xvXJ_HXHrPtvH2QQ1xqQZ67N_HV45ulWrt3j6hziDW5eshRCmu8CAT_W31PY0-WVZpFv7NQD-acv1stVK8ndribTokIp9ukSYAedx3icuUrOu" />
   </picture>
 </a>
 
@@ -565,10 +505,10 @@ Renders shields.io-compatible badges with your current totals (60s cache):
 
 ## 🤝 Contributing & Support
 
-- **Bugs / feature requests**: [open an issue](https://github.com/xiufengsun/TokenTracker/issues/new)
+- **Bugs / feature requests**: [open an issue](https://github.com/mohui666/TokenTracker/issues/new)
 - **Security**: see [SECURITY.md](SECURITY.md) — please don't open public issues for security reports
 - **Pull requests**: see [CONTRIBUTING.md](CONTRIBUTING.md) for setup, tests, and how to add a new AI tool integration
-- **Questions / showcase**: [GitHub Discussions](https://github.com/xiufengsun/TokenTracker/discussions)
+- **Questions / showcase**: [GitHub Discussions](https://github.com/mohui666/TokenTracker/discussions)
 
 ## 🙏 Credits
 
@@ -588,6 +528,6 @@ The Clawd character design belongs to Anthropic. This is a community project wit
 
 **Token Tracker** — Quantify your AI output.
 
-<a href="https://www.tokentracker.cc">tokentracker.cc</a>  ·  <a href="https://www.npmjs.com/package/tokentracker-cli">npm</a>  ·  <a href="https://github.com/xiufengsun/TokenTracker">GitHub</a>
+<a href="https://github.com/mohui666/TokenTracker">GitHub</a>  ·  <a href="https://www.npmjs.com/package/tokentracker-cli">npm</a>  ·  <a href="https://github.com/xiufengsun/TokenTracker">upstream</a>
 
 </div>

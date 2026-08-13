@@ -1132,7 +1132,7 @@ final class StatusBarController: NSObject {
     }
 
     @objc private func openGitHub() {
-        if let url = URL(string: "https://github.com/xiufengsun/TokenTracker") {
+        if let url = URL(string: "https://github.com/mohui666/TokenTracker") {
             NSWorkspace.shared.open(url)
         }
     }

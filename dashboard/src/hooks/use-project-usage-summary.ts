@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from "react";
-import { isAccessTokenReady, resolveAuthAccessToken } from "../lib/auth-token";
 import { isMockEnabled } from "../lib/mock-data";
 import { getProjectUsageSummary } from "../lib/api";
 import { useLatestRequestGuard } from "./use-latest-request-guard";
@@ -21,7 +20,6 @@ export function useProjectUsageSummary({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const mockEnabled = isMockEnabled();
-  const tokenReady = isAccessTokenReady(accessToken);
 
   const isLocalMode = typeof window !== "undefined" &&
     (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
@@ -38,7 +36,7 @@ export function useProjectUsageSummary({
 
   const refresh = useCallback(async () => {
     const isCurrent = beginRequest();
-    const resolvedToken = await resolveAuthAccessToken(accessToken);
+    const resolvedToken = typeof accessToken === "string" ? accessToken : null;
     if (!isCurrent()) return;
     // 本地模式允许空 token
     if (!resolvedToken && !mockEnabled && !isLocalMode) {
@@ -73,8 +71,7 @@ export function useProjectUsageSummary({
   }, [accessToken, baseUrl, from, mockEnabled, source, timeZone, to, tzOffsetMinutes, isLocalMode, beginRequest]);
 
   useEffect(() => {
-    // 本地模式跳过 token 检查
-    if (!tokenReady && !mockEnabled && !isLocalMode) {
+    if (!mockEnabled && !isLocalMode) {
       setEntries([]);
       setError(null);
       setLoading(false);
@@ -84,7 +81,7 @@ export function useProjectUsageSummary({
     setError(null);
     setLoading(true);
     refresh();
-  }, [mockEnabled, refresh, tokenReady, isLocalMode]);
+  }, [mockEnabled, refresh, isLocalMode]);
 
   return { entries, loading, error, refresh };
 }

@@ -1,7 +1,7 @@
 // Display metadata for the achievement catalog.
 //
-// Thresholds do NOT live here — the server (SQL catalog table / local-api)
-// returns per-badge thresholds + next_threshold in its payloads, and
+// Thresholds do NOT live here — the local CLI (local-api) returns per-badge
+// thresholds + next_threshold in its payload, and
 // test/user-badges-thresholds-single-source.test.js enforces that no
 // threshold literals appear in dashboard code. Array order = display order.
 import {
@@ -14,9 +14,7 @@ import {
   FolderGit2,
   Footprints,
   Heart,
-  Medal,
   MoonStar,
-  Rocket,
   ShieldCheck,
   TrendingUp,
   Zap,
@@ -26,18 +24,16 @@ import {
 // for provenance); the lucide `icon` is the render fallback if the art fails
 // to load.
 export const BADGE_CATALOG = [
-  { id: "token_titan", scope: "cloud", icon: Crown, format: "tokens", art: "/achievements/token-titan.png" },
-  { id: "big_day", scope: "cloud", icon: Zap, format: "tokens", art: "/achievements/big-day.png" },
-  { id: "wordsmith", scope: "cloud", icon: Feather, format: "tokens", art: "/achievements/wordsmith.png" },
-  { id: "marathoner", scope: "cloud", icon: Footprints, format: "days", art: "/achievements/marathoner.png" },
-  { id: "streak", scope: "cloud", icon: Flame, format: "days", art: "/achievements/streak.png" },
-  { id: "weekend_warrior", scope: "cloud", icon: CalendarDays, format: "days", art: "/achievements/weekend-warrior.png" },
-  { id: "momentum", scope: "cloud", icon: TrendingUp, format: "multiplier", art: "/achievements/momentum.png" },
-  { id: "polyglot", scope: "cloud", icon: Brain, format: "count", art: "/achievements/polyglot.png" },
-  { id: "trendsetter", scope: "cloud", icon: Rocket, format: "count", art: "/achievements/trendsetter.png" },
-  { id: "multitool", scope: "cloud", icon: Blocks, format: "count", art: "/achievements/multitool.png" },
-  { id: "podium", scope: "cloud", icon: Medal, format: "rank", art: "/achievements/podium.png" },
-  { id: "veteran", scope: "cloud", icon: ShieldCheck, format: "days", art: "/achievements/veteran.png" },
+  { id: "token_titan", scope: "local", icon: Crown, format: "tokens", art: "/achievements/token-titan.png" },
+  { id: "big_day", scope: "local", icon: Zap, format: "tokens", art: "/achievements/big-day.png" },
+  { id: "wordsmith", scope: "local", icon: Feather, format: "tokens", art: "/achievements/wordsmith.png" },
+  { id: "marathoner", scope: "local", icon: Footprints, format: "days", art: "/achievements/marathoner.png" },
+  { id: "streak", scope: "local", icon: Flame, format: "days", art: "/achievements/streak.png" },
+  { id: "weekend_warrior", scope: "local", icon: CalendarDays, format: "days", art: "/achievements/weekend-warrior.png" },
+  { id: "momentum", scope: "local", icon: TrendingUp, format: "multiplier", art: "/achievements/momentum.png" },
+  { id: "polyglot", scope: "local", icon: Brain, format: "count", art: "/achievements/polyglot.png" },
+  { id: "multitool", scope: "local", icon: Blocks, format: "count", art: "/achievements/multitool.png" },
+  { id: "veteran", scope: "local", icon: ShieldCheck, format: "days", art: "/achievements/veteran.png" },
   { id: "project_hopper", scope: "local", icon: FolderGit2, format: "count", art: "/achievements/project-hopper.png" },
   { id: "project_devotion", scope: "local", icon: Heart, format: "tokens", art: "/achievements/project-devotion.png" },
   { id: "night_owl", scope: "local", icon: MoonStar, format: "count", art: "/achievements/night-owl.png" },

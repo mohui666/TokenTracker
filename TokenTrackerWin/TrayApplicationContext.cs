@@ -652,42 +652,6 @@ internal sealed class TrayApplicationContext : ApplicationContext
             PetWindow.CurrentCharacter);
     }
 
-    /// <summary>
-    /// Handle a <c>tokentracker://</c> deep link (forwarded from a second launch, or a
-    /// cold start argument). Currently only the OAuth callback
-    /// <c>tokentracker://auth/callback?insforge_code=…</c> is used; the code is routed
-    /// into the dashboard WebView to finish the InsForge session exchange. Mirrors the
-    /// macOS <c>application(_:open:)</c> → <c>handleAuthCallback</c> path.
-    /// </summary>
-    public void HandleDeepLink(string url)
-    {
-        DiagLog($"HandleDeepLink url={url}");
-        string? code = null;
-        try
-        {
-            var uri = new Uri(url);
-            if (!uri.Host.Equals("auth", StringComparison.OrdinalIgnoreCase)) return;
-            foreach (var pair in uri.Query.TrimStart('?').Split('&'))
-            {
-                var i = pair.IndexOf('=');
-                if (i <= 0 || pair[..i] != "insforge_code") continue;
-                var raw = pair[(i + 1)..];
-                if (raw.Length > 0) code = Uri.UnescapeDataString(raw);
-                break;
-            }
-        }
-        catch { return; }
-
-        if (string.IsNullOrEmpty(code)) { DiagLog("HandleDeepLink no insforge_code in query"); return; }
-        var resolved = code;
-        DiagLog($"HandleDeepLink resolved code.len={resolved.Length}");
-        PostToUi(() =>
-        {
-            EnsureDashboard();
-            _dashboard!.HandleAuthCallback(resolved);
-        });
-    }
-
     /// <summary>Diagnostics → %LOCALAPPDATA%\TokenTracker\windows-host.log (shared with ServerManager).</summary>
     private static void DiagLog(string message) => Diag.Log("tray", message);
 

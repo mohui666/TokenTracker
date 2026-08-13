@@ -10,24 +10,22 @@
 
 [![npm version](https://img.shields.io/npm/v/tokentracker-cli.svg?color=blue)](https://www.npmjs.com/package/tokentracker-cli)
 [![npm downloads](https://img.shields.io/npm/dm/tokentracker-cli.svg?color=brightgreen)](https://www.npmjs.com/package/tokentracker-cli)
-[![Homebrew](https://img.shields.io/github/v/release/xiufengsun/TokenTracker?label=brew&color=F8B73E&logo=homebrew&logoColor=white)](https://github.com/xiufengsun/homebrew-tokentracker)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 [![Platform](https://img.shields.io/badge/macOS-supported-lightgrey.svg)](https://www.apple.com/macos/)
-[![GitHub stars](https://img.shields.io/github/stars/xiufengsun/TokenTracker?style=social)](https://github.com/xiufengsun/TokenTracker/stargazers)
+[![GitHub stars](https://img.shields.io/github/stars/mohui666/TokenTracker?style=social)](https://github.com/mohui666/TokenTracker/stargazers)
 [![Featured in 阮一峰周刊 #393](https://img.shields.io/badge/Featured%20in-%E9%98%AE%E4%B8%80%E5%B3%B0%E5%91%A8%E5%88%8A%20%23393-FF6B35?logo=rss&logoColor=white)](https://github.com/ruanyf/weekly/blob/master/docs/issue-393.md)
-[![Author tokens](https://srctyff5.us-east.insforge.app/functions/tokentracker-badge-svg?user_id=0652839f-d19f-4f67-af85-6b7675875443&metric=tokens&compact=1&label=author%20tokens)](https://github.com/xiufengsun/TokenTracker)
 
 <br/>
 
-<video src="https://github.com/user-attachments/assets/5e709422-5af8-4e4c-8109-f5bb711eb3f8" controls muted playsinline poster="https://raw.githubusercontent.com/xiufengsun/tokentracker/main/docs/screenshots/dashboard-dark.png" width="820">
-  <img src="https://raw.githubusercontent.com/xiufengsun/tokentracker/main/docs/screenshots/dashboard-dark.png" alt="Token Tracker Dashboard" width="820" />
+<video src="https://github.com/user-attachments/assets/5e709422-5af8-4e4c-8109-f5bb711eb3f8" controls muted playsinline poster="https://raw.githubusercontent.com/mohui666/TokenTracker/main/docs/screenshots/dashboard-dark.png" width="820">
+  <img src="https://raw.githubusercontent.com/mohui666/TokenTracker/main/docs/screenshots/dashboard-dark.png" alt="Token Tracker Dashboard" width="820" />
 </video>
 
-<video src="https://github.com/user-attachments/assets/3275979d-bbed-4639-83e2-8b7d83bed6af" controls muted playsinline poster="https://raw.githubusercontent.com/xiufengsun/tokentracker/main/docs/screenshots/dashboard-light.png" width="820"></video>
+<video src="https://github.com/user-attachments/assets/3275979d-bbed-4639-83e2-8b7d83bed6af" controls muted playsinline poster="https://raw.githubusercontent.com/mohui666/TokenTracker/main/docs/screenshots/dashboard-light.png" width="820"></video>
 
 <br/><br/>
 
-⭐ **TokenTracker가 시간을 아껴줬다면 [GitHub에서 스타를 눌러주세요](https://github.com/xiufengsun/TokenTracker) — 다른 개발자들이 이 프로젝트를 발견하는 데 도움이 됩니다.**
+⭐ **TokenTracker가 시간을 아껴줬다면 [GitHub에서 스타를 눌러주세요](https://github.com/mohui666/TokenTracker) — 다른 개발자들이 이 프로젝트를 발견하는 데 도움이 됩니다.**
 
 <br/>
 
@@ -50,13 +48,13 @@ npx tokentracker-cli
 **30초 안에 얻는 것:**
 - 📊 사용 추세, 모델별 분석, 비용 분석을 보여주는 `localhost:7680`의 로컬 대시보드
 - 🔌 설치된 모든 지원 AI 도구에 대한 hook 자동 감지
-- 🏠 100% 로컬 — 계정 없음, API Key 없음, 네트워크 호출 없음 (옵션 리더보드 제외)
+- 🏠 100% 로컬 — 계정 없음, API Key 없음, 네트워크 호출 없음
 - 🧩 *옵션:* 250+개의 공개 Skill을 둘러보고 Claude · Codex · Gemini · OpenCode · Hermes 간에 동기화할 수 있는 Skills 탭
 
 > **네이티브 데스크톱 앱이 필요하다면?**
-> - **macOS** — [`TokenTrackerBar.dmg` 다운로드](https://github.com/xiufengsun/TokenTracker/releases/latest/download/TokenTrackerBar.dmg) → Applications로 드래그. 데스크톱 위젯, 메뉴바 상태 아이콘, WKWebView 안의 동일한 대시보드를 포함합니다.
-> - **Windows** — [`TokenTracker-Setup.exe` 다운로드](https://github.com/xiufengsun/TokenTracker/releases/latest/download/TokenTracker-Setup.exe) → 관리자 권한이 필요 없는 사용자 단위 설치 프로그램 실행. WebView2 안에 대시보드를 표시하는 시스템 트레이 앱입니다. 포터블 zip은 [릴리스 페이지](https://github.com/xiufengsun/TokenTracker/releases/latest)에 있습니다.
-> - **Linux** — [`TokenTracker-linux-x86_64.AppImage` 다운로드](https://github.com/xiufengsun/TokenTracker/releases/latest/download/TokenTracker-linux-x86_64.AppImage) → `chmod +x` 후 실행. WebKitGTK 창에 대시보드를 표시하는 트레이 앱입니다. 배포판의 `webkit2gtk-4.1`, `gtk3`, `libayatana-appindicator`가 필요하며 GNOME에서는 트레이 아이콘에 [AppIndicator 확장](https://extensions.gnome.org/extension/615/appindicator-support/)도 필요합니다.
+> - **macOS** — [`TokenTrackerBar.dmg` 다운로드](https://github.com/mohui666/TokenTracker/releases/latest/download/TokenTrackerBar.dmg) → Applications로 드래그. 데스크톱 위젯, 메뉴바 상태 아이콘, WKWebView 안의 동일한 대시보드를 포함합니다.
+> - **Windows** — [`TokenTracker-Setup.exe` 다운로드](https://github.com/mohui666/TokenTracker/releases/latest/download/TokenTracker-Setup.exe) → 관리자 권한이 필요 없는 사용자 단위 설치 프로그램 실행. WebView2 안에 대시보드를 표시하는 시스템 트레이 앱입니다. 포터블 zip은 [릴리스 페이지](https://github.com/mohui666/TokenTracker/releases/latest)에 있습니다.
+> - **Linux** — [`TokenTracker-linux-x86_64.AppImage` 다운로드](https://github.com/mohui666/TokenTracker/releases/latest/download/TokenTracker-linux-x86_64.AppImage) → `chmod +x` 후 실행. WebKitGTK 창에 대시보드를 표시하는 트레이 앱입니다. 배포판의 `webkit2gtk-4.1`, `gtk3`, `libayatana-appindicator`가 필요하며 GNOME에서는 트레이 아이콘에 [AppIndicator 확장](https://extensions.gnome.org/extension/615/appindicator-support/)도 필요합니다.
 
 짧은 명령어로 쓰려면 전역 설치:
 
@@ -68,20 +66,6 @@ tokentracker sync         # 수동 동기화
 tokentracker status       # hook 상태 확인
 tokentracker doctor       # 헬스 체크
 ```
-
-### 🍺 Homebrew (macOS)
-
-`brew`를 선호한다면, 별도 tap 단계 없이 바로 설치 가능:
-
-```bash
-# macOS 메뉴바 앱 (DMG)
-brew install --cask xiufengsun/tokentracker/tokentracker
-
-# CLI만
-brew install xiufengsun/tokentracker/tokentracker
-```
-
-업그레이드는 `brew upgrade --cask xiufengsun/tokentracker/tokentracker`. tap은 새 릴리스마다 한 시간 이내에 자동 갱신됩니다.
 
 ---
 
@@ -97,8 +81,6 @@ brew install xiufengsun/tokentracker/tokentracker
 - 📈 **실시간 사용 한도** — Claude / Codex / Cursor / Gemini / Kimi / Kiro / Grok / Copilot / Antigravity / ZCode / OpenCode Go / Qoder / Qoder CN 한도를 표시하고 로컬 provider 앱이 잠시 종료되어도 last-good 캐시 유지
 - 🟢 **서비스 상태 페이지** — 8개 공식 provider 상태 페이지의 운영 및 장애 상태 표시
 - 💰 **비용 엔진** — [LiteLLM](https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json)을 통해 2,200+개 모델 가격 책정 (매일 자동 갱신) + 틈새 도구 (Kiro, Cursor Composer, Kimi, CodeBuddy hy3)를 위한 수동 큐레이션 오버라이드; 24시간 디스크 캐시 + 번들된 오프라인 스냅샷으로 인터넷 없이도 정확한 USD 표시. 벤더가 공식 가격을 공개하지 않은 모델 (예: Tencent hy3-preview)은 토큰만 추적되며 벤더가 요율을 공개할 때까지 비용은 $0으로 표시됩니다.
-- 🌐 **옵션 리더보드** — 전 세계 개발자들과 비교; 컬럼을 드래그하여 관심 있는 프로바이더에 집중 (옵트인, 참여하려면 사인인 필요)
-- 🔄 **기기 간 계정 뷰** — 클라우드 동기화를 켜면 작업하는 모든 기기(노트북 + 데스크톱 + 서버)의 사용량을 하나의 뷰로 통합 — 총량·트렌드·히트맵·모델 분석을 모두 기기 통합으로 집계 (옵트인, 사인인 필요; 기본 로컬 전용 경험은 즉시·오프라인 유지)
 - 🧩 **옵션 Skills 탭** — `anthropics/skills`, `ComposioHQ/awesome-claude-skills`, `skills.sh` 그리고 직접 추가한 임의의 GitHub 저장소에서 250+개의 공개 Skill을 둘러보고, 타겟 이름을 지정해 Claude / Codex / Gemini / OpenCode / Hermes에 동기화. 원클릭 Undo 지원.
 - 🔒 **프라이버시 우선** — 토큰 수치와 타임스탬프만. 프롬프트, 응답, 파일 내용은 절대 다루지 않음.
 
@@ -112,30 +94,23 @@ brew install xiufengsun/tokentracker/tokentracker
 
 **대시보드** — 사용 추세, 모델별 분석, 비용 분석
 
-<img src="https://raw.githubusercontent.com/xiufengsun/tokentracker/main/docs/screenshots/dashboard-light.png" alt="Dashboard" />
+<img src="https://raw.githubusercontent.com/mohui666/TokenTracker/main/docs/screenshots/dashboard-light.png" alt="Dashboard" />
 
 </td>
 <td width="50%">
 
 **데스크톱 위젯** — 사용 정보를 데스크톱에 고정
 
-<img src="https://raw.githubusercontent.com/xiufengsun/tokentracker/main/docs/screenshots/widgets-overview.png" alt="Desktop Widgets" />
+<img src="https://raw.githubusercontent.com/mohui666/TokenTracker/main/docs/screenshots/widgets-overview.png" alt="Desktop Widgets" />
 
 </td>
 </tr>
 <tr>
-<td width="50%">
+<td colspan="2">
 
 **메뉴바 앱** — 애니메이션 Clawd 컴패니언 + 네이티브 패널
 
-<img src="https://raw.githubusercontent.com/xiufengsun/tokentracker/main/docs/screenshots/menubar.gif" alt="Menu Bar App" />
-
-</td>
-<td width="50%">
-
-**글로벌 리더보드** — 전 세계 개발자들과 비교
-
-<img src="https://raw.githubusercontent.com/xiufengsun/tokentracker/main/docs/screenshots/leaderboard.png" alt="Leaderboard" />
+<img src="https://raw.githubusercontent.com/mohui666/TokenTracker/main/docs/screenshots/menubar.gif" alt="Menu Bar App" />
 
 </td>
 </tr>
@@ -144,7 +119,7 @@ brew install xiufengsun/tokentracker/tokentracker
 
 **Skills Manager** — GitHub와 `skills.sh`에서 250+개의 공개 Skill을 둘러보고, 한 번 설치하면 Claude / Codex / Gemini / OpenCode / Hermes에 동기화. 타겟별 토글, 원클릭 Undo, 수동 파일 복사 불필요.
 
-<img src="https://raw.githubusercontent.com/xiufengsun/tokentracker/main/docs/screenshots/skills.png" alt="Skills Manager" />
+<img src="https://raw.githubusercontent.com/mohui666/TokenTracker/main/docs/screenshots/skills.png" alt="Skills Manager" />
 
 </td>
 </tr>
@@ -153,7 +128,7 @@ brew install xiufengsun/tokentracker/tokentracker
 
 **데스크톱 펫** — 데스크톱 위에 떠 있는 픽셀 컴패니언. 실제 토큰 사용량에 반응해 코딩할 때 함께 일하고, 연속 기록을 축하하고, 쉴 때는 잠듭니다. [codex-pets.net](https://codex-pets.net) 링크나 `.codex-pet.zip`으로 커뮤니티 펫을 가져올 수 있고, V2 펫은 커서를 16방향으로 따라봅니다. macOS / Windows / 웹 지원.
 
-<img src="https://raw.githubusercontent.com/xiufengsun/tokentracker/main/docs/screenshots/pet.png" alt="Desktop Pet" />
+<img src="https://raw.githubusercontent.com/mohui666/TokenTracker/main/docs/screenshots/pet.png" alt="Desktop Pet" />
 
 </td>
 </tr>
@@ -206,7 +181,7 @@ brew install xiufengsun/tokentracker/tokentracker
 >
 > 더 깊이 살펴보기: [OpenClaw 통합 & 트러블슈팅](docs/openclaw-integration.md).
 
-원하는 도구가 빠져 있나요? [Issue를 열어주세요](https://github.com/xiufengsun/TokenTracker/issues/new) — 새 프로바이더 추가는 보통 파서 파일 하나 정도면 됩니다.
+원하는 도구가 빠져 있나요? [Issue를 열어주세요](https://github.com/mohui666/TokenTracker/issues/new) — 새 프로바이더 추가는 보통 파서 파일 하나 정도면 됩니다.
 
 ---
 
@@ -232,7 +207,6 @@ flowchart LR
     C --> D[Web Dashboard]
     C --> E[Menu Bar App]
     C --> F[Desktop Widgets]
-    C -.->|opt-in| G[(Cloud Leaderboard)]
 ```
 
 1. AI CLI 도구가 평소 사용 중에 로그를 생성
@@ -250,9 +224,9 @@ flowchart LR
 | 보호 | 설명 |
 |---|---|
 | **콘텐츠 업로드 없음** | 토큰 수치와 타임스탬프만. 프롬프트, 응답, 파일 내용은 절대 다루지 않습니다. |
-| **기본적으로 로컬 전용** | 모든 데이터는 기기에 머뭅니다. 리더보드는 완전히 옵트인. |
+| **기본적으로 로컬 전용** | 모든 데이터는 기기에 머뭅니다. |
 | **감사 가능** | 오픈 소스. [`src/lib/rollout.js`](src/lib/rollout.js)를 읽어보세요 — 숫자와 타임스탬프뿐입니다. |
-| **익명 사용 통계만** | 외부 전송은 익명 2가지뿐: (1) 하루 최대 1회 하트비트——머신 ID의 단방향 해시, 앱 버전, OS 플랫폼, 실행 형태(cli/mac/win); (2) 익명 대시보드 페이지/기능 이벤트(PostHog——autocapture와 세션 녹화 비활성화, 브라우저 Do-Not-Track 존중). 토큰 수, 모델명, 프롬프트, 경로는 절대 포함되지 않습니다. [`src/lib/telemetry.js`](src/lib/telemetry.js)와 [`dashboard/src/lib/analytics.js`](dashboard/src/lib/analytics.js)에서 감사 가능하며 `TOKENTRACKER_NO_TELEMETRY=1` 또는 `DO_NOT_TRACK=1` 하나로 둘 다 비활성화됩니다. |
+| **외부 전송 없음** | 이 포크에는 호스티드 백엔드가 없습니다. 하트비트도, 애널리틱스도, 업로드도 없습니다. 토큰 수, 모델명, 프롬프트, 경로는 기기를 절대 떠나지 않습니다. |
 
 ---
 
@@ -263,7 +237,6 @@ flowchart LR
 | 변수 | 설명 | 기본값 |
 |---|---|---|
 | `TOKENTRACKER_DEBUG` | 디버그 출력 활성화 (`1`로 활성화) | — |
-| `TOKENTRACKER_NO_TELEMETRY` | 모든 익명 텔레메트리(일일 하트비트 + 대시보드 분석) 비활성화 (`1`로 비활성화, `DO_NOT_TRACK` 표준도 지원) | — |
 | `TOKENTRACKER_HTTP_TIMEOUT_MS` | HTTP 타임아웃 (밀리초) | `20000` |
 | `TOKENTRACKER_DISABLE_GIT_ATTRIBUTION` | Git 커밋 연결 비활성화(`1`이면 비활성화). 연결 기능은 각 세션의 작업 디렉터리에서 `git log`를 실행합니다. 비활성화하면 TokenTracker가 프로젝트 디렉터리에 전혀 접근하지 않습니다(Outcomes에는 수동 기록만 표시) | — |
 | `TOKENTRACKER_GIT_ATTRIBUTION_PROTECTED_DIRS` | Git 연결이 macOS 보호 위치에 접근하도록 허용(`1`이면 허용). 기본적으로 `~/Documents`, `~/Downloads`, `~/Desktop`, `~/Library`, 미디어 폴더, `/Volumes` 아래의 세션은 건너뜁니다. macOS가 위치마다 별도의 접근 허용 대화상자를 띄우기 때문입니다. 해당 위치에 저장소를 두고 있고 권한을 허용해도 괜찮을 때만 켜세요 | — |
@@ -275,7 +248,7 @@ flowchart LR
 ## 🛠️ 개발
 
 ```bash
-git clone https://github.com/xiufengsun/TokenTracker.git
+git clone https://github.com/mohui666/TokenTracker.git
 cd TokenTracker
 npm install
 
@@ -360,7 +333,7 @@ tokentracker status
 tokentracker doctor
 ```
 
-사용하고 있는데도 설정되지 않은 것으로 표시되는 프로바이더가 있다면 `tokentracker activate-if-needed`로 hook 감지를 다시 실행해 보세요. 여전히 없으면 `doctor` 출력을 첨부해 [Issue를 열어주세요](https://github.com/xiufengsun/TokenTracker/issues/new).
+사용하고 있는데도 설정되지 않은 것으로 표시되는 프로바이더가 있다면 `tokentracker activate-if-needed`로 hook 감지를 다시 실행해 보세요. 여전히 없으면 `doctor` 출력을 첨부해 [Issue를 열어주세요](https://github.com/mohui666/TokenTracker/issues/new).
 
 </details>
 
@@ -426,46 +399,13 @@ xattr -cr /Applications/TokenTracker.app
 
 ---
 
-## 🪪 README 배지
-
-GitHub 프로필이나 프로젝트 README에서 토큰 사용량을 자랑해 보세요.
-
-`YOUR_USER_ID`를 얻는 방법:
-1. `tokentracker`를 실행해 대시보드를 열고 리더보드에 사인인합니다.
-2. **Settings → Account**로 이동합니다.
-3. 표시되는 **User ID**를 사용합니다. headless / SSH 환경에서는 `tokentracker device-login`도 같은 `user_id`를 `~/.tokentracker/tracker/config.json`에 씁니다.
-
-아래 중 하나를 붙여넣으세요:
-
-```markdown
-[![tokens](https://srctyff5.us-east.insforge.app/functions/tokentracker-badge-svg?user_id=YOUR_USER_ID&metric=tokens)](https://github.com/xiufengsun/TokenTracker)
-[![cost](https://srctyff5.us-east.insforge.app/functions/tokentracker-badge-svg?user_id=YOUR_USER_ID&metric=cost)](https://github.com/xiufengsun/TokenTracker)
-[![rank](https://srctyff5.us-east.insforge.app/functions/tokentracker-badge-svg?user_id=YOUR_USER_ID&metric=rank)](https://github.com/xiufengsun/TokenTracker)
-```
-
-> 링크 대상은 기본적으로 TokenTracker 리포지토리로 설정되어 있어, 클릭 한 번이 다른 개발자의 발견으로 이어집니다. 본인의 leaderboard 프로필, 개인 사이트, 또는 `https://www.tokentracker.cc`로 보내고 싶다면 URL만 바꾸면 됩니다.
-
-현재 합계를 반영한 shields.io 호환 배지가 렌더링됩니다 (60초 캐시):
-
-| 파라미터 | 값 | 기본값 |
-|---|---|---|
-| `metric` | `tokens` / `cost` / `rank` | `tokens` |
-| `period` | `week` / `month` / `total` | `total` |
-| `style` | `flat` / `flat-square` | `flat` |
-| `label` | 임의의 짧은 문자열 | metric 이름 |
-| `color` | hex, 예: `ff6b35` | 브랜드 그린 |
-
-> **프라이버시**: 배지는 리더보드 공유가 **켜져** 있는 (`Settings → Account → Public profile`) 프로필에 대해서만 해석됩니다. 비공개 프로필은 "private" 플레이스홀더가 반환됩니다.
-
----
-
 ## ⭐ Star History
 
-<a href="https://www.star-history.com/?repos=xiufengsun%2FTokenTracker&type=date&legend=top-left">
+<a href="https://www.star-history.com/?repos=mohui666%2FTokenTracker&type=date&legend=top-left">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=xiufengsun/TokenTracker&type=date&theme=dark&legend=top-left&sealed_token=Vr7qbPNqOTtzQEdtkxS2yArAReX2QkBZKNJgs3n32Q5oJa1iXddLlrT201teNSnt7QnsXtDcHy_T387xvXJ_HXHrPtvH2QQ1xqQZ67N_HV45ulWrt3j6hziDW5eshRCmu8CAT_W31PY0-WVZpFv7NQD-acv1stVK8ndribTokIp9ukSYAedx3icuUrOu" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=xiufengsun/TokenTracker&type=date&legend=top-left&sealed_token=Vr7qbPNqOTtzQEdtkxS2yArAReX2QkBZKNJgs3n32Q5oJa1iXddLlrT201teNSnt7QnsXtDcHy_T387xvXJ_HXHrPtvH2QQ1xqQZ67N_HV45ulWrt3j6hziDW5eshRCmu8CAT_W31PY0-WVZpFv7NQD-acv1stVK8ndribTokIp9ukSYAedx3icuUrOu" />
-    <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=xiufengsun/TokenTracker&type=date&legend=top-left&sealed_token=Vr7qbPNqOTtzQEdtkxS2yArAReX2QkBZKNJgs3n32Q5oJa1iXddLlrT201teNSnt7QnsXtDcHy_T387xvXJ_HXHrPtvH2QQ1xqQZ67N_HV45ulWrt3j6hziDW5eshRCmu8CAT_W31PY0-WVZpFv7NQD-acv1stVK8ndribTokIp9ukSYAedx3icuUrOu" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=mohui666/TokenTracker&type=date&theme=dark&legend=top-left&sealed_token=Vr7qbPNqOTtzQEdtkxS2yArAReX2QkBZKNJgs3n32Q5oJa1iXddLlrT201teNSnt7QnsXtDcHy_T387xvXJ_HXHrPtvH2QQ1xqQZ67N_HV45ulWrt3j6hziDW5eshRCmu8CAT_W31PY0-WVZpFv7NQD-acv1stVK8ndribTokIp9ukSYAedx3icuUrOu" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=mohui666/TokenTracker&type=date&legend=top-left&sealed_token=Vr7qbPNqOTtzQEdtkxS2yArAReX2QkBZKNJgs3n32Q5oJa1iXddLlrT201teNSnt7QnsXtDcHy_T387xvXJ_HXHrPtvH2QQ1xqQZ67N_HV45ulWrt3j6hziDW5eshRCmu8CAT_W31PY0-WVZpFv7NQD-acv1stVK8ndribTokIp9ukSYAedx3icuUrOu" />
+    <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=mohui666/TokenTracker&type=date&legend=top-left&sealed_token=Vr7qbPNqOTtzQEdtkxS2yArAReX2QkBZKNJgs3n32Q5oJa1iXddLlrT201teNSnt7QnsXtDcHy_T387xvXJ_HXHrPtvH2QQ1xqQZ67N_HV45ulWrt3j6hziDW5eshRCmu8CAT_W31PY0-WVZpFv7NQD-acv1stVK8ndribTokIp9ukSYAedx3icuUrOu" />
   </picture>
 </a>
 
@@ -473,10 +413,10 @@ GitHub 프로필이나 프로젝트 README에서 토큰 사용량을 자랑해 �
 
 ## 🤝 컨트리뷰션 & 지원
 
-- **버그 / 기능 요청**: [Issue 열기](https://github.com/xiufengsun/TokenTracker/issues/new)
+- **버그 / 기능 요청**: [Issue 열기](https://github.com/mohui666/TokenTracker/issues/new)
 - **보안**: [SECURITY.md](SECURITY.md) 참조 — 보안 보고는 공개 Issue로 올리지 마세요
 - **풀 리퀘스트**: 셋업, 테스트, 새 AI 도구 통합 추가 방법은 [CONTRIBUTING.md](CONTRIBUTING.md) 참조
-- **질문 / 쇼케이스**: [GitHub Discussions](https://github.com/xiufengsun/TokenTracker/discussions)
+- **질문 / 쇼케이스**: [GitHub Discussions](https://github.com/mohui666/TokenTracker/discussions)
 
 ## 🙏 크레딧
 
@@ -496,6 +436,6 @@ Clawd 캐릭터 디자인은 Anthropic의 자산입니다. 이 프로젝트는 �
 
 **Token Tracker** — 당신의 AI 산출물을 정량화하세요.
 
-<a href="https://www.tokentracker.cc">tokentracker.cc</a>  ·  <a href="https://www.npmjs.com/package/tokentracker-cli">npm</a>  ·  <a href="https://github.com/xiufengsun/TokenTracker">GitHub</a>
+<a href="https://github.com/mohui666/TokenTracker">GitHub</a>  ·  <a href="https://www.npmjs.com/package/tokentracker-cli">npm</a>  ·  <a href="https://github.com/xiufengsun/TokenTracker">upstream</a>
 
 </div>

@@ -21,7 +21,7 @@ async function runInit(env) {
   await new Promise((resolve, reject) => {
     cp.execFile(
       process.execPath,
-      [entry, "init", "--yes", "--no-auth", "--no-open", "--base-url", "https://example.invalid"],
+      [entry, "init", "--yes", "--no-open"],
       { env },
       (err) => {
         if (err) return reject(err);

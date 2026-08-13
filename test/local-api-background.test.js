@@ -44,9 +44,7 @@ async function getLocalAuthToken(handler) {
 
 function loadLocalApiWithSpawn(fakeSpawn) {
   const childProcess = require("node:child_process");
-  const cloudAccount = require("../src/lib/cloud-account");
   const originalSpawn = childProcess.spawn;
-  cloudAccount.__resetCloudAccountCacheForTests();
   childProcess.spawn = fakeSpawn;
   delete require.cache[require.resolve("../src/lib/local-api")];
   const mod = require("../src/lib/local-api");
@@ -54,7 +52,6 @@ function loadLocalApiWithSpawn(fakeSpawn) {
     mod,
     restore() {
       childProcess.spawn = originalSpawn;
-      cloudAccount.__resetCloudAccountCacheForTests();
       delete require.cache[require.resolve("../src/lib/local-api")];
     },
   };
@@ -93,10 +90,7 @@ async function runLocalSync(body, options = {}) {
     const req = createRequest({
       method: "POST",
       headers: { "x-tokentracker-local-auth": localAuthToken },
-      body: JSON.stringify({
-        ...(options.includeDeviceToken === false ? {} : { deviceToken: "device-token" }),
-        ...body,
-      }),
+      body: JSON.stringify(body),
     });
     const res = createResponse();
 
@@ -118,41 +112,6 @@ async function runLocalSync(body, options = {}) {
     else process.env.USERPROFILE = savedUserProfile;
     if (ownsTmpHome) fs.rmSync(tmpHome, { recursive: true, force: true });
   }
-}
-
-function createCloudSyncHome(prefix) {
-  const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
-  const trackerDir = path.join(tmpHome, ".tokentracker", "tracker");
-  fs.mkdirSync(trackerDir, { recursive: true });
-  fs.writeFileSync(path.join(trackerDir, "cloud-sync-pref.json"), JSON.stringify({ enabled: true }));
-  fs.writeFileSync(path.join(trackerDir, "config.json"), JSON.stringify({ machineId: "machine-abcdef12" }));
-  fs.writeFileSync(
-    path.join(trackerDir, "relay-cookies.json"),
-    JSON.stringify({
-      insforge_refresh_token: "insforge_refresh_token=refresh-xyz; Path=/; HttpOnly; SameSite=Lax",
-    }),
-  );
-  return { tmpHome, trackerDir };
-}
-
-function installDeviceTokenFetch(fetchCalls) {
-  global.fetch = async (urlStr, opts = {}) => {
-    fetchCalls.push({ url: String(urlStr), opts });
-    if (String(urlStr) === "https://cloud.example/api/auth/refresh?client_type=mobile") {
-      return { ok: true, status: 200, json: async () => ({ accessToken: "access-token" }) };
-    }
-    if (String(urlStr) === "https://cloud.example/functions/tokentracker-device-token-issue") {
-      assert.equal(opts.headers.Authorization, "Bearer access-token");
-      const body = JSON.parse(String(opts.body || "{}"));
-      assert.equal(body.machine_id, "machine-abcdef12");
-      return {
-        ok: true,
-        status: 200,
-        json: async () => ({ token: "issued-device-token", device_id: "device-id" }),
-      };
-    }
-    throw new Error(`unexpected fetch ${urlStr}`);
-  };
 }
 
 test("local-api forwards strict boolean auto background sync", async () => {
@@ -177,7 +136,7 @@ test("local-api treats lightweight true as background alias", async () => {
   ]);
 });
 
-test("local-api combines background scan with drain upload", async () => {
+test("local-api combines background scan with drain priority", async () => {
   const call = await runLocalSync({
     drain: true,
     auto: true,
@@ -211,181 +170,5 @@ test("local-api background and lightweight require boolean true", async () => {
     const call = await runLocalSync({ auto: true, ...body });
     const args = call.args;
     assert.deepEqual(args.slice(-3), [path.join(process.cwd(), "bin/tracker.js"), "sync", "--auto"]);
-  }
-});
-
-test("local-api background sync skips relayed cloud device-token issuance", async () => {
-  const fixture = createCloudSyncHome("tokentracker-local-api-background-cloud-");
-  const savedBaseUrl = process.env.TOKENTRACKER_INSFORGE_BASE_URL;
-  const savedFetch = global.fetch;
-  const fetchCalls = [];
-  process.env.TOKENTRACKER_INSFORGE_BASE_URL = "https://cloud.example";
-  global.fetch = async (urlStr) => {
-    fetchCalls.push(String(urlStr));
-    throw new Error(`unexpected fetch ${urlStr}`);
-  };
-
-  try {
-    const call = await runLocalSync(
-      { auto: true, background: true },
-      {
-        tmpHome: fixture.tmpHome,
-        queuePath: path.join(fixture.trackerDir, "queue.jsonl"),
-        includeDeviceToken: false,
-      },
-    );
-
-    assert.deepEqual(call.args.slice(-4), [
-      path.join(process.cwd(), "bin/tracker.js"),
-      "sync",
-      "--auto",
-      "--background",
-    ]);
-    assert.equal(call.options.env.TOKENTRACKER_DEVICE_TOKEN, undefined);
-    assert.deepEqual(fetchCalls, []);
-  } finally {
-    if (savedBaseUrl === undefined) delete process.env.TOKENTRACKER_INSFORGE_BASE_URL;
-    else process.env.TOKENTRACKER_INSFORGE_BASE_URL = savedBaseUrl;
-    global.fetch = savedFetch;
-    fs.rmSync(fixture.tmpHome, { recursive: true, force: true });
-  }
-});
-
-test("explicit account publication mints a cached token for bounded background sync", async () => {
-  const fixture = createCloudSyncHome("tokentracker-local-api-background-publish-");
-  const savedBaseUrl = process.env.TOKENTRACKER_INSFORGE_BASE_URL;
-  const savedFetch = global.fetch;
-  const fetchCalls = [];
-  process.env.TOKENTRACKER_INSFORGE_BASE_URL = "https://cloud.example";
-  installDeviceTokenFetch(fetchCalls);
-
-  try {
-    const call = await runLocalSync(
-      { auto: true, background: true, publishAccount: true },
-      {
-        tmpHome: fixture.tmpHome,
-        queuePath: path.join(fixture.trackerDir, "queue.jsonl"),
-        includeDeviceToken: false,
-      },
-    );
-
-    assert.deepEqual(call.args.slice(-5), [
-      path.join(process.cwd(), "bin/tracker.js"),
-      "sync",
-      "--auto",
-      "--background",
-      "--publish-account",
-    ]);
-    assert.equal(call.options.env.TOKENTRACKER_DEVICE_TOKEN, "issued-device-token");
-    assert.equal(fetchCalls.filter((c) => c.url.endsWith("/api/auth/refresh?client_type=mobile")).length, 1);
-    assert.equal(fetchCalls.filter((c) => c.url.endsWith("/functions/tokentracker-device-token-issue")).length, 1);
-  } finally {
-    if (savedBaseUrl === undefined) delete process.env.TOKENTRACKER_INSFORGE_BASE_URL;
-    else process.env.TOKENTRACKER_INSFORGE_BASE_URL = savedBaseUrl;
-    global.fetch = savedFetch;
-    fs.rmSync(fixture.tmpHome, { recursive: true, force: true });
-  }
-});
-
-test("disabled cloud sync suppresses background account publication even with a device token", async () => {
-  const fixture = createCloudSyncHome("tokentracker-local-api-background-disabled-");
-  fs.writeFileSync(
-    path.join(fixture.trackerDir, "cloud-sync-pref.json"),
-    JSON.stringify({ enabled: false }),
-  );
-
-  try {
-    const call = await runLocalSync(
-      { auto: true, background: true, publishAccount: true },
-      {
-        tmpHome: fixture.tmpHome,
-        queuePath: path.join(fixture.trackerDir, "queue.jsonl"),
-      },
-    );
-
-    assert.deepEqual(call.args.slice(-4), [
-      path.join(process.cwd(), "bin/tracker.js"),
-      "sync",
-      "--auto",
-      "--background",
-    ]);
-    assert.equal(call.options.env.TOKENTRACKER_DEVICE_TOKEN, "device-token");
-  } finally {
-    fs.rmSync(fixture.tmpHome, { recursive: true, force: true });
-  }
-});
-
-test("local-api lightweight sync skips relayed cloud device-token issuance", async () => {
-  const fixture = createCloudSyncHome("tokentracker-local-api-lightweight-cloud-");
-  const savedBaseUrl = process.env.TOKENTRACKER_INSFORGE_BASE_URL;
-  const savedFetch = global.fetch;
-  const fetchCalls = [];
-  process.env.TOKENTRACKER_INSFORGE_BASE_URL = "https://cloud.example";
-  global.fetch = async (urlStr) => {
-    fetchCalls.push(String(urlStr));
-    throw new Error(`unexpected fetch ${urlStr}`);
-  };
-
-  try {
-    const call = await runLocalSync(
-      { auto: true, lightweight: true },
-      {
-        tmpHome: fixture.tmpHome,
-        queuePath: path.join(fixture.trackerDir, "queue.jsonl"),
-        includeDeviceToken: false,
-      },
-    );
-
-    assert.deepEqual(call.args.slice(-4), [
-      path.join(process.cwd(), "bin/tracker.js"),
-      "sync",
-      "--auto",
-      "--background",
-    ]);
-    assert.equal(call.options.env.TOKENTRACKER_DEVICE_TOKEN, undefined);
-    assert.deepEqual(fetchCalls, []);
-  } finally {
-    if (savedBaseUrl === undefined) delete process.env.TOKENTRACKER_INSFORGE_BASE_URL;
-    else process.env.TOKENTRACKER_INSFORGE_BASE_URL = savedBaseUrl;
-    global.fetch = savedFetch;
-    fs.rmSync(fixture.tmpHome, { recursive: true, force: true });
-  }
-});
-
-test("local-api manual and drain sync still issue relayed cloud device tokens", async () => {
-  const savedBaseUrl = process.env.TOKENTRACKER_INSFORGE_BASE_URL;
-  const savedFetch = global.fetch;
-  const cases = [
-    { prefix: "tokentracker-local-api-manual-cloud-", body: {}, expectedArgs: ["sync"] },
-    { prefix: "tokentracker-local-api-drain-cloud-", body: { drain: true }, expectedArgs: ["sync", "--drain"] },
-  ];
-
-  try {
-    process.env.TOKENTRACKER_INSFORGE_BASE_URL = "https://cloud.example";
-    for (const testCase of cases) {
-      const fixture = createCloudSyncHome(testCase.prefix);
-      const fetchCalls = [];
-      installDeviceTokenFetch(fetchCalls);
-      try {
-        const call = await runLocalSync(
-          testCase.body,
-          {
-            tmpHome: fixture.tmpHome,
-            queuePath: path.join(fixture.trackerDir, "queue.jsonl"),
-            includeDeviceToken: false,
-          },
-        );
-        assert.deepEqual(call.args.slice(-testCase.expectedArgs.length), testCase.expectedArgs);
-        assert.equal(call.options.env.TOKENTRACKER_DEVICE_TOKEN, "issued-device-token");
-        assert.equal(fetchCalls.filter((c) => c.url.endsWith("/api/auth/refresh?client_type=mobile")).length, 1);
-        assert.equal(fetchCalls.filter((c) => c.url.endsWith("/functions/tokentracker-device-token-issue")).length, 1);
-      } finally {
-        fs.rmSync(fixture.tmpHome, { recursive: true, force: true });
-      }
-    }
-  } finally {
-    if (savedBaseUrl === undefined) delete process.env.TOKENTRACKER_INSFORGE_BASE_URL;
-    else process.env.TOKENTRACKER_INSFORGE_BASE_URL = savedBaseUrl;
-    global.fetch = savedFetch;
   }
 });

@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { isAccessTokenReady, resolveAuthAccessToken } from "../lib/auth-token";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { isMockEnabled } from "../lib/mock-data";
 import { getTimeZoneCacheKey } from "../lib/timezone";
-import { fetchCloudUsageModelBreakdown, getUsageModelBreakdown } from "../lib/api";
+import { getUsageModelBreakdown } from "../lib/api";
 import { useLatestRequestGuard } from "./use-latest-request-guard";
 
 export function useUsageModelBreakdown({
@@ -14,20 +13,14 @@ export function useUsageModelBreakdown({
   cacheKey,
   timeZone,
   tzOffsetMinutes,
-  accountView = false,
-  accountAccessToken = null,
-  accountRevision = 0,
-  accountViewResolving = false,
   deviceId = null,
 }: any = {}) {
-  const useCloud = Boolean(accountView && accountAccessToken);
-  const scopeKey = useCloud ? "cloud" : "local";
+  const scopeKey = "local";
   const [breakdown, setBreakdown] = useState<any | null>(null);
   const [source, setSource] = useState<string>("edge");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const mockEnabled = isMockEnabled();
-  const tokenReady = isAccessTokenReady(accessToken);
   const cacheAllowed = !guestAllowed;
 
   const storageKey = useMemo(() => {
@@ -78,40 +71,19 @@ export function useUsageModelBreakdown({
     baseUrl,
     from,
     to,
-    scopeKey,
     accessToken,
-    accountAccessToken,
-    accountRevision,
     deviceId,
     timeZone,
     tzOffsetMinutes,
   ]);
 
-  // Wipe state when the scope flips so the prior buckets don't render
-  // while the new fetch is in flight.
-  const lastScopeRef = useRef(scopeKey);
-  useEffect(() => {
-    if (lastScopeRef.current === scopeKey) return;
-    lastScopeRef.current = scopeKey;
-    setBreakdown(null);
-    setSource("edge");
-    setError(null);
-    setLoading(true);
-  }, [scopeKey]);
-
   const refresh = useCallback(async () => {
     const isCurrent = beginRequest();
-    const resolvedToken = await resolveAuthAccessToken(accessToken);
-    const cloudToken = useCloud ? await resolveAuthAccessToken(accountAccessToken) : null;
+    const resolvedToken = typeof accessToken === "string" ? accessToken : null;
     if (!isCurrent()) return;
-    if (!resolvedToken && !mockEnabled && !isLocalMode && !useCloud) return;
-    if (useCloud && !cloudToken) {
-      setError("Your session expired. Please sign in again to view account data.");
-      setLoading(false);
-      return;
-    }
-    const tokenForFetch = useCloud ? cloudToken : resolvedToken;
-    const breakdownFetcher = useCloud ? fetchCloudUsageModelBreakdown : getUsageModelBreakdown;
+    if (!resolvedToken && !mockEnabled && !isLocalMode) return;
+    const tokenForFetch = resolvedToken;
+    const breakdownFetcher = getUsageModelBreakdown;
     setLoading(true);
     setError(null);
     try {
@@ -165,24 +137,16 @@ export function useUsageModelBreakdown({
     readCache,
     timeZone,
     to,
-    tokenReady,
     tzOffsetMinutes,
     clearCache,
     writeCache,
     isLocalMode,
-    useCloud,
-    accountAccessToken,
-    accountRevision,
     deviceId,
     beginRequest,
   ]);
 
   useEffect(() => {
-    if (accountViewResolving) {
-      setLoading(true);
-      return;
-    }
-    if (!tokenReady && !guestAllowed && !mockEnabled && !isLocalMode && !useCloud) {
+    if (!guestAllowed && !mockEnabled && !isLocalMode) {
       setBreakdown(null);
       setSource("edge");
       setError(null);
@@ -214,12 +178,10 @@ export function useUsageModelBreakdown({
     mockEnabled,
     readCache,
     refresh,
-    tokenReady,
     guestAllowed,
     cacheAllowed,
     clearCache,
     isLocalMode,
-    accountViewResolving,
   ]);
 
   const normalizedSource = mockEnabled ? "mock" : source;

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
 import { getOutcomes } from "../lib/api";
-import { resolveAuthAccessToken } from "../lib/auth-token";
 import { useLatestRequestGuard } from "./use-latest-request-guard";
 
 // Fetches the opt-in quality-per-dollar / Effective-Tokens join from the local
@@ -25,9 +24,8 @@ export function useQualityPerDollar({
     setLoading(true);
     setError(null);
     try {
-      const token = await resolveAuthAccessToken(accessToken);
       if (!isCurrent()) return;
-      const res = await getOutcomes({ from, to, device: deviceId, accessToken: token });
+      const res = await getOutcomes({ from, to, device: deviceId, accessToken });
       if (!isCurrent()) return;
       setData(res || null);
     } catch (e: any) {

@@ -1,40 +1,4 @@
 key,module,page,component,slot,text,notes,status
-header.auth.sign_in_aria,shared,*,InsforgeUserHeaderControls,sign_in_aria,"Sign in",,active
-login.back_home,shared,LoginPage,LoginPage,back_home,"Back to home",,active
-login.cloud_only,shared,LoginPage,LoginPage,cloud_only,"Cloud sign-in is not configured. Use the local dashboard on localhost.",,active
-login.title,shared,LoginPage,LoginPage,title,"Sign in",,active
-login.subtitle,shared,LoginPage,LoginPage,subtitle,"Choose email or a connected account.",,active
-login.dismiss,shared,LoginPage,LoginPage,dismiss,"Dismiss",,active
-login.verify_email_success,shared,LoginPage,LoginPage,verify_ok,"Email verified. You can sign in below.",,active
-login.verify_email_pending,shared,LoginPage,LoginPage,verify_pending,"Check your email to verify your account, then sign in.",,active
-login.oauth.continue,shared,LoginPage,LoginPage,oauth_continue,"Continue with {{provider}}",,active
-login.divider,shared,LoginPage,LoginPage,divider,"Or",,active
-login.tab.sign_in,shared,LoginPage,LoginPage,tab_sign_in,"Sign in",,active
-login.tab.sign_up,shared,LoginPage,LoginPage,tab_sign_up,"Create account",,active
-login.field.name,shared,LoginPage,LoginPage,field_name,"Display name",,active
-login.field.name_placeholder,shared,LoginPage,LoginPage,name_placeholder,"Optional",,active
-login.field.email,shared,LoginPage,LoginPage,field_email,"Email",,active
-login.field.password,shared,LoginPage,LoginPage,field_password,"Password",,active
-login.forgot_password,shared,LoginPage,LoginPage,forgot_password,"Forgot password?",,active
-login.password_hint,shared,LoginPage,LoginPage,pw_hint,"At least {{min}} characters.",,active
-login.submit.sign_in,shared,LoginPage,LoginPage,submit_sign_in,"Sign in with email",,active
-login.submit.sign_up,shared,LoginPage,LoginPage,submit_sign_up,"Create account",,active
-reset_password.back_to_sign_in,shared,ResetPasswordPage,ResetPasswordPage,back_to_sign_in,"Back to sign in",,active
-reset_password.title,shared,ResetPasswordPage,ResetPasswordPage,title,"Reset password",,active
-reset_password.subtitle,shared,ResetPasswordPage,ResetPasswordPage,subtitle,"Enter your email to receive a reset link.",,active
-reset_password.request.submit,shared,ResetPasswordPage,ResetPasswordPage,request_submit,"Send reset link",,active
-reset_password.request.sent,shared,ResetPasswordPage,ResetPasswordPage,request_sent,"Check email for reset link & code.",,active
-reset_password.field.code,shared,ResetPasswordPage,ResetPasswordPage,field_code,"Reset code",,active
-reset_password.field.new_password,shared,ResetPasswordPage,ResetPasswordPage,field_new_password,"New password",,active
-reset_password.field.confirm_password,shared,ResetPasswordPage,ResetPasswordPage,field_confirm_password,"Confirm password",,active
-reset_password.reset.submit,shared,ResetPasswordPage,ResetPasswordPage,reset_submit,"Reset password",,active
-reset_password.error.password_mismatch,shared,ResetPasswordPage,ResetPasswordPage,error_password_mismatch,"Passwords do not match.",,active
-reset_password.error.missing_token,shared,ResetPasswordPage,ResetPasswordPage,error_missing_token,"Reset token is missing. Request a new reset link.",,active
-reset_password.success,shared,ResetPasswordPage,ResetPasswordPage,success,"Password updated. You can sign in with the new password.",,active
-reset_password.success_cta,shared,ResetPasswordPage,ResetPasswordPage,success_cta,"Return to sign in",,active
-login_modal.subtitle,shared,*,LoginModal,subtitle,"Sign in to join the leaderboard",,active
-login_modal.continue_email,shared,*,LoginModal,continue_email,"Continue with Email",,active
-login_modal.divider_email,shared,*,LoginModal,divider_email,"email",,active
 shared.placeholder.short,shared,*,*,placeholder_short,"--",,active
 shared.unit.percent,shared,*,*,unit_percent,"%",,active
 shared.unit.thousand_abbrev,shared,*,*,unit_thousand_abbrev,"K",,active
@@ -48,35 +12,14 @@ error.boundary.subtitle,shared,*,ErrorBoundary,subtitle,"This view failed to ren
 error.boundary.hint,shared,*,ErrorBoundary,hint,"Open the console, then reload the page",,active
 error.boundary.no_details,shared,*,ErrorBoundary,details,"No error details",,active
 error.boundary.action.reload,shared,*,ErrorBoundary,action_reload,"Reload",,active
-
 landing.screenshot.alt,landing,LandingPage,LandingPage,screenshot_alt,"TokenTracker dashboard screenshot",,active
 landing.nav.login,landing,LandingPage,LandingPage,nav_login,"LOGIN",,active
 landing.nav.signup,landing,LandingPage,LandingPage,nav_signup,"SIGN UP",,active
 landing.install.command,landing,LandingPage,LandingPage,install_command,"npx --yes tokentracker-cli",,active
 landing.install.action.copy,landing,LandingPage,LandingPage,install_copy,"COPY COMMAND",,active
 landing.install.action.copied,landing,LandingPage,LandingPage,install_copied,"COPIED",,active
-landing.meta.title,landing,LandingPage,Meta,title,"Token Tracker — AI Token Usage & Cost Tracker for Coding CLIs",,active
-landing.meta.description,landing,LandingPage,Meta,description,"Free, open-source, local-first tracker that monitors AI token usage and cost across Claude Code, Codex, Cursor, Gemini and 27 CLIs. One-command install, privacy-first.",,active
-landing.meta.og_site_name,landing,LandingPage,Meta,og_site_name,"Token Tracker",,active
-landing.meta.og_type,landing,LandingPage,Meta,og_type,"website",,active
-landing.meta.og_image,landing,LandingPage,Meta,og_image,"https://www.tokentracker.cc/dashboard-dark.png",,active
-landing.meta.og_url,landing,LandingPage,Meta,og_url,"https://www.tokentracker.cc/",,active
-landing.meta.twitter_card,landing,LandingPage,Meta,twitter_card,"summary_large_image",,active
-share.meta.title,share,SharePage,Meta,title,"Token Tracker Share",,active
-share.meta.description,share,SharePage,Meta,description,"Share a Token Tracker dashboard snapshot with token usage insights across models, projects, and time windows.",,active
-share.meta.og_site_name,share,SharePage,Meta,og_site_name,"Token Tracker",,active
-share.meta.og_type,share,SharePage,Meta,og_type,"website",,active
-share.meta.og_image,share,SharePage,Meta,og_image,"https://www.tokentracker.cc/dashboard-dark.png",,active
-share.meta.og_url,share,SharePage,Meta,og_url,"https://www.tokentracker.cc/share",,active
-share.meta.twitter_card,share,SharePage,Meta,twitter_card,"summary_large_image",,active
 landing.cta.primary,landing,LandingPage,LandingPage,cta_primary,"View Dashboard",,active
 landing.cta.secondary,landing,LandingPage,LandingPage,cta_secondary,"GitHub",,active
-
-
-
-
-
-
 landing.v2.hero.title_line1,landing,LandingPage,MarketingLanding,hero_title_1,"TRACK EVERY",,active
 landing.v2.hero.title_line2,landing,LandingPage,MarketingLanding,hero_title_2,"AI TOKEN",,active
 landing.v2.install.mac_cta,landing,LandingPage,MarketingLanding,mac_cta,"Download for macOS",,active
@@ -126,22 +69,12 @@ landing.v3.privacy.title,landing,LandingPage,PrivacySection,privacy_title,"Your 
 landing.v3.privacy.p1,landing,LandingPage,PrivacySection,privacy_p1,"Token counts only",,active
 landing.v3.privacy.p2,landing,LandingPage,PrivacySection,privacy_p2,"No prompts. No code.",,active
 landing.v3.privacy.p3,landing,LandingPage,PrivacySection,privacy_p3,"Open source on GitHub",,active
-landing.v3.leaderboard.panel_title,landing,LandingPage,LeaderboardSection,leaderboard_panel_title,"Community rankings (global)",,active
-landing.v3.leaderboard.live,landing,LandingPage,LeaderboardSection,leaderboard_live,"Live",,active
-landing.v3.leaderboard.anonymous,landing,LandingPage,LeaderboardSection,leaderboard_anonymous,"Anonymous",,active
-landing.v3.leaderboard.tokens_synced,landing,LandingPage,LeaderboardSection,leaderboard_tokens_synced,"{{count}} tokens synced",,active
 landing.v3.download.title,landing,LandingPage,DownloadSection,download_title,"Start tracking in 30 seconds.",,active
 landing.v3.download.subtitle,landing,LandingPage,DownloadSection,download_subtitle,"One command or one download. Free, open source, yours.",,active
-
-
-
-
 identity_card.rank_label,ui,IdentityCard,IdentityCard,rank_label,"Started",,active
 identity_card.streak_label,ui,IdentityCard,IdentityCard,streak_label,"Active days",,active
 identity_card.rank_placeholder,ui,IdentityCard,IdentityCard,rank_placeholder,"—",,active
 identity_card.streak_value,ui,IdentityCard,IdentityCard,streak_value,"{{days}} DAY",,active
-
-
 dashboard.core_index.collapse_label,dashboard,DashboardPage,UsagePanel,toggle,"▾",,active
 dashboard.core_index.expand_label,dashboard,DashboardPage,UsagePanel,toggle,"▸",,active
 dashboard.core_index.collapse_aria,dashboard,DashboardPage,UsagePanel,toggle_aria,"Collapse model breakdown",,active
@@ -154,12 +87,10 @@ usage.metric.output,ui,UsagePanel,UsagePanel,metric_output,"Output",,active
 usage.metric.cached_input,ui,UsagePanel,UsagePanel,metric_cached_input,"Cached input",,active
 usage.metric.reasoning_output,ui,UsagePanel,UsagePanel,metric_reasoning_output,"Reasoning output",,active
 usage.button.refresh,ui,UsagePanel,UsagePanel,button_refresh,"Refresh",,active
-
 dashboard.rolling.title,ui,RollingUsagePanel,RollingUsagePanel,title,"Recent Activity",,active
 dashboard.rolling.last_7d,ui,RollingUsagePanel,RollingUsagePanel,label_last_7d,"Last 7 days",,active
 dashboard.rolling.last_30d,ui,RollingUsagePanel,RollingUsagePanel,label_last_30d,"Last 30 days",,active
 dashboard.rolling.avg_active_day,ui,RollingUsagePanel,RollingUsagePanel,label_avg_active_day,"Daily average",,active
-
 dashboard.projects.title,ui,DataDetails,DataDetails,title,"Project Usage",,active
 dashboard.projects.limit_aria,ui,DataDetails,DataDetails,limit_aria,"Select project limit",,active
 dashboard.projects.limit_top_3,ui,DataDetails,DataDetails,limit_top_3,"TOP 3",,active
@@ -207,8 +138,6 @@ widgets.limits.description,dashboard,WidgetsPage,WidgetsPage,limits_desc,"Live r
 dashboard.cost_breakdown.title,ui,CostAnalysisModal,CostAnalysisModal,title,"Cost Breakdown",,active
 dashboard.cost_breakdown.total_label,ui,CostAnalysisModal,CostAnalysisModal,total_label,"Estimated Total Cost",,active
 dashboard.cost_breakdown.close,ui,CostAnalysisModal,CostAnalysisModal,close_label,"Close",,active
-
-
 trend.monitor.label,ui,TrendMonitor,TrendMonitor,label,"Usage Trend",,active
 trend.monitor.predicted,ui,TrendMonitor,TrendMonitor,predicted_label,"Estimated",,active
 trend.zoom.open_aria,ui,TrendMonitor,TrendMonitor,zoom_open_aria,"Expand to full screen",,active
@@ -236,7 +165,6 @@ trend.zoom.insight.calm,ui,TrendMonitorZoomModal,TrendMonitorZoomModal,zoom_insi
 trend.zoom.insight.steady,ui,TrendMonitorZoomModal,TrendMonitorZoomModal,zoom_insight_steady,"A steady rhythm across {{active}} active stretches, cresting at {{peak}}. The kind of pace that ships things without drama.",,active
 trend.zoom.insight.heavy,ui,TrendMonitorZoomModal,TrendMonitorZoomModal,zoom_insight_heavy,"Heavy lifting: {{active}} stretches running hot, peaking at {{peak}}. This is output from someone who manufactures momentum instead of waiting for it.",,active
 trend.zoom.insight.massive,ui,TrendMonitorZoomModal,TrendMonitorZoomModal,zoom_insight_massive,"Industrial scale. A {{peak}} peak and throughput that never cools. At this volume you are not using the model, you are running a foundry.",,active
-
 heatmap.title,ui,ActivityHeatmap,ActivityHeatmap,title,"Activity Heatmap",,active
 heatmap.empty,ui,ActivityHeatmap,ActivityHeatmap,empty_state,"No activity data yet.",,active
 heatmap.legend.less,ui,ActivityHeatmap,ActivityHeatmap,legend_less,"Less",,active
@@ -266,10 +194,6 @@ heatmap.day.wed,ui,ActivityHeatmap,ActivityHeatmap,day_label,"Wed",,active
 heatmap.day.thu,ui,ActivityHeatmap,ActivityHeatmap,day_label,"Thu",,active
 heatmap.day.fri,ui,ActivityHeatmap,ActivityHeatmap,day_label,"Fri",,active
 heatmap.day.sat,ui,ActivityHeatmap,ActivityHeatmap,day_label,"Sat",,active
-
-
-
-
 daily.sort.date.label,dashboard,DashboardPage,DailyTable,sort_label,"Date",,active
 daily.sort.date.title,dashboard,DashboardPage,DailyTable,sort_title,"Sort by Date",,active
 daily.sort.total.label,dashboard,DashboardPage,DailyTable,sort_label,"Total",,active
@@ -286,64 +210,10 @@ daily.sort.conversations.label,dashboard,DashboardPage,DailyTable,sort_label,"Co
 daily.sort.conversations.title,dashboard,DashboardPage,DailyTable,sort_title,"Sort by Conversations",,active
 details.pagination.prev,dashboard,DashboardPage,DailyTable,pagination_prev,"Prev",,active
 details.pagination.next,dashboard,DashboardPage,DailyTable,pagination_next,"Next",,active
-
-
-
-leaderboard.profile.nav.back,dashboard,LeaderboardProfilePage,Header,nav_back,"Leaderboard",,active
-leaderboard.profile.nav.download,dashboard,LeaderboardProfilePage,Header,nav_download,"Download",Shown only to browser visitors without the app,active
-leaderboard.profile.hero.rank_label,dashboard,LeaderboardProfilePage,Hero,rank_label,"Rank",,active
-leaderboard.title,dashboard,LeaderboardPage,LeaderboardPage,title,"Leaderboard",,active
-leaderboard.range,dashboard,LeaderboardPage,LeaderboardPage,range,"UTC {{period}} · {{from}} – {{to}}",,active
-leaderboard.range_loading,dashboard,LeaderboardPage,LeaderboardPage,range_loading,"UTC {{period}} · …",,active
-leaderboard.range.total,dashboard,LeaderboardPage,LeaderboardPage,range_total,"All time",,active
-leaderboard.generated_at,dashboard,LeaderboardPage,LeaderboardPage,generated_at,"Updated {{ts}}",,active
-leaderboard.period.week,dashboard,LeaderboardPage,LeaderboardPage,period_week,"Week",,active
-leaderboard.period.month,dashboard,LeaderboardPage,LeaderboardPage,period_month,"Month",,active
-leaderboard.period.total,dashboard,LeaderboardPage,LeaderboardPage,period_total,"All",,active
-
-leaderboard.me_label,dashboard,LeaderboardPage,LeaderboardPage,me_label,"You",,active
-leaderboard.anon_label,dashboard,LeaderboardPage,LeaderboardPage,anon_label,"Anonymous",,active
-leaderboard.error.unknown,dashboard,LeaderboardPage,LeaderboardPage,error_unknown,"Unknown error",,active
-
-
-
-leaderboard.loading,dashboard,LeaderboardPage,LeaderboardPage,state_loading,"Loading…",,active
-leaderboard.empty,dashboard,LeaderboardPage,LeaderboardPage,state_empty,"No data",,active
-
-leaderboard.column.rank,dashboard,LeaderboardPage,LeaderboardPage,column_rank,"Rank",,active
-leaderboard.column.user,dashboard,LeaderboardPage,LeaderboardPage,column_user,"User",,active
-leaderboard.column.total,dashboard,LeaderboardPage,LeaderboardPage,column_total,"Total",,active
-leaderboard.column.codex,dashboard,LeaderboardPage,LeaderboardPage,column_codex,"Codex",,active
-leaderboard.column.claude,dashboard,LeaderboardPage,LeaderboardPage,column_claude,"Claude",,active
-leaderboard.column.gemini,dashboard,LeaderboardPage,LeaderboardPage,column_gemini,"Gemini",,active
-leaderboard.column.cursor,dashboard,LeaderboardPage,LeaderboardPage,column_cursor,"Cursor",,active
-leaderboard.column.opencode,dashboard,LeaderboardPage,LeaderboardPage,column_opencode,"OpenCode",,active
-leaderboard.column.openclaw,dashboard,LeaderboardPage,LeaderboardPage,column_openclaw,"OpenClaw",,active
-leaderboard.column.hermes,dashboard,LeaderboardPage,LeaderboardPage,column_hermes,"Hermes",,active
-leaderboard.column.kiro,dashboard,LeaderboardPage,LeaderboardPage,column_kiro,"Kiro",,active
-leaderboard.column.copilot,dashboard,LeaderboardPage,LeaderboardPage,column_copilot,"GitHub Copilot",,active
-leaderboard.column.kimi,dashboard,LeaderboardPage,LeaderboardPage,column_kimi,"Kimi Code",,active
-leaderboard.column.kilo-cli,dashboard,LeaderboardPage,LeaderboardPage,column_kilo_cli,"Kilo CLI",,active
-leaderboard.column.kilo-code,dashboard,LeaderboardPage,LeaderboardPage,column_kilo_code,"Kilo Code",,active
 limits.copilot.otelHint.title,dashboard,LimitsPage,LimitsPage,otel_hint_title,"Track Copilot token usage",,active
 limits.copilot.otelHint.body,dashboard,LimitsPage,LimitsPage,otel_hint_body,"Limits load via your GitHub OAuth token. To also record per-token usage, enable Copilot's OpenTelemetry export and add these lines to your shell profile (~/.zshrc or ~/.bashrc):",,active
 limits.copilot.otelHint.copy,dashboard,LimitsPage,LimitsPage,otel_hint_copy,"Copy",,active
 limits.copilot.otelHint.copied,dashboard,LimitsPage,LimitsPage,otel_hint_copied,"Copied",,active
-leaderboard.column.supplemental,dashboard,LeaderboardPage,LeaderboardPage,column_supplemental,"Supplemental",,active
-
-
-leaderboard.pagination.prev,dashboard,LeaderboardPage,LeaderboardPage,pagination_prev,"Previous",,active
-leaderboard.pagination.next,dashboard,LeaderboardPage,LeaderboardPage,pagination_next,"Next",,active
-leaderboard.pagination.ellipsis,dashboard,LeaderboardPage,LeaderboardPage,pagination_ellipsis,"…",,active
-leaderboard.pagination.page_unknown,dashboard,LeaderboardPage,LeaderboardPage,pagination_unknown,"Page {{page}}",,active
-
-
-
-
-dashboard.session_expired.copy_label,dashboard,DashboardPage,AsciiBox,body,"run npx --yes tokentracker-cli init",,active
-dashboard.session_expired.copied,dashboard,DashboardPage,AsciiBox,body,"copied",,active
-
-
 dashboard.install.prompt,dashboard,DashboardPage,AsciiBox,install_prompt,"Install Node.js 18+ then run:",,active
 dashboard.install.cmd.init,dashboard,DashboardPage,AsciiBox,install_cmd,"npx --yes tokentracker-cli init",,active
 dashboard.install.cmd.init_link_code,dashboard,DashboardPage,AsciiBox,install_cmd,"npx --yes tokentracker-cli init --link-code {{link_code}}",,active
@@ -353,24 +223,16 @@ dashboard.install.copied,dashboard,DashboardPage,AsciiBox,install_copy,"Copied t
 dashboard.install.link_code.loading,dashboard,DashboardPage,AsciiBox,install_status,"Generating private code...",,active
 dashboard.install.link_code.failed,dashboard,DashboardPage,AsciiBox,install_status,"Private code unavailable",,active
 dashboard.install.cmd.sync,dashboard,DashboardPage,AsciiBox,install_cmd,"npx --yes tokentracker-cli sync",,active
-
-
-
 dashboard.daily.title,dashboard,DashboardPage,AsciiBox,title,"Daily Breakdown",,active
 dashboard.daily.empty,dashboard,DashboardPage,AsciiBox,empty_state,"No data yet. Use your AI CLI then run {{cmd}}.",,active
-
 dashboard.identity.title,dashboard,DashboardPage,IdentityCard,title,"Your Profile",,active
 dashboard.identity.subtitle,dashboard,DashboardPage,IdentityCard,subtitle,"Track your coding journey",,active
 dashboard.identity.fallback,dashboard,DashboardPage,IdentityCard,handle_fallback,"Anonymous",,active
 dashboard.overview.layout.drag_handle,dashboard,DashboardPage,SortableCard,drag_handle_aria_label,"Drag to reorder",,active
-
-
 dashboard.screenshot.twitter_text,dashboard,DashboardPage,ScreenshotShare,share_text,"{{total_tokens}} tokens on the record.\n{{model_name}} led with {{model_percent}}%.\n\nMy AI usage, unaudited →",,active
-
 nav.usage,shared,*,Sidebar,nav_usage,"Tokens",,active
 nav.limits,shared,*,Sidebar,nav_limits,"Limits",,active
 nav.widgets,shared,*,Sidebar,nav_widgets,"Menu Bar & Widgets",,active
-nav.leaderboard,shared,*,Sidebar,nav_leaderboard,"Leaderboard",,active
 nav.collapse,shared,*,Sidebar,nav_collapse,"Collapse sidebar",,active
 nav.expand,shared,*,Sidebar,nav_expand,"Expand sidebar",,active
 nav.menu,shared,*,Sidebar,nav_menu,"Open navigation menu",,active
@@ -383,83 +245,14 @@ limits.settings.display_mode_label,ui,LimitsPage,LimitsSettingsPanel,display_mod
 limits.settings.display_mode_used,ui,LimitsPage,LimitsSettingsPanel,display_mode_used,"Used",,active
 limits.settings.display_mode_remaining,ui,LimitsPage,LimitsSettingsPanel,display_mode_remaining,"Remaining",,active
 limits.page.openSettings,ui,LimitsPage,LimitsPage,open_settings,"Display settings",,active
-leaderboard.community.tokens_label,ui,LeaderboardPage,LeaderboardPage,community_tokens_label,"Tokens tracked by the community",,active
-leaderboard.community.devs,ui,LeaderboardPage,LeaderboardPage,community_devs,"{{count}} users syncing",,active
-leaderboard.community.view_stats,ui,LeaderboardPage,CommunityStatsChip,view_stats,"View global community stats",,active
-leaderboard.community.tokens_chip,ui,LeaderboardPage,CommunityStatsChip,tokens_chip,"Community Tokens",,active
-leaderboard.community.devs_chip,ui,LeaderboardPage,CommunityStatsChip,devs_chip,"Users",,active
-leaderboard.community.modal.title,ui,LeaderboardPage,CommunityStatsModal,title,"Global Metrics",,active
-leaderboard.community.modal.description,ui,LeaderboardPage,CommunityStatsModal,description,"A privacy-safe view of how the community builds with AI.",,active
-leaderboard.community.modal.total_tokens,ui,LeaderboardPage,CommunityStatsModal,total_tokens,"Total Tokens",,active
-leaderboard.community.modal.active_devs,ui,LeaderboardPage,CommunityStatsModal,active_devs,"Active users",,active
-leaderboard.community.modal.active_devs_detail,ui,LeaderboardPage,CommunityStatsModal,active_devs_detail,"{{count}} syncing",,active
-leaderboard.community.modal.global_spend,ui,LeaderboardPage,CommunityStatsModal,global_spend,"Est. Spend",,active
-leaderboard.community.modal.global_spend_detail,ui,LeaderboardPage,CommunityStatsModal,global_spend_detail,"${{amount}} USD",,active
-leaderboard.community.modal.top_models,ui,LeaderboardPage,CommunityStatsModal,top_models,"Top Models",,active
-leaderboard.community.modal.all_time,ui,LeaderboardPage,CommunityStatsModal,all_time,"All time",,active
-leaderboard.community.modal.tokens_title,ui,LeaderboardPage,CommunityStatsModal,tokens_title,"{{count}} tokens",,active
-leaderboard.community.modal.no_data,ui,LeaderboardPage,CommunityStatsModal,no_data,"No aggregate data yet",,active
-leaderboard.community.modal.activity_chart,ui,LeaderboardPage,CommunityStatsModal,activity_chart,"Daily community token activity",,active
-leaderboard.community.modal.developers_short,ui,LeaderboardPage,CommunityStatsModal,developers_short,"users",,active
-leaderboard.community.modal.daily_tokens,ui,LeaderboardPage,CommunityStatsModal,daily_tokens,"Daily tokens",,active
-leaderboard.community.modal.seven_day_average,ui,LeaderboardPage,CommunityStatsModal,seven_day_average,"7-day average",,active
-leaderboard.community.modal.composition,ui,LeaderboardPage,CommunityStatsModal,composition,"Composition",,active
-leaderboard.community.modal.token_mix,ui,LeaderboardPage,CommunityStatsModal,token_mix,"Token mix",,active
-leaderboard.community.modal.token_mix.input,ui,LeaderboardPage,CommunityStatsModal,token_mix_input,"Input",,active
-leaderboard.community.modal.token_mix.cache_read,ui,LeaderboardPage,CommunityStatsModal,token_mix_cache_read,"Cache read",,active
-leaderboard.community.modal.token_mix.cache_write,ui,LeaderboardPage,CommunityStatsModal,token_mix_cache_write,"Cache write",,active
-leaderboard.community.modal.token_mix.output,ui,LeaderboardPage,CommunityStatsModal,token_mix_output,"Output",,active
-leaderboard.community.modal.token_mix.reasoning,ui,LeaderboardPage,CommunityStatsModal,token_mix_reasoning,"Reasoning",,active
-leaderboard.community.modal.last_30_days,ui,LeaderboardPage,CommunityStatsModal,last_30_days,"Last 30 days",,active
-leaderboard.community.modal.daily_average,ui,LeaderboardPage,CommunityStatsModal,daily_average,"Daily average",,active
-leaderboard.community.modal.peak_day,ui,LeaderboardPage,CommunityStatsModal,peak_day,"Peak day",,active
-leaderboard.community.modal.community_activity,ui,LeaderboardPage,CommunityStatsModal,community_activity,"Community activity",,active
-leaderboard.community.modal.utc_note,ui,LeaderboardPage,CommunityStatsModal,utc_note,"Daily totals in UTC",,active
-leaderboard.community.modal.ecosystem,ui,LeaderboardPage,CommunityStatsModal,ecosystem,"Ecosystem",,active
-leaderboard.community.modal.provider_distribution,ui,LeaderboardPage,CommunityStatsModal,provider_distribution,"Provider distribution",,active
-leaderboard.community.modal.rank,ui,LeaderboardPage,CommunityStatsModal,rank,"Rank",,active
-leaderboard.community.modal.provider,ui,LeaderboardPage,CommunityStatsModal,provider,"Provider",,active
-leaderboard.community.modal.usage_share,ui,LeaderboardPage,CommunityStatsModal,usage_share,"Usage share",,active
-leaderboard.community.modal.developer_count,ui,LeaderboardPage,CommunityStatsModal,developer_count,"{{count}} users",,active
-leaderboard.community.modal.participation,ui,LeaderboardPage,CommunityStatsModal,participation,"Participation",,active
-leaderboard.community.modal.usage_distribution,ui,LeaderboardPage,CommunityStatsModal,usage_distribution,"Lifetime usage bands",,active
-leaderboard.community.modal.band.lt_1m,ui,LeaderboardPage,CommunityStatsModal,band_lt_1m,"Under 1M",,active
-leaderboard.community.modal.band.1m_10m,ui,LeaderboardPage,CommunityStatsModal,band_1m_10m,"1M–10M",,active
-leaderboard.community.modal.band.10m_100m,ui,LeaderboardPage,CommunityStatsModal,band_10m_100m,"10M–100M",,active
-leaderboard.community.modal.band.100m_1b,ui,LeaderboardPage,CommunityStatsModal,band_100m_1b,"100M–1B",,active
-leaderboard.community.modal.band.1b_plus,ui,LeaderboardPage,CommunityStatsModal,band_1b_plus,"1B+",,active
-leaderboard.community.modal.developer_share_title,ui,LeaderboardPage,CommunityStatsModal,developer_share_title,"{{share}} of contributors",,active
-leaderboard.community.modal.adoption,ui,LeaderboardPage,CommunityStatsModal,adoption,"Adoption",,active
-leaderboard.community.modal.platforms,ui,LeaderboardPage,CommunityStatsModal,platforms,"Platforms",,active
-leaderboard.community.modal.platform.darwin,ui,LeaderboardPage,CommunityStatsModal,platform_darwin,"macOS",,active
-leaderboard.community.modal.platform.win32,ui,LeaderboardPage,CommunityStatsModal,platform_win32,"Windows",,active
-leaderboard.community.modal.platform.linux,ui,LeaderboardPage,CommunityStatsModal,platform_linux,"Linux",,active
-leaderboard.community.modal.machine_count,ui,LeaderboardPage,CommunityStatsModal,machine_count,"{{count}} anonymous installs",,active
-leaderboard.community.modal.platform_privacy,ui,LeaderboardPage,CommunityStatsModal,platform_privacy,"Platform adoption uses anonymous installation hashes. No location or account identity is collected for this view.",,active
-leaderboard.community.modal.model_landscape,ui,LeaderboardPage,CommunityStatsModal,model_landscape,"Model landscape",,active
-leaderboard.community.modal.eyebrow,ui,LeaderboardPage,CommunityStatsModal,eyebrow,"Community intelligence",,active
-leaderboard.community.modal.tokens_30d,ui,LeaderboardPage,CommunityStatsModal,tokens_30d,"Tokens · 30d",,active
-leaderboard.community.modal.contributors,ui,LeaderboardPage,CommunityStatsModal,contributors,"Contributors",,active
-leaderboard.community.modal.with_usage,ui,LeaderboardPage,CommunityStatsModal,with_usage,"With recorded usage",,active
-leaderboard.community.modal.active_30d,ui,LeaderboardPage,CommunityStatsModal,active_30d,"Active · 30d",,active
-leaderboard.community.modal.vs_previous_week,ui,LeaderboardPage,CommunityStatsModal,vs_previous_week,"vs previous 7 days",,active
-leaderboard.community.modal.views,ui,LeaderboardPage,CommunityStatsModal,views,"Global metric views",,active
-leaderboard.community.modal.updated,ui,LeaderboardPage,CommunityStatsModal,updated,"Updated {{time}}",,active
-leaderboard.community.modal.tab.overview,ui,LeaderboardPage,CommunityStatsModal,tab_overview,"Overview",,active
-leaderboard.community.modal.tab.providers,ui,LeaderboardPage,CommunityStatsModal,tab_providers,"Providers",,active
-leaderboard.community.modal.tab.community,ui,LeaderboardPage,CommunityStatsModal,tab_community,"Community",,active
-leaderboard.community.modal.tab.models,ui,LeaderboardPage,CommunityStatsModal,tab_models,"Models",,active
-leaderboard.community.modal.note,ui,LeaderboardPage,CommunityStatsModal,note,"Aggregates are refreshed hourly from canonical community rollups. No user-level rows are exposed.",,active
 shared.dialog.close,shared,*,Dialog,close,"Close dialog",,active
 nav.group.general,shared,*,Sidebar,group_general,"General",,active
 nav.group.tools,shared,*,Sidebar,group_tools,"Tools",,active
 nav.group.account,shared,*,Sidebar,group_account,"Account",,active
 nav.settings,shared,*,Sidebar,nav_settings,"Settings",,active
-header.auth.open_settings,shared,*,InsforgeUserHeaderControls,open_settings,"Open settings",,active
 settings.page.title,ui,SettingsPage,SettingsPage,title,"Settings",,active
 settings.page.subtitle,ui,SettingsPage,SettingsPage,subtitle,"Manage your account, appearance, and display preferences.",,active
 settings.section.appearance,ui,SettingsPage,SettingsPage,sec_appearance,"Appearance",,active
-settings.section.account,ui,SettingsPage,SettingsPage,sec_account,"Account",,active
 settings.section.limits,ui,SettingsPage,SettingsPage,sec_limits,"Limits Display",,active
 settings.limits.providers,ui,SettingsPage,SettingsPage,limits_providers,"Providers",,active
 settings.labs.island.label,ui,SettingsPage,LabsSection,island_label,"Dynamic Island",,active
@@ -517,52 +310,10 @@ settings.appearance.currency.rate_source.default,ui,SettingsPage,SettingsPage,ra
 settings.appearance.currency.rate_source.fetched,ui,SettingsPage,SettingsPage,rate_source_fetched,"Source: open.er-api.com",,active
 settings.appearance.currency.rate_updated,ui,SettingsPage,SettingsPage,rate_updated,"updated {{when}}",,active
 settings.appearance.currency.rate_never,ui,SettingsPage,SettingsPage,rate_never,"awaiting first refresh",,active
-settings.account.displayName,ui,SettingsPage,SettingsPage,display_name,"Display name",,active
-settings.account.edit,ui,SettingsPage,SettingsPage,edit,"Edit",,active
-settings.account.save,ui,SettingsPage,SettingsPage,save,"Save",,active
-settings.account.saving,ui,SettingsPage,SettingsPage,saving,"Saving...",,active
-settings.account.cancel,ui,SettingsPage,SettingsPage,cancel,"Cancel",,active
-settings.account.userId,ui,SettingsPage,SettingsPage,user_id,"User ID",,active
-settings.account.copyUserId,ui,SettingsPage,SettingsPage,copy_user_id,"Copy user ID",,active
-settings.account.copy,ui,SettingsPage,SettingsPage,copy,"Copy",,active
-settings.account.copied,ui,SettingsPage,SettingsPage,copied,"Copied",,active
-settings.account.cloudSync,ui,SettingsPage,SettingsPage,cloud_sync,"Cloud sync",,active
-settings.account.cloudSyncHint,ui,SettingsPage,SettingsPage,cloud_sync_hint,"Upload local usage to your Token Tracker cloud account.",,active
-settings.account.publicProfile,ui,SettingsPage,SettingsPage,public_profile,"Public profile",,active
-settings.account.publicProfileHint,ui,SettingsPage,SettingsPage,public_profile_hint,"Show your usage on the public leaderboard.",,active
-settings.account.displayNameAnonymousHint,ui,SettingsPage,SettingsPage,display_name_anon_hint,"Anonymous — your name and avatar are hidden on the leaderboard",,active
-settings.account.displayNameDisabledWhileAnon,ui,SettingsPage,SettingsPage,display_name_disabled,"Turn on the switch first to edit your name",,active
-settings.account.githubUrl,ui,SettingsPage,SettingsPage,github_url,"GitHub profile",,active
-settings.account.githubUrlHint,ui,SettingsPage,SettingsPage,github_url_hint,"Show a GitHub link next to your name on the leaderboard.",,active
-settings.account.githubUrlPlaceholder,ui,SettingsPage,SettingsPage,github_url_placeholder,"username or https://github.com/username",,active
-settings.account.githubUrlInvalid,ui,SettingsPage,SettingsPage,github_url_invalid,"Use a GitHub username or https://github.com/username URL.",,active
-leaderboard.github.aria,ui,LeaderboardPage,LeaderboardPage,github_aria,"Open GitHub profile",,active
-auth.callback.processing,ui,*,NativeAuthCallbackPage,processing,"Processing…",,active
-auth.callback.success,ui,*,NativeAuthCallbackPage,success,"Signed in successfully",,active
-auth.callback.redirecting,ui,*,NativeAuthCallbackPage,redirecting,"Returning to TokenTracker…",,active
-auth.callback.failed,ui,*,NativeAuthCallbackPage,failed,"Sign-in incomplete. Please try again.",,active
-auth.callback.close,ui,*,NativeAuthCallbackPage,close,"Close this page",,active
 stats.period.last_7d,ui,DashboardPage,StatsPanel,period_last_7d,"7d",,active
 stats.period.last_30d,ui,DashboardPage,StatsPanel,period_last_30d,"30d",,active
 stats.period.avg,ui,DashboardPage,StatsPanel,period_avg,"avg",,active
 stats.period.convs,ui,DashboardPage,StatsPanel,period_convs,"convs",,active
-leaderboard.column.est_cost,ui,LeaderboardPage,LeaderboardPage,column_est_cost,"Est. Cost",,active
-leaderboard.signin_prompt,ui,LeaderboardPage,LeaderboardPage,signin_prompt,"Sign in to join the leaderboard",,active
-leaderboard.signin_button,ui,LeaderboardPage,LeaderboardPage,signin_button,"Sign In",,active
-leaderboard.sync_prompt,ui,LeaderboardPage,LeaderboardPage,sync_prompt,"Enable Cloud Sync to appear in rankings",,active
-leaderboard.sync_button.idle,ui,LeaderboardPage,LeaderboardPage,sync_button_idle,"Enable & Sync",,active
-leaderboard.sync_button.busy,ui,LeaderboardPage,LeaderboardPage,sync_button_busy,"Syncing...",,active
-leaderboard.pagination.page_size_label,ui,LeaderboardPage,LeaderboardPage,page_size_label,"Rows per page",,active
-leaderboard.github.tooltipAction,ui,LeaderboardPage,LeaderboardPage,github_tooltip_action,"Click to open GitHub profile",,active
-leaderboard.github.tooltipPrefix,ui,LeaderboardPage,LeaderboardPage,github_tooltip_prefix,"Set yours in",,active
-leaderboard.github.tooltipSettingsLink,ui,LeaderboardPage,LeaderboardPage,github_tooltip_link,"Settings",,active
-leaderboard.github.tooltipSuffix,ui,LeaderboardPage,LeaderboardPage,github_tooltip_suffix,"to appear here",,active
-leaderboard.summary.percentile,ui,LeaderboardPage,LeaderboardMeChip,summary_percentile,"Top {{p}}%",,active
-leaderboard.summary.jump_to_me,ui,LeaderboardPage,LeaderboardMeChip,summary_jump_to_me,"Jump to my row",,active
-leaderboard.summary.view_profile,ui,LeaderboardPage,LeaderboardMeChip,summary_view_profile,"View your profile",,active
-settings.account.signOut,ui,SettingsPage,SettingsPage,sign_out,"Sign out",,active
-settings.account.signIn,ui,SettingsPage,SettingsPage,sign_in,"Sign in",,active
-settings.account.signedOutHint,ui,SettingsPage,SettingsPage,signed_out_hint,"Sign in to manage cloud sync and leaderboard preferences.",,active
 settings.section.menubar,ui,SettingsPage,SettingsPage,sec_menubar,"Menu Bar App",,active
 settings.menubar.showStats,ui,SettingsPage,SettingsPage,mb_show_stats,"Show stats in menu bar",,active
 settings.menubar.showStatsHint,ui,SettingsPage,SettingsPage,mb_show_stats_hint,"Display today's token count and cost beside the menu bar icon.",,active
@@ -771,7 +522,6 @@ shared.time.now,shared,*,Shared,time_now,"now",,active
 shared.time.m_ago,shared,*,Shared,time_m_ago,"{{n}}m",,active
 shared.time.h_ago,shared,*,Shared,time_h_ago,"{{n}}h",,active
 shared.time.d_ago,shared,*,Shared,time_d_ago,"{{n}}d",,active
-nav.ip_check,shared,*,Sidebar,nav_ip_check,Claude IP Check,,active
 nav.service_status,shared,*,Sidebar,nav_service_status,Service Status,,active
 status.page.subtitle,ui,ServiceStatusPage,ServiceStatusPage,subtitle,"Live incident status from your AI providers' official status pages.",,active
 status.page.source_note,ui,ServiceStatusPage,ServiceStatusPage,source_note,"Read directly from each provider's public status page in your browser. Auto-refreshes every minute.",,active
@@ -941,201 +691,11 @@ heatmap.3d.voxel.level3,ui,ActivityHeatmap3D,ActivityHeatmap3D,voxel_level3,"⚡
 heatmap.3d.voxel.level2,ui,ActivityHeatmap3D,ActivityHeatmap3D,voxel_level2,"🌱 Getting into the groove ({{value}} tokens)! Steady output, every keystroke is contributing to the architecture.",,active
 heatmap.3d.voxel.level1,ui,ActivityHeatmap3D,ActivityHeatmap3D,voxel_level1,"🍃 Every drop counts ({{value}} tokens). Tiny commits are investments in the future, embrace compound interest!",,active
 heatmap.3d.voxel.level0,ui,ActivityHeatmap3D,ActivityHeatmap3D,voxel_level0,"💤 Recharging. On days without coding, inspiration grows silently.",,active
-ipcheck.page.title,ui,IpCheckPage,IpCheckPage,page_title,"Claude IP Check",,active
-ipcheck.page.subtitle,ui,IpCheckPage,IpCheckPage,page_subtitle,"Inspect the exit IP used to reach Claude, plus reputation, geo, and risk signals that may affect sign-in or trigger rate-limiting.",,active
-ipcheck.mask.toggle,ui,IpCheckPage,IpCheckPage,mask_toggle,"Hide IP",,active
-ipcheck.ipv6.warn,ui,IpCheckPage,IpCheckPage,ipv6_warn,"IPv6 detected. Using IPv6 to reach Claude Code is not recommended; some checks may be incomplete.",,active
-ipcheck.ip.cn,ui,IpCheckPage,IpCheckPage,ip_cn,"China exit IPv4",,active
-ipcheck.ip.cloudflare,ui,IpCheckPage,IpCheckPage,ip_cloudflare,"Cloudflare exit",,active
-ipcheck.ip.claude,ui,IpCheckPage,IpCheckPage,ip_claude,"Claude exit",,active
-ipcheck.ip.failed,ui,IpCheckPage,IpCheckPage,ip_failed,"Unable to fetch",,active
-ipcheck.ip.loading,ui,IpCheckPage,IpCheckPage,ip_loading,"Loading...",,active
-ipcheck.trust.title,ui,IpCheckPage,IpCheckPage,trust_title,"Trust Score",,active
-ipcheck.trust.subtitle,ui,IpCheckPage,IpCheckPage,trust_subtitle,"IP cleanliness from Claude's risk view",,active
-ipcheck.trust.no_data,ui,IpCheckPage,IpCheckPage,trust_no_data,"No data",,active
-ipcheck.trust.no_ip,ui,IpCheckPage,IpCheckPage,trust_no_ip,"Claude exit IP not detected — cannot score",,active
-ipcheck.trust.no_score,ui,IpCheckPage,IpCheckPage,trust_no_score,"No score data for this IP",,active
-ipcheck.trust.gauge.low,ui,IpCheckPage,IpCheckPage,trust_gauge_low,"0 High risk",,active
-ipcheck.trust.gauge.high,ui,IpCheckPage,IpCheckPage,trust_gauge_high,"100 Trusted",,active
-ipcheck.trust.label.pristine,ui,IpCheckPage,IpCheckPage,trust_label_pristine,"Pristine",,active
-ipcheck.trust.label.clean,ui,IpCheckPage,IpCheckPage,trust_label_clean,"Clean",,active
-ipcheck.trust.label.good,ui,IpCheckPage,IpCheckPage,trust_label_good,"Good",,active
-ipcheck.trust.label.neutral,ui,IpCheckPage,IpCheckPage,trust_label_neutral,"Neutral",,active
-ipcheck.trust.label.suspicious,ui,IpCheckPage,IpCheckPage,trust_label_suspicious,"Suspicious",,active
-ipcheck.trust.label.unreachable,ui,IpCheckPage,IpCheckPage,trust_label_unreachable,"Unreachable",,active
-ipcheck.trust.text.excellent,ui,IpCheckPage,IpCheckPage,trust_text_excellent,"Excellent reputation",,active
-ipcheck.trust.text.great,ui,IpCheckPage,IpCheckPage,trust_text_great,"Strong reputation",,active
-ipcheck.trust.text.minor,ui,IpCheckPage,IpCheckPage,trust_text_minor,"Minor risk",,active
-ipcheck.trust.text.moderate,ui,IpCheckPage,IpCheckPage,trust_text_moderate,"Moderate risk",,active
-ipcheck.trust.text.severe,ui,IpCheckPage,IpCheckPage,trust_text_severe,"Severe risk",,active
-ipcheck.trust.text.restricted,ui,IpCheckPage,IpCheckPage,trust_text_restricted,"Restricted region — Claude enforces strict risk controls",,active
-ipcheck.trust.region_warn.title,ui,IpCheckPage,IpCheckPage,region_warn_title,"Claude exit IP is in {{region}}",,active
-ipcheck.trust.region_warn.body,ui,IpCheckPage,IpCheckPage,region_warn_body,"Avoid signing in — high chance of triggering account flagging.",,active
-ipcheck.trust.region_support,ui,IpCheckPage,IpCheckPage,region_support,"Claude support",,active
-ipcheck.trust.region.accessible,ui,IpCheckPage,IpCheckPage,region_accessible,"Accessible",,active
-ipcheck.common.unknown,ui,IpCheckPage,IpCheckPage,common_unknown,"Unknown",,active
-ipcheck.props.title,ui,IpCheckPage,IpCheckPage,props_title,"IP Attributes",,active
-ipcheck.props.region,ui,IpCheckPage,IpCheckPage,props_region,"Region",,active
-ipcheck.props.city,ui,IpCheckPage,IpCheckPage,props_city,"City",,active
-ipcheck.props.type,ui,IpCheckPage,IpCheckPage,props_type,"Type",,active
-ipcheck.props.asn,ui,IpCheckPage,IpCheckPage,props_asn,"ASN",,active
-ipcheck.props.org,ui,IpCheckPage,IpCheckPage,props_org,"ISP",,active
-ipcheck.props.residential,ui,IpCheckPage,IpCheckPage,props_residential,"Residential",,active
-ipcheck.props.datacenter,ui,IpCheckPage,IpCheckPage,props_datacenter,"Datacenter",,active
-ipcheck.security.title,ui,IpCheckPage,IpCheckPage,sec_title,"Security Checks",,active
-ipcheck.security.vpn,ui,IpCheckPage,IpCheckPage,sec_vpn,"VPN",,active
-ipcheck.security.proxy,ui,IpCheckPage,IpCheckPage,sec_proxy,"Proxy",,active
-ipcheck.security.tor,ui,IpCheckPage,IpCheckPage,sec_tor,"Tor",,active
-ipcheck.security.crawler,ui,IpCheckPage,IpCheckPage,sec_crawler,"Crawler",,active
-ipcheck.security.abuser,ui,IpCheckPage,IpCheckPage,sec_abuser,"Abuse history",,active
-ipcheck.security.proxy_flag,ui,IpCheckPage,IpCheckPage,sec_proxy_flag,"Proxy",,active
-ipcheck.security.crawler_yes,ui,IpCheckPage,IpCheckPage,sec_crawler_yes,"Yes",,active
-ipcheck.security.crawler_no,ui,IpCheckPage,IpCheckPage,sec_crawler_no,"No",,active
-ipcheck.security.abuser_yes,ui,IpCheckPage,IpCheckPage,sec_abuser_yes,"Reported",,active
-ipcheck.security.abuser_no,ui,IpCheckPage,IpCheckPage,sec_abuser_no,"Clean",,active
-ipcheck.security.clean,ui,IpCheckPage,IpCheckPage,sec_clean,"Not detected",,active
-ipcheck.avail.title,ui,IpCheckPage,IpCheckPage,avail_title,"Claude Availability",,active
-ipcheck.avail.tooltip,ui,IpCheckPage,IpCheckPage,avail_tooltip,"Claude servers run in the US; latency above 100ms from Asia is normal.",,active
-ipcheck.avail.refresh,ui,IpCheckPage,IpCheckPage,avail_refresh,"Refresh",,active
-ipcheck.avail.svc_row,ui,IpCheckPage,IpCheckPage,avail_svc_row,"Service status",,active
-ipcheck.avail.latency.normal,ui,IpCheckPage,IpCheckPage,avail_lat_normal,"Normal",,active
-ipcheck.avail.latency.good,ui,IpCheckPage,IpCheckPage,avail_lat_good,"Good",,active
-ipcheck.avail.latency.slow,ui,IpCheckPage,IpCheckPage,avail_lat_slow,"Slow",,active
-ipcheck.avail.latency.unreachable,ui,IpCheckPage,IpCheckPage,avail_lat_unreach,"Unreachable",,active
-ipcheck.avail.svc.none,ui,IpCheckPage,IpCheckPage,avail_svc_none,"All systems normal",,active
-ipcheck.avail.svc.minor,ui,IpCheckPage,IpCheckPage,avail_svc_minor,"Minor outage",,active
-ipcheck.avail.svc.major,ui,IpCheckPage,IpCheckPage,avail_svc_major,"Major outage",,active
-ipcheck.avail.svc.critical,ui,IpCheckPage,IpCheckPage,avail_svc_critical,"Critical outage",,active
-ipcheck.avail.svc.maintenance,ui,IpCheckPage,IpCheckPage,avail_svc_maintenance,"Maintenance",,active
-ipcheck.avail.svc.other,ui,IpCheckPage,IpCheckPage,avail_svc_other,"Disrupted",,active
-ipcheck.dns.title,ui,IpCheckPage,IpCheckPage,dns_title,"DNS Leak",,active
-ipcheck.dns.status,ui,IpCheckPage,IpCheckPage,dns_status,"Status",,active
-ipcheck.dns.outlet,ui,IpCheckPage,IpCheckPage,dns_outlet,"DNS exit",,active
-ipcheck.dns.outlet_ip,ui,IpCheckPage,IpCheckPage,dns_outlet_ip,"DNS exit IP",,active
-ipcheck.dns.isp,ui,IpCheckPage,IpCheckPage,dns_isp,"Provider",,active
-ipcheck.dns.leaked,ui,IpCheckPage,IpCheckPage,dns_leaked,"Possible leak",,active
-ipcheck.dns.no_leak,ui,IpCheckPage,IpCheckPage,dns_no_leak,"No leak detected",,active
-ipcheck.dns.encrypted,ui,IpCheckPage,IpCheckPage,dns_encrypted,"DNS encrypted or hidden",,active
-ipcheck.dns.cn_tag,ui,IpCheckPage,IpCheckPage,dns_cn_tag,"China DNS",,active
-ipcheck.udp.title,ui,IpCheckPage,IpCheckPage,udp_title,"WebRTC UDP Leak",,active
-ipcheck.udp.status,ui,IpCheckPage,IpCheckPage,udp_status,"Status",,active
-ipcheck.udp.outlet,ui,IpCheckPage,IpCheckPage,udp_outlet,"UDP exit",,active
-ipcheck.udp.outlet_ip,ui,IpCheckPage,IpCheckPage,udp_outlet_ip,"UDP exit IP",,active
-ipcheck.udp.origin,ui,IpCheckPage,IpCheckPage,udp_origin,"Origin",,active
-ipcheck.udp.disabled,ui,IpCheckPage,IpCheckPage,udp_disabled,"WebRTC disabled",,active
-ipcheck.udp.no_leak,ui,IpCheckPage,IpCheckPage,udp_no_leak,"No leak detected",,active
-ipcheck.udp.leaked,ui,IpCheckPage,IpCheckPage,udp_leaked,"Possible leak",,active
-ipcheck.udp.anomaly,ui,IpCheckPage,IpCheckPage,udp_anomaly,"Anomaly",,active
-ipcheck.device.title,ui,IpCheckPage,IpCheckPage,dev_title,"Device Info",,active
-ipcheck.device.tz,ui,IpCheckPage,IpCheckPage,dev_tz,"Timezone",,active
-ipcheck.device.lang,ui,IpCheckPage,IpCheckPage,dev_lang,"Language",,active
-ipcheck.device.os,ui,IpCheckPage,IpCheckPage,dev_os,"OS / Browser",,active
-ipcheck.device.touch,ui,IpCheckPage,IpCheckPage,dev_touch,"Touch",,active
-ipcheck.device.net,ui,IpCheckPage,IpCheckPage,dev_net,"Network type",,active
-ipcheck.device.dnt,ui,IpCheckPage,IpCheckPage,dev_dnt,"Do Not Track",,active
-ipcheck.device.webgl_render,ui,IpCheckPage,IpCheckPage,dev_webgl_render,"WebGL renderer",,active
-ipcheck.device.canvas_fp,ui,IpCheckPage,IpCheckPage,dev_canvas_fp,"Canvas fingerprint",,active
-ipcheck.device.webgl_fp,ui,IpCheckPage,IpCheckPage,dev_webgl_fp,"WebGL fingerprint",,active
-ipcheck.device.match,ui,IpCheckPage,IpCheckPage,dev_match,"Match",,active
-ipcheck.device.mismatch,ui,IpCheckPage,IpCheckPage,dev_mismatch,"Mismatch",,active
-ipcheck.device.local,ui,IpCheckPage,IpCheckPage,dev_local,"Local",,active
-ipcheck.device.estimate_suffix,ui,IpCheckPage,IpCheckPage,dev_est_suffix,"(est.)",,active
-ipcheck.device.diff_equal,ui,IpCheckPage,IpCheckPage,dev_diff_eq,"Slight offset",,active
-ipcheck.device.diff_ahead,ui,IpCheckPage,IpCheckPage,dev_diff_ahead,"Claude is {{h}}h ahead",,active
-ipcheck.device.diff_behind,ui,IpCheckPage,IpCheckPage,dev_diff_behind,"Claude is {{h}}h behind",,active
-ipcheck.device.lang_expected,ui,IpCheckPage,IpCheckPage,dev_lang_expected,"Claude region usually",,active
-ipcheck.device.touch_yes,ui,IpCheckPage,IpCheckPage,dev_touch_yes,"Yes",,active
-ipcheck.device.touch_no,ui,IpCheckPage,IpCheckPage,dev_touch_no,"No",,active
-ipcheck.device.dnt_on,ui,IpCheckPage,IpCheckPage,dev_dnt_on,"On",,active
-ipcheck.device.dnt_off,ui,IpCheckPage,IpCheckPage,dev_dnt_off,"Off",,active
-ipcheck.device.dnt_unset,ui,IpCheckPage,IpCheckPage,dev_dnt_unset,"Unset",,active
-ipcheck.device.net_unsupported,ui,IpCheckPage,IpCheckPage,dev_net_unsup,"Not detected",,active
-ipcheck.device.unsupported,ui,IpCheckPage,IpCheckPage,dev_unsupported,"Unsupported",,active
-ipcheck.history.title,ui,IpCheckPage,IpCheckPage,hist_title,"Claude exit IP history",,active
-ipcheck.history.subtitle,ui,IpCheckPage,IpCheckPage,hist_subtitle,"Stored only in this browser, up to 6 entries",,active
-ipcheck.history.clear,ui,IpCheckPage,IpCheckPage,hist_clear,"Clear",,active
-ipcheck.history.empty,ui,IpCheckPage,IpCheckPage,hist_empty,"No history yet",,active
-ipcheck.history.current,ui,IpCheckPage,IpCheckPage,hist_current,"Now",,active
-ipcheck.region.CN,ui,IpCheckPage,IpCheckPage,region_cn,"Mainland China",,active
-ipcheck.region.HK,ui,IpCheckPage,IpCheckPage,region_hk,"Hong Kong",,active
-ipcheck.region.MO,ui,IpCheckPage,IpCheckPage,region_mo,"Macao",,active
-ipcheck.region.RU,ui,IpCheckPage,IpCheckPage,region_ru,"Russia",,active
-ipcheck.region.KP,ui,IpCheckPage,IpCheckPage,region_kp,"North Korea",,active
-ipcheck.region.IR,ui,IpCheckPage,IpCheckPage,region_ir,"Iran",,active
-ipcheck.region.SY,ui,IpCheckPage,IpCheckPage,region_sy,"Syria",,active
-ipcheck.region.CU,ui,IpCheckPage,IpCheckPage,region_cu,"Cuba",,active
-ipcheck.region.BY,ui,IpCheckPage,IpCheckPage,region_by,"Belarus",,active
-ipcheck.region.VE,ui,IpCheckPage,IpCheckPage,region_ve,"Venezuela",,active
-leaderboard.profile_modal.close,dashboard,LeaderboardProfileModal,LeaderboardProfileModal,close,"Close",,active
-leaderboard.profile_modal.loading,dashboard,LeaderboardProfileModal,LeaderboardProfileModal,loading,"Loading profile…",,active
-leaderboard.profile_modal.error,dashboard,LeaderboardProfileModal,LeaderboardProfileModal,error,"Failed to load profile.",,active
-leaderboard.profile_modal.empty,dashboard,LeaderboardProfileModal,LeaderboardProfileModal,empty,"This profile is not public.",,active
-leaderboard.profile_modal.row_aria,dashboard,LeaderboardPage,LeaderboardRow,row_aria,"Open profile for {{name}}",,active
-leaderboard.profile_modal.rank,dashboard,LeaderboardProfileModal,Hero,rank,"#{{rank}}",,active
-leaderboard.profile_modal.hero.total_tokens,dashboard,LeaderboardProfileModal,Hero,total_tokens,"Total Tokens",,active
-leaderboard.profile_modal.hero.total_cost,dashboard,LeaderboardProfileModal,Hero,total_cost,"Total Cost",,active
-leaderboard.profile_modal.hero.github,dashboard,LeaderboardProfileModal,Hero,github,"GitHub profile",,active
-leaderboard.profile_modal.stat.total_cost,dashboard,LeaderboardProfileModal,StatCards,total_cost,"Total Cost",,active
-leaderboard.profile_modal.stat.total_tokens,dashboard,LeaderboardProfileModal,StatCards,total_tokens,"Total Tokens",,active
-leaderboard.profile_modal.stat.active_days,dashboard,LeaderboardProfileModal,StatCards,active_days,"Active Days",,active
-leaderboard.profile_modal.stat.avg_per_day,dashboard,LeaderboardProfileModal,StatCards,avg_per_day,"Avg/Day",,active
-leaderboard.profile_modal.streak.current,dashboard,LeaderboardProfileModal,Streak,current,"Current Streak",,active
-leaderboard.profile_modal.streak.longest,dashboard,LeaderboardProfileModal,Streak,longest,"Longest Streak",,active
-leaderboard.profile_modal.streak.days,dashboard,LeaderboardProfileModal,Streak,days,"{{count}} days",,active
-leaderboard.profile_modal.best_day.title,dashboard,LeaderboardProfileModal,BestDay,title,"Best Day",,active
-leaderboard.profile_modal.best_day.none,dashboard,LeaderboardProfileModal,BestDay,none,"—",,active
-leaderboard.profile_modal.models.count,dashboard,LeaderboardProfileModal,Models,count,"{{count}} models used",,active
-leaderboard.profile_modal.models.favorite,dashboard,LeaderboardProfileModal,Models,favorite,"Favorite",,active
-leaderboard.profile_modal.models.none,dashboard,LeaderboardProfileModal,Models,none,"No models tracked",,active
-leaderboard.profile_modal.heatmap.title,dashboard,LeaderboardProfileModal,Heatmap,title,"Activity (last 365 days)",,active
-leaderboard.profile_modal.providers.title,dashboard,LeaderboardProfileModal,Providers,title,"By provider",,active
-leaderboard.profile_modal.providers.none,dashboard,LeaderboardProfileModal,Providers,none,"No usage this period.",,active
-leaderboard.profile_modal.view_full,dashboard,LeaderboardProfileModal,Footer,view_full,"View full profile",,active
-leaderboard.profile_modal.badge.copy_url,dashboard,LeaderboardProfileModal,Badge,copy_url,"Copy profile URL",,active
-leaderboard.profile_modal.badge.copy,dashboard,LeaderboardProfileModal,Badge,copy,"Copy README badge",,active
-leaderboard.profile_modal.badge.copied,dashboard,LeaderboardProfileModal,Badge,copied,"Copied!",,active
 local_only.title,dashboard,LocalOnlyNotice,LocalOnlyNotice,title,"Available in the app",,active
 local_only.body,dashboard,LocalOnlyNotice,LocalOnlyNotice,body,"This page reads data from your own machine, so it only works in the Mac app or the CLI dashboard.",,active
 local_only.open_app,dashboard,LocalOnlyNotice,LocalOnlyNotice,open_app,"Open in Mac app",,active
 local_only.download,dashboard,LocalOnlyNotice,LocalOnlyNotice,download,"Get the Mac app",,active
-leaderboard.profile.like.aria_like,dashboard,LeaderboardProfileModal,LikeButton,aria_like,"Like profile",,active
-leaderboard.profile.like.aria_unlike,dashboard,LeaderboardProfileModal,LikeButton,aria_unlike,"Unlike profile",,active
-dashboard.auth_gate.title,dashboard,DashboardPage,DashboardView,auth_gate_title,"Sign in to Token Tracker",,active
-dashboard.auth_gate.subtitle,dashboard,DashboardPage,DashboardView,auth_gate_subtitle,"Sign in to sync and view your API usage, cost, and token consumption trends in the cloud.",,active
-dashboard.auth_gate.button,dashboard,DashboardPage,DashboardView,auth_gate_button,"Sign In",,active
-dashboard.expired_gate.title,dashboard,DashboardPage,DashboardView,expired_gate_title,"Session Expired",,active
-dashboard.expired_gate.subtitle,dashboard,DashboardPage,DashboardView,expired_gate_subtitle,"Your session has expired. Please sign in again to continue viewing your cloud dashboard.",,active
-dashboard.expired_gate.button,dashboard,DashboardPage,DashboardView,expired_gate_button,"Sign In Again",,active
 shared.app_name,shared,*,*,app_name,"Token Tracker",,active
-dashboard.auth_gate.hero_title,dashboard,DashboardPage,DashboardView,hero_title,"Track every AI agent token seamlessly",,active
-dashboard.auth_gate.hero_subtitle,dashboard,DashboardPage,DashboardView,hero_subtitle,"Clear, transparent, and multi-endpoint control",,active
-dashboard.auth_gate.desc,dashboard,DashboardPage,DashboardView,desc,"Securely sync token quotas, concurrent costs, and latency across Claude Code, Cursor, and Gemini CLI in a beautifully unified real-time dashboard.",,active
-dashboard.auth_gate.feature.sync.title,dashboard,DashboardPage,DashboardView,sync_title,"Real-time Cloud Sync",,active
-dashboard.auth_gate.feature.sync.desc,dashboard,DashboardPage,DashboardView,sync_desc,"Automated pipeline harvesting terminal execution costs into secure cloud records.",,active
-dashboard.auth_gate.feature.anal.title,dashboard,DashboardPage,DashboardView,anal_title,"Multi-dimensional Analytics",,active
-dashboard.auth_gate.feature.anal.desc,dashboard,DashboardPage,DashboardView,anal_desc,"Slice and dice by models or period to isolate high-cost peaks and allocations.",,active
-dashboard.auth_gate.feature.guard.title,dashboard,DashboardPage,DashboardView,guard_title,"Local-first Autonomy",,active
-dashboard.auth_gate.feature.guard.desc,dashboard,DashboardPage,DashboardView,guard_desc,"Skip all auth steps entirely on localhost. Preserves local debug speed.",,active
-dashboard.expired_gate.hero_title,dashboard,DashboardPage,DashboardView,expired_hero_title,"Your cloud session has expired",,active
-dashboard.expired_gate.desc,dashboard,DashboardPage,DashboardView,expired_desc,"For privacy and cloud drive security, active sessions expire automatically after a period. Verify again to restore your dashboard instantly.",,active
-dashboard.expired_gate.feature.sec.title,dashboard,DashboardPage,DashboardView,sec_title,"Secure Protection",,active
-dashboard.expired_gate.feature.sec.desc,dashboard,DashboardPage,DashboardView,sec_desc,"Encrypted tokens automatically rotate, guaranteeing complete assets privacy.",,active
-dashboard.expired_gate.feature.restore.title,dashboard,DashboardPage,DashboardView,restore_title,"Seamless Restore",,active
-dashboard.expired_gate.feature.restore.desc,dashboard,DashboardPage,DashboardView,restore_desc,"Instantly resume telemetry charts without reconfiguring terminal hooks.",,active
-dashboard.expired_gate.feature.cloud.title,dashboard,DashboardPage,DashboardView,cloud_title,"Multi-device Sync",,active
-dashboard.expired_gate.feature.cloud.desc,dashboard,DashboardPage,DashboardView,cloud_desc,"Readily access parsed token logs anywhere through synced dashboard.",,active
-landing.v2.leaderboard.kicker,landing,LandingPage,MarketingLanding,leaderboard_kicker,"GLOBAL TOKEN LEADERBOARD",,active
-landing.v2.leaderboard.title,landing,LandingPage,MarketingLanding,leaderboard_title,"AI Token Efficiency",,active
-landing.v2.leaderboard.subtitle,landing,LandingPage,MarketingLanding,leaderboard_subtitle,"Optionally and anonymously sync your local AI token usage to join the global efficiency leaderboard. Benchmark cost efficiency and model rotations with users worldwide.",,active
-landing.v2.leaderboard.active_developers,landing,LandingPage,MarketingLanding,active_developers,"1,240+ users actively syncing",,active
-landing.v2.leaderboard.top_badge,landing,LandingPage,MarketingLanding,top_badge,"EFFICIENCY CHAMP",,active
-landing.v2.leaderboard.rank_first,landing,LandingPage,MarketingLanding,rank_first,"NO. 1 GLOBAL",,active
-landing.v2.leaderboard.rank_second,landing,LandingPage,MarketingLanding,rank_second,"NO. 2",,active
-landing.v2.leaderboard.rank_third,landing,LandingPage,MarketingLanding,rank_third,"NO. 3",,active
-landing.v2.leaderboard.synced_tokens,landing,LandingPage,MarketingLanding,synced_tokens,"{{count}} tokens synced",,active
-landing.v2.leaderboard.efficiency,landing,LandingPage,MarketingLanding,efficiency,"Efficiency: {{value}}",,active
-landing.v2.leaderboard.streak_days,landing,LandingPage,MarketingLanding,streak_days,"{{count}} day streak",,active
-landing.v2.leaderboard.view_more,landing,LandingPage,MarketingLanding,view_more,"View full leaderboard",,active
 cmdk.placeholder,ui,CommandPalette,CommandPalette,placeholder,"Search pages and skills…",,active
 cmdk.empty,ui,CommandPalette,CommandPalette,empty,"No matches",,active
 cmdk.group.pages,ui,CommandPalette,CommandPalette,group_pages,"Pages",,active
@@ -1281,7 +841,6 @@ nav.achievements,shared,*,Sidebar,nav_achievements,"Achievements",,active
 achievements.section.title,dashboard,*,AchievementsSection,section_title,"Achievements",,active
 achievements.page.title,dashboard,AchievementsPage,AchievementsPage,page_title,"Achievements",,active
 achievements.page.local_note,dashboard,AchievementsPage,AchievementsPage,local_note,"Project and night-owl badges stay on this device.",,active
-achievements.signin.prompt,dashboard,AchievementsPage,AchievementsPage,signin_prompt,"Sign in to earn cloud achievements and show them on the leaderboard.",,active
 achievements.mini.tooltip,dashboard,LeaderboardPage,BadgeMini,mini_tooltip,"{{name}} — {{tier}}",,active
 achievements.badge.aria,dashboard,*,AchievementsSection,badge_aria,"{{name}} — {{tier}}",,active
 achievements.tier.bronze,dashboard,*,AchievementBadge,tier_bronze,"Bronze",,active
@@ -1313,12 +872,8 @@ achievements.badge.momentum.name,dashboard,*,AchievementsSection,momentum_name,"
 achievements.badge.momentum.desc,dashboard,*,BadgeDetailModal,momentum_desc,"Multiply your weekly usage over the previous week.",,active
 achievements.badge.polyglot.name,dashboard,*,AchievementsSection,polyglot_name,"Model Polyglot",,active
 achievements.badge.polyglot.desc,dashboard,*,BadgeDetailModal,polyglot_desc,"Put many different models to work.",,active
-achievements.badge.trendsetter.name,dashboard,*,AchievementsSection,trendsetter_name,"Trendsetter",,active
-achievements.badge.trendsetter.desc,dashboard,*,BadgeDetailModal,trendsetter_desc,"Adopt new models within their first week in the wild.",,active
 achievements.badge.multitool.name,dashboard,*,AchievementsSection,multitool_name,"Multitool",,active
 achievements.badge.multitool.desc,dashboard,*,BadgeDetailModal,multitool_desc,"Track usage across many AI coding tools.",,active
-achievements.badge.podium.name,dashboard,*,AchievementsSection,podium_name,"Podium",,active
-achievements.badge.podium.desc,dashboard,*,BadgeDetailModal,podium_desc,"Climb the all-time leaderboard.",,active
 achievements.badge.veteran.name,dashboard,*,AchievementsSection,veteran_name,"Veteran",,active
 achievements.badge.veteran.desc,dashboard,*,BadgeDetailModal,veteran_desc,"Stick around — counted from your first tracked day.",,active
 achievements.badge.project_hopper.name,dashboard,*,AchievementsSection,project_hopper_name,"Project Hopper",,active
@@ -1327,7 +882,6 @@ achievements.badge.project_devotion.name,dashboard,*,AchievementsSection,project
 achievements.badge.project_devotion.desc,dashboard,*,BadgeDetailModal,project_devotion_desc,"Pour tokens into a single beloved project.",,active
 achievements.badge.night_owl.name,dashboard,*,AchievementsSection,night_owl_name,"Night Owl",,active
 achievements.badge.night_owl.desc,dashboard,*,BadgeDetailModal,night_owl_desc,"Code in the small hours between midnight and 6 AM.",,active
-achievements.signin.action,dashboard,AchievementsPage,AchievementsPage,signin_action,"Sign in",,active
 achievements.scope.local,dashboard,*,AchievementsSection,scope_local,"Local",,active
 achievements.page.suggest,dashboard,AchievementsPage,AchievementsPage,suggest,"Have an idea for a new badge?",,active
 achievements.page.suggest_link,dashboard,AchievementsPage,AchievementsPage,suggest_link,"Suggest it on GitHub",,active
@@ -1406,25 +960,6 @@ limits.provenance.tooltip,limits,LimitsPage,UsageLimitsPanel,provenance_tooltip,
 limits.reauth.badge,limits,LimitsPage,UsageLimitsPanel,reauth_badge,"Re-auth",,active
 limits.reauth.tooltip,limits,LimitsPage,UsageLimitsPanel,reauth_tooltip,"Sign-in expired — run `{{command}}` in a terminal once to sign in again, then refresh.",,active
 shared.github.star,shared,*,GithubStar,star,"Star",,active
-device.approval.title,ui,DevicePage,DevicePage,title,"Approve your CLI",,active
-device.approval.description,ui,DevicePage,DevicePage,description,"Enter the code shown by your CLI. It will link this machine to your account so its token usage appears in your leaderboard profile.",,active
-device.approval.sign_in_banner,ui,DevicePage,DevicePage,sign_in_banner,"Sign in first, then return to this page.",,active
-device.approval.code_label,ui,DevicePage,DevicePage,code_label,"CLI code",,active
-device.approval.action.approve,ui,DevicePage,DevicePage,approve,"Approve",,active
-device.approval.action.approving,ui,DevicePage,DevicePage,approving,"Approving…",,active
-device.approval.error.sign_in,ui,DevicePage,DevicePage,error_sign_in,"Please sign in first.",,active
-device.approval.error.invalid_code,ui,DevicePage,DevicePage,error_invalid_code,"Invalid code format. Expected XXXX-XXXX.",,active
-device.approval.error.no_token,ui,DevicePage,DevicePage,error_no_token,"No access token — please sign in again.",,active
-device.approval.success.already,ui,DevicePage,DevicePage,success_already,"This device was already approved.",,active
-device.approval.success.already_client,ui,DevicePage,DevicePage,success_already_client,"{{client}} was already approved.",,active
-device.approval.success.approved,ui,DevicePage,DevicePage,success_approved,"Approved. You can close this tab — your CLI will connect within a few seconds.",,active
-device.approval.success.approved_client,ui,DevicePage,DevicePage,success_approved_client,"Approved for {{client}}. You can close this tab — your CLI will connect within a few seconds.",,active
-device.approval.error.not_found,ui,DevicePage,DevicePage,error_not_found,"Code not found. Double-check the code shown by your CLI.",,active
-device.approval.error.expired,ui,DevicePage,DevicePage,error_expired,"Code expired. Run `tracker device-login` again and retry.",,active
-device.approval.error.session_expired,ui,DevicePage,DevicePage,error_session_expired,"Session expired. Sign out, sign in, and try again.",,active
-device.approval.error.server,ui,DevicePage,DevicePage,error_server,"Server error (HTTP {{status}}).",,active
-device.approval.error.server_detail,ui,DevicePage,DevicePage,error_server_detail,"Server error: {{message}}",,active
-device.approval.error.network,ui,DevicePage,DevicePage,error_network,"Network error: {{message}}",,active
 dashboard.cost_breakdown.empty,ui,CostAnalysisModal,CostAnalysisModal,empty,"No spend recorded.",,active
 dashboard.cost_breakdown.model_column,ui,CostAnalysisModal,CostAnalysisModal,model_column,"Model",,active
 dashboard.cost_breakdown.cost_column,ui,CostAnalysisModal,CostAnalysisModal,cost_column,"Cost",,active

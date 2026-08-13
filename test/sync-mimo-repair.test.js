@@ -25,7 +25,7 @@ function row(source, model, hour, total) {
   });
 }
 
-test("repairMimoClaudeMislabel: purges source=mimo from queue + state, keeps others, resets offset, idempotent", async () => {
+test("repairMimoClaudeMislabel: purges source=mimo from queue + state, keeps others, idempotent", async () => {
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "tt-mimo-repair-"));
   try {
     const queuePath = path.join(tmp, "queue.jsonl");
@@ -95,9 +95,9 @@ test("repairMimoClaudeMislabel: purges source=mimo from queue + state, keeps oth
     assert.ok(!Object.keys(cursors.projectHourly.buckets).some((k) => k.includes("|mimo|")));
     assert.equal(cursors.mimo, undefined);
 
-    // Upload offsets reset for full replay.
-    assert.equal(JSON.parse(await fs.readFile(queueStatePath, "utf8")).offset, 0);
-    assert.equal(JSON.parse(await fs.readFile(projectQueueStatePath, "utf8")).offset, 0);
+    // Local-only build: retired upload offsets are left untouched by repairs.
+    assert.equal(JSON.parse(await fs.readFile(queueStatePath, "utf8")).offset, 4096);
+    assert.equal(JSON.parse(await fs.readFile(projectQueueStatePath, "utf8")).offset, 2048);
 
     // Backup of the main queue was written.
     const files = await fs.readdir(tmp);

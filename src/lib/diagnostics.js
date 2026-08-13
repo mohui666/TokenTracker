@@ -13,7 +13,6 @@ const {
   isGeminiHookConfigured,
 } = require("./gemini-config");
 const { resolveOpencodeConfigDir, isOpencodePluginInstalled } = require("./opencode-config");
-const { normalizeState: normalizeUploadState } = require("./upload-throttle");
 const { probeOpenclawHookState } = require("./openclaw-hook");
 const { probeOpenclawSessionPluginState } = require("./openclaw-session-plugin");
 const { probeGrokHookState } = require("./grok-hook");
@@ -72,13 +71,10 @@ async function collectTrackerDiagnostics({
   const { trackerDir, binDir } = await resolveTrackerPaths({ home });
   const configPath = path.join(trackerDir, "config.json");
   const queuePath = path.join(trackerDir, "queue.jsonl");
-  const queueStatePath = path.join(trackerDir, "queue.state.json");
   const cursorsPath = path.join(trackerDir, "cursors.json");
   const notifySignalPath = path.join(trackerDir, "notify.signal");
   const openclawSignalPath = path.join(trackerDir, "openclaw.signal");
   const throttlePath = path.join(trackerDir, "sync.throttle");
-  const uploadThrottlePath = path.join(trackerDir, "upload.throttle.json");
-  const autoRetryPath = path.join(trackerDir, "auto.retry.json");
   const syncSkipPath = path.join(trackerDir, "sync.skip.json");
   const codexConfigPath = path.join(codexHome, "config.toml");
   const codeConfigPath = path.join(codeHome, "config.toml");
@@ -94,14 +90,9 @@ async function collectTrackerDiagnostics({
   const config = await readJson(configPath);
   const cursorSummary = await readCursorStateSummary({ trackerDir, cursorsPath });
   const cursors = cursorSummary.cursors;
-  const queueState = (await readJson(queueStatePath)) || { offset: 0 };
-  const uploadThrottle = normalizeUploadState(await readJson(uploadThrottlePath));
-  const autoRetry = await readJson(autoRetryPath);
   const syncSkip = await readJson(syncSkipPath);
 
   const queueSize = await safeStatSize(queuePath);
-  const offsetBytes = Number(queueState.offset || 0);
-  const pendingBytes = Math.max(0, queueSize - offsetBytes);
 
   const lastNotify = (await safeReadText(notifySignalPath))?.trim() || null;
   const lastOpenclawSync = (await safeReadText(openclawSignalPath))?.trim() || null;
@@ -175,11 +166,6 @@ async function collectTrackerDiagnostics({
     }
   }
 
-  const lastSuccessAt = uploadThrottle.lastSuccessMs
-    ? new Date(uploadThrottle.lastSuccessMs).toISOString()
-    : null;
-  const autoRetryAt = parseEpochMsToIso(autoRetry?.retryAtMs);
-
   return {
     ok: true,
     version: 1,
@@ -218,9 +204,6 @@ async function collectTrackerDiagnostics({
         "Kiro IDE and Kiro CLI both emit source='kiro' in queue.jsonl so token, cost, heatmap, and leaderboard aggregations merge transparently. Use this block to distinguish sub-path contributions.",
     },
     config: {
-      base_url: typeof config?.baseUrl === "string" ? config.baseUrl : null,
-      device_token: config?.deviceToken ? "set" : "unset",
-      device_id: maskId(config?.deviceId),
       installed_at: typeof config?.installedAt === "string" ? config.installedAt : null,
     },
     parse: {
@@ -233,9 +216,6 @@ async function collectTrackerDiagnostics({
     },
     queue: {
       size_bytes: queueSize,
-      offset_bytes: offsetBytes,
-      pending_bytes: pendingBytes,
-      updated_at: typeof queueState.updatedAt === "string" ? queueState.updatedAt : null,
     },
     notify: {
       last_notify: lastNotify,
@@ -262,17 +242,6 @@ async function collectTrackerDiagnostics({
       grok_hook_handler_exists: Boolean(grokHookState?.handlerExists),
       grok_sessions_dir: redactValue(grokHookState?.sessionsDir, home),
     },
-    upload: {
-      last_success_at: lastSuccessAt,
-      next_allowed_after: parseEpochMsToIso(uploadThrottle.nextAllowedAtMs || null),
-      backoff_until: parseEpochMsToIso(uploadThrottle.backoffUntilMs || null),
-      last_error: uploadThrottle.lastError
-        ? {
-            at: uploadThrottle.lastErrorAt || null,
-            message: redactError(String(uploadThrottle.lastError), home),
-          }
-        : null,
-    },
     sync_skip: syncSkip?.at
       ? {
           at: syncSkip.at,
@@ -281,25 +250,7 @@ async function collectTrackerDiagnostics({
           lock_path: redactValue(syncSkip.lockPath, home),
         }
       : null,
-    auto_retry: autoRetryAt
-      ? {
-          next_retry_at: autoRetryAt,
-          reason: typeof autoRetry?.reason === "string" ? autoRetry.reason : null,
-          pending_bytes: Number.isFinite(Number(autoRetry?.pendingBytes))
-            ? Math.max(0, Number(autoRetry.pendingBytes))
-            : null,
-          scheduled_at: typeof autoRetry?.scheduledAt === "string" ? autoRetry.scheduledAt : null,
-          source: typeof autoRetry?.source === "string" ? autoRetry.source : null,
-        }
-      : null,
   };
-}
-
-function maskId(v) {
-  if (typeof v !== "string") return null;
-  const s = v.trim();
-  if (s.length < 12) return null;
-  return `${s.slice(0, 8)}…${s.slice(-4)}`;
 }
 
 function redactValue(value, home) {
@@ -318,13 +269,6 @@ function redactWslUser(value) {
     /^([\\/]{2}wsl(?:\$|\.localhost)[\\/][^\\/]+[\\/]home[\\/])[^\\/]+/i,
     "$1~",
   );
-}
-
-function redactError(message, home) {
-  if (typeof message !== "string") return message;
-  if (typeof home !== "string" || home.length === 0) return message;
-  const homeNorm = home.endsWith(path.sep) ? home.slice(0, -1) : home;
-  return message.split(homeNorm).join("~");
 }
 
 async function safeStatSize(p) {

@@ -31,10 +31,10 @@ struct TokenTrackerBarApp: App {
                     }
                     .keyboardShortcut(",", modifiers: .command)
                 }
-                // Default Help menu shows "Help isn't available" — open the website.
+                // Default Help menu shows "Help isn't available" — open the project page.
                 CommandGroup(replacing: .help) {
                     Button(Strings.menuHelp) {
-                        if let url = URL(string: "https://www.tokentracker.cc") {
+                        if let url = URL(string: "https://github.com/mohui666/TokenTracker") {
                             NSWorkspace.shared.open(url)
                         }
                     }
@@ -230,19 +230,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls {
             guard url.scheme == "tokentracker" else { continue }
-            if url.host == "auth" && url.path.hasPrefix("/done") {
-                DashboardWindowController.shared.handleAuthDone()
-            } else if url.host == "auth" && url.path.hasPrefix("/callback") {
-                // Browser relays OAuth code back via tokentracker://auth/callback?insforge_code=xxx
-                let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
-                let code = components?.queryItems?.first(where: { $0.name == "insforge_code" })?.value
-                if let code {
-                    DashboardWindowController.shared.handleAuthCallback(code: code)
-                }
-            } else if url.host == "open" || url.host == "dashboard" {
-                // The web app's local-only pages (Limits / Skills on
-                // tokentracker.cc) deep-link here via tokentracker://open to
-                // surface the local dashboard window.
+            if url.host == "open" || url.host == "dashboard" {
+                // The web app's local-only pages deep-link here via
+                // tokentracker://open to surface the local dashboard window.
                 DashboardPresentationCoordinator.shared.showDashboard()
             }
         }

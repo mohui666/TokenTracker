@@ -5,6 +5,13 @@ const { loadDashboardModule } = require("./helpers/load-dashboard-module");
 let mod;
 
 test.before(async () => {
+  // copy.ts resolves its locale from navigator.language at module init; force
+  // English so the assertions below are host-locale independent (Node exposes
+  // a navigator global whose language follows the OS).
+  Object.defineProperty(globalThis, "navigator", {
+    value: { language: "en-US", languages: ["en-US"] },
+    configurable: true,
+  });
   mod = await loadDashboardModule("dashboard/src/ui/share/build-share-card-data.ts");
 });
 

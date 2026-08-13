@@ -1,26 +1,12 @@
-use tokentracker_linux::{oauth, paths, server, tray};
+use tokentracker_linux::{paths, server, tray};
 
 use std::sync::Mutex;
 
-use oauth::{DashboardBaseUrl, PendingAuthCode};
 use once_cell::sync::Lazy;
 use server::TokenTrackerServer;
 use tauri::{AppHandle, Manager, WebviewWindow, WindowEvent};
 
 static SERVER: Lazy<Mutex<Option<TokenTrackerServer>>> = Lazy::new(|| Mutex::new(None));
-
-const NATIVE_OAUTH_BRIDGE: &str = r#"
-(() => {
-  if (window.location.hostname !== '127.0.0.1') return;
-  window.webkit = window.webkit || {};
-  window.webkit.messageHandlers = window.webkit.messageHandlers || {};
-  window.webkit.messageHandlers.nativeOAuth = {
-    postMessage(url) {
-      return window.__TAURI_INTERNALS__.invoke('open_oauth', { url });
-    }
-  };
-})();
-"#;
 
 fn stop_server() {
     if let Ok(mut guard) = SERVER.lock() {
@@ -83,7 +69,6 @@ fn start_dashboard(app: AppHandle, window: WebviewWindow) {
         };
 
     let dashboard_url = server.url().to_string();
-    app.state::<DashboardBaseUrl>().store(dashboard_url.clone());
 
     if let Ok(mut guard) = SERVER.lock() {
         *guard = Some(server);
@@ -103,16 +88,10 @@ fn start_dashboard(app: AppHandle, window: WebviewWindow) {
         }
     };
 
-    let navigate_app = app.clone();
-    let navigate_window = window.clone();
     on_main_thread(&app, move || {
-        if let Err(error) = navigate_window.navigate(url) {
+        if let Err(error) = window.navigate(url) {
             eprintln!("[TokenTracker] failed to open the dashboard: {error}");
-            return;
         }
-        // A `tokentracker://` callback may have arrived before the server was
-        // ready, in which case it was parked as a pending code.
-        oauth::deliver_pending_callback(&navigate_app);
     });
 }
 
@@ -220,31 +199,12 @@ fn start_health_monitor() {
 }
 
 fn main() {
-    let initial_args: Vec<String> = std::env::args().collect();
-
     tauri::Builder::default()
-        .manage(PendingAuthCode::default())
-        .manage(DashboardBaseUrl::default())
-        .invoke_handler(tauri::generate_handler![oauth::open_oauth])
-        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
-            for arg in argv {
-                if oauth::handle_callback(app, &arg) {
-                    return;
-                }
-            }
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             tray::show_main_window(app);
         }))
-        .setup(move |app| {
-            if let Err(error) = oauth::ensure_appimage_protocol_registration() {
-                eprintln!("[TokenTracker] AppImage OAuth callback registration failed: {error}");
-            }
+        .setup(|app| {
             tray::install(app)?;
-
-            for arg in &initial_args {
-                if let Some(code) = oauth::parse_auth_callback(arg) {
-                    app.state::<PendingAuthCode>().store(code);
-                }
-            }
 
             // Create the window up front so it paints `src/index.html` as a
             // loading screen and the tray menu has a "main" window to raise
@@ -254,7 +214,6 @@ fn main() {
                 "main",
                 tauri::WebviewUrl::App("index.html".into()),
             )
-            .initialization_script(NATIVE_OAUTH_BRIDGE)
             .title("TokenTracker")
             .inner_size(1180.0, 820.0)
             .min_inner_size(960.0, 640.0)

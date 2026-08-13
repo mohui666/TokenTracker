@@ -9,10 +9,6 @@ vi.mock("../lib/api", () => ({
   getUsageMonthly: vi.fn(),
 }));
 
-vi.mock("../lib/auth-token", () => ({
-  isAccessTokenReady: vi.fn(() => true),
-  resolveAuthAccessToken: vi.fn(async (token) => token || "test-token"),
-}));
 
 vi.mock("../lib/mock-data", () => ({
   isMockEnabled: vi.fn(() => false),

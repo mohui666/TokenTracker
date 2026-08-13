@@ -57,7 +57,7 @@ targets:
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         CFBundleURLTypes:
-          - CFBundleURLName: com.tokentracker.bar.auth
+          - CFBundleURLName: com.tokentracker.bar.deeplink
             CFBundleURLSchemes:
               - tokentracker
         NSAppTransportSecurity:

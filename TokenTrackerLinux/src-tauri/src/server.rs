@@ -266,11 +266,9 @@ pub fn dashboard_url(port: u16) -> String {
     format!("http://127.0.0.1:{port}")
 }
 
-/// OAuth (Google/GitHub) redirects to `http://127.0.0.1:<port>/auth/callback`,
-/// which must be in InsForge's allowed-redirect-URL list.  Prefer a fixed port
-/// registered alongside the macOS (:7680) and Windows (:17680) apps.  Falls
-/// back to an OS-assigned free port if the preferred one is already in use
-/// (email login still works; OAuth needs the fixed port).
+/// A stable fixed port keeps the local dashboard URL consistent across
+/// restarts, matching the Windows app (:17680).  Falls back to an OS-assigned
+/// free port if the preferred one is already in use.
 const PREFERRED_PORT: u16 = 17680;
 
 pub fn pick_available_port() -> Result<u16, String> {

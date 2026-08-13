@@ -21,8 +21,8 @@ jobs:
   # Create the vX.Y.Z release as a DRAFT first, so the macOS and Windows build
   # jobs can upload their assets to it IN PARALLEL while it stays invisible.
   # Drafts are excluded from releases/latest and the public releases page, so
-  # consumers (the Homebrew tap, the landing "Download" deep-link, anyone
-  # browsing) never see a half-published release — releases/latest stays on the
+  # consumers (the landing "Download" deep-link, anyone browsing) never see a
+  # half-published release — releases/latest stays on the
   # PREVIOUS complete version until the publish job flips this one live, once
   # every asset is attached. Cheap (~10s on ubuntu).
   create-release:
@@ -187,15 +187,7 @@ jobs:
       - name: Install dashboard dependencies
         run: npm ci --prefix dashboard --no-audit --no-fund
 
-      # InsForge URL + anon key are public client-side values (shipped in every
-      # dashboard bundle). They MUST be present at build time or Vite inlines
-      # empty strings, which breaks the leaderboard page (no baseUrl → no fetch)
-      # and disables cloud OAuth (`isCloudInsforgeConfigured()` returns false).
-      # `dashboard/.env.local` is gitignored so CI cannot read it — inject here.
       - name: Build dashboard
-        env:
-          VITE_INSFORGE_BASE_URL: https://srctyff5.us-east.insforge.app
-          VITE_INSFORGE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3OC0xMjM0LTU2NzgtOTBhYi1jZGVmMTIzNDU2NzgiLCJlbWFpbCI6ImFub25AaW5zZm9yZ2UuY29tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExNDU5NDd9.T0auta_IrVIh0uXW1bob5QSnzvsnJmN28r5XkSGEuQY
         run: npm run dashboard:build
 
       # 2. Bundle EmbeddedServer (Node.js + tokentracker source)
@@ -438,12 +430,7 @@ jobs:
       - name: Install dashboard dependencies
         run: npm ci --prefix dashboard --no-audit --no-fund
 
-      # Same public client-side values as the macOS job: absent at build time
-      # Vite inlines empty strings, breaking the leaderboard and cloud OAuth.
       - name: Build dashboard
-        env:
-          VITE_INSFORGE_BASE_URL: https://srctyff5.us-east.insforge.app
-          VITE_INSFORGE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3OC0xMjM0LTU2NzgtOTBhYi1jZGVmMTIzNDU2NzgiLCJlbWFpbCI6ImFub25AaW5zZm9yZ2UuY29tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExNDU5NDd9.T0auta_IrVIh0uXW1bob5QSnzvsnJmN28r5XkSGEuQY
         run: npm run dashboard:build
 
       - name: Install Linux client dependencies
@@ -547,9 +534,7 @@ jobs:
   # release appears complete and atomically — releases/latest stays on the
   # previous version until this instant, never a partial release. If either
   # build fails, the release stays a draft (invisible) instead of going public
-  # half-empty. The Homebrew tap is notified HERE (not in the build job) so it
-  # fetches a release that is both public and fully populated — fixing the race
-  # where the tap saw vX.Y.Z before the DMG asset existed.
+  # half-empty.
   publish:
     needs: [build, windows, linux]
     runs-on: ubuntu-latest
@@ -576,19 +561,3 @@ jobs:
           done
 
           gh release edit "$tag" --draft=false --latest --repo "$GITHUB_REPOSITORY"
-
-      - name: Dispatch homebrew tap update
-        env:
-          HOMEBREW_DISPATCH_TOKEN: ${{ secrets.HOMEBREW_DISPATCH_TOKEN }}
-          VERSION: ${{ inputs.version }}
-        run: |
-          if [ -z "${HOMEBREW_DISPATCH_TOKEN:-}" ]; then
-            echo "HOMEBREW_DISPATCH_TOKEN not set — tap will update via hourly cron."
-            exit 0
-          fi
-          curl -sSL -X POST \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer $HOMEBREW_DISPATCH_TOKEN" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            https://api.github.com/repos/xiufengsun/homebrew-tokentracker/dispatches \
-            -d "{\"event_type\":\"tokentracker-release\",\"client_payload\":{\"source\":\"dmg\",\"version\":\"$VERSION\"}}"

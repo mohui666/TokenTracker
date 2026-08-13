@@ -89,6 +89,6 @@ This is an MVP launcher. The following macOS features are **not** ported yet:
 
 - Live token/cost numbers rendered into the tray icon.
 - Native ↔ web bridge (`NativeBridge`) — Settings page menu-bar-pref controls,
-  theme sync, OAuth deep-link relay. The dashboard loads in plain web mode.
+  theme sync. The dashboard loads in plain web mode.
 - Auto-update checker.
 - An installer / signed package and a CI workflow to build the `.exe`.

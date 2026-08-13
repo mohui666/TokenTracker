@@ -4,17 +4,17 @@ const { test } = require("node:test");
 const { resolveRuntimeConfig } = require("../src/lib/runtime-config");
 
 test("resolveRuntimeConfig prefers CLI flags over config and env", () => {
-  const config = { baseUrl: "https://config.example", deviceToken: "cfg" };
   const result = resolveRuntimeConfig({
-    cli: { baseUrl: "https://cli.example" },
-    config,
-    env: { TOKENTRACKER_DEVICE_TOKEN: "env" },
+    cli: { httpTimeoutMs: 5000 },
+    config: { httpTimeoutMs: 9000, debug: false },
+    env: { TOKENTRACKER_DEBUG: "1" },
   });
 
-  assert.equal(result.baseUrl, "https://cli.example");
-  assert.equal(result.deviceToken, "cfg");
-  assert.equal(result.sources.baseUrl, "cli");
-  assert.equal(result.sources.deviceToken, "config");
+  assert.equal(result.httpTimeoutMs, 5000);
+  // Precedence is cli > config > env: the persisted false beats the env flag.
+  assert.equal(result.debug, false);
+  assert.equal(result.sources.httpTimeoutMs, "cli");
+  assert.equal(result.sources.debug, "config");
 });
 
 test("resolveRuntimeConfig ignores non-TOKENTRACKER env inputs", () => {
@@ -25,26 +25,22 @@ test("resolveRuntimeConfig ignores non-TOKENTRACKER env inputs", () => {
     },
   });
 
-  assert.equal(result.deviceToken, null);
-  assert.equal(result.sources.deviceToken, "default");
+  assert.equal(result.httpTimeoutMs, 20_000);
+  assert.equal(result.debug, false);
+  assert.equal(result.sources.httpTimeoutMs, "default");
 });
 
-test("resolveRuntimeConfig recovers from the leaked Windows test base URL", () => {
-  const recovered = resolveRuntimeConfig({
-    config: { baseUrl: "https://example.invalid" },
-    env: {},
+test("resolveRuntimeConfig ignores retired cloud config keys", () => {
+  // Pre-local-only installs may still carry baseUrl/deviceToken/dashboardUrl in
+  // config.json; none of them may leak into the runtime config anymore.
+  const result = resolveRuntimeConfig({
+    config: { baseUrl: "https://example.invalid", deviceToken: "tok" },
+    env: { TOKENTRACKER_INSFORGE_BASE_URL: "https://example.invalid" },
   });
 
-  assert.equal(recovered.baseUrl, "https://srctyff5.us-east.insforge.app");
-  assert.equal(recovered.sources.baseUrl, "default");
-
-  const explicit = resolveRuntimeConfig({
-    cli: { baseUrl: "https://example.invalid" },
-    config: { baseUrl: "https://config.example" },
-    env: {},
-  });
-  assert.equal(explicit.baseUrl, "https://example.invalid");
-  assert.equal(explicit.sources.baseUrl, "cli");
+  assert.equal("baseUrl" in result, false);
+  assert.equal("deviceToken" in result, false);
+  assert.equal(result.httpTimeoutMs, 20_000);
 });
 
 test("resolveRuntimeConfig normalizes timeout and flags", () => {
@@ -52,11 +48,9 @@ test("resolveRuntimeConfig normalizes timeout and flags", () => {
     env: {
       TOKENTRACKER_HTTP_TIMEOUT_MS: "500",
       TOKENTRACKER_DEBUG: "1",
-      TOKENTRACKER_AUTO_RETRY_NO_SPAWN: "1",
     },
   });
 
   assert.equal(result.httpTimeoutMs, 1000);
   assert.equal(result.debug, true);
-  assert.equal(result.autoRetryNoSpawn, true);
 });

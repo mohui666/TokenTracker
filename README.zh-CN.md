@@ -10,24 +10,22 @@
 
 [![npm version](https://img.shields.io/npm/v/tokentracker-cli.svg?color=blue)](https://www.npmjs.com/package/tokentracker-cli)
 [![npm downloads](https://img.shields.io/npm/dm/tokentracker-cli.svg?color=brightgreen)](https://www.npmjs.com/package/tokentracker-cli)
-[![Homebrew](https://img.shields.io/github/v/release/xiufengsun/TokenTracker?label=brew&color=F8B73E&logo=homebrew&logoColor=white)](https://github.com/xiufengsun/homebrew-tokentracker)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 [![Platform](https://img.shields.io/badge/macOS-supported-lightgrey.svg)](https://www.apple.com/macos/)
-[![GitHub stars](https://img.shields.io/github/stars/xiufengsun/TokenTracker?style=social)](https://github.com/xiufengsun/TokenTracker/stargazers)
+[![GitHub stars](https://img.shields.io/github/stars/mohui666/TokenTracker?style=social)](https://github.com/mohui666/TokenTracker/stargazers)
 [![阮一峰周刊 #393 收录](https://img.shields.io/badge/%E6%94%B6%E5%BD%95-%E9%98%AE%E4%B8%80%E5%B3%B0%E5%91%A8%E5%88%8A%20%23393-FF6B35?logo=rss&logoColor=white)](https://github.com/ruanyf/weekly/blob/master/docs/issue-393.md)
-[![作者 tokens](https://srctyff5.us-east.insforge.app/functions/tokentracker-badge-svg?user_id=0652839f-d19f-4f67-af85-6b7675875443&metric=tokens&compact=1&label=author%20tokens)](https://github.com/xiufengsun/TokenTracker)
 
 <br/>
 
-<video src="https://github.com/user-attachments/assets/5e709422-5af8-4e4c-8109-f5bb711eb3f8" controls muted playsinline poster="https://raw.githubusercontent.com/xiufengsun/tokentracker/main/docs/screenshots/dashboard-dark.png" width="820">
-  <img src="https://raw.githubusercontent.com/xiufengsun/tokentracker/main/docs/screenshots/dashboard-dark.png" alt="Token Tracker Dashboard" width="820" />
+<video src="https://github.com/user-attachments/assets/5e709422-5af8-4e4c-8109-f5bb711eb3f8" controls muted playsinline poster="https://raw.githubusercontent.com/mohui666/TokenTracker/main/docs/screenshots/dashboard-dark.png" width="820">
+  <img src="https://raw.githubusercontent.com/mohui666/TokenTracker/main/docs/screenshots/dashboard-dark.png" alt="Token Tracker Dashboard" width="820" />
 </video>
 
-<video src="https://github.com/user-attachments/assets/3275979d-bbed-4639-83e2-8b7d83bed6af" controls muted playsinline poster="https://raw.githubusercontent.com/xiufengsun/tokentracker/main/docs/screenshots/dashboard-light.png" width="820"></video>
+<video src="https://github.com/user-attachments/assets/3275979d-bbed-4639-83e2-8b7d83bed6af" controls muted playsinline poster="https://raw.githubusercontent.com/mohui666/TokenTracker/main/docs/screenshots/dashboard-light.png" width="820"></video>
 
 <br/><br/>
 
-⭐ **如果 TokenTracker 帮你省了时间，欢迎 [在 GitHub 上 Star](https://github.com/xiufengsun/TokenTracker) —— 可以让更多开发者发现它。**
+⭐ **如果 TokenTracker 帮你省了时间，欢迎 [在 GitHub 上 Star](https://github.com/mohui666/TokenTracker) —— 可以让更多开发者发现它。**
 
 <br/>
 
@@ -50,13 +48,13 @@ npx tokentracker-cli
 **30 秒能看到什么：**
 - 📊 本地 Dashboard（`localhost:7680`）—— 用量趋势、模型明细、成本分析
 - 🔌 自动识别并挂接你电脑上所有已安装的 AI 工具
-- 🏠 100% 本地运行 —— 无账号、无 API Key、无网络请求（排行榜是可选的）
+- 🏠 100% 本地运行 —— 无账号、无 API Key、无网络请求
 - 🧩 *可选：* Skills 面板——浏览 250+ 公开 skill，并在 Claude · Codex · Grok · Antigravity · Gemini · OpenCode · Hermes 之间同步
 
 > **想要原生桌面 App？**
-> - **macOS** —— [下载 `TokenTrackerBar.dmg`](https://github.com/xiufengsun/TokenTracker/releases/latest/download/TokenTrackerBar.dmg) → 拖入「应用程序」即可。包含桌面小组件、菜单栏状态图标，以及同一套 Dashboard（跑在 WKWebView 里）。
-> - **Windows** —— [下载 `TokenTracker-Setup.exe`](https://github.com/xiufengsun/TokenTracker/releases/latest/download/TokenTracker-Setup.exe) → 运行免管理员的单用户安装包即可。系统托盘 App，Dashboard 跑在 WebView2 里。便携版 zip 见[发布页](https://github.com/xiufengsun/TokenTracker/releases/latest)。
-> - **Linux** —— [下载 `TokenTracker-linux-x86_64.AppImage`](https://github.com/xiufengsun/TokenTracker/releases/latest/download/TokenTracker-linux-x86_64.AppImage) → `chmod +x` 后直接运行。托盘 App，Dashboard 跑在 WebKitGTK 窗口里。需要发行版自带的 `webkit2gtk-4.1`、`gtk3`、`libayatana-appindicator`；GNOME 上托盘图标还需装 [AppIndicator 扩展](https://extensions.gnome.org/extension/615/appindicator-support/)。
+> - **macOS** —— [下载 `TokenTrackerBar.dmg`](https://github.com/mohui666/TokenTracker/releases/latest/download/TokenTrackerBar.dmg) → 拖入「应用程序」即可。包含桌面小组件、菜单栏状态图标，以及同一套 Dashboard（跑在 WKWebView 里）。
+> - **Windows** —— [下载 `TokenTracker-Setup.exe`](https://github.com/mohui666/TokenTracker/releases/latest/download/TokenTracker-Setup.exe) → 运行免管理员的单用户安装包即可。系统托盘 App，Dashboard 跑在 WebView2 里。便携版 zip 见[发布页](https://github.com/mohui666/TokenTracker/releases/latest)。
+> - **Linux** —— [下载 `TokenTracker-linux-x86_64.AppImage`](https://github.com/mohui666/TokenTracker/releases/latest/download/TokenTracker-linux-x86_64.AppImage) → `chmod +x` 后直接运行。托盘 App，Dashboard 跑在 WebKitGTK 窗口里。需要发行版自带的 `webkit2gtk-4.1`、`gtk3`、`libayatana-appindicator`；GNOME 上托盘图标还需装 [AppIndicator 扩展](https://extensions.gnome.org/extension/615/appindicator-support/)。
 
 全局安装可以少敲字：
 
@@ -70,20 +68,6 @@ tokentracker status --json   # 机器可读 JSON（pipe 到 jq、给 AI agent �
 tokentracker status --light  # 纯 ASCII 表（CI / SSH 用，无 spinner）
 tokentracker doctor       # 健康检查
 ```
-
-### 🍺 Homebrew（macOS）
-
-用惯 `brew` 的话可以直接装，无需额外 `tap`：
-
-```bash
-# macOS 菜单栏 App（DMG）
-brew install --cask xiufengsun/tokentracker/tokentracker
-
-# 只装 CLI
-brew install xiufengsun/tokentracker/tokentracker
-```
-
-升级：`brew upgrade --cask xiufengsun/tokentracker/tokentracker`。每次新版本发布后，tap 会在一小时内自动跟上。
 
 ---
 
@@ -99,8 +83,6 @@ brew install xiufengsun/tokentracker/tokentracker
 - 📈 **实时限额追踪** —— Claude / Codex / Cursor / Gemini / Kimi / Kiro / Grok / Copilot / Antigravity / ZCode / OpenCode Go / Qoder / Qoder CN 的配额窗口；本地 provider App 暂时退出时保留 last-good 缓存
 - 🟢 **服务状态页** —— 直接汇总 8 家 provider 官方状态页的实时运行与事故状态
 - 💰 **成本引擎** —— 内置 70+ 模型定价表，精确到 USD
-- 🌐 **可选排行榜** —— 与全球开发者对比；列可拖拽排序，聚焦你关心的 provider（需登录参与）
-- 🔄 **跨设备账户视图** —— 开启云同步后，Dashboard 会把你在每台机器（笔记本 + 台式机 + 服务器）上的用量合并成一个视图——总量、趋势、热力图、模型明细全部跨设备聚合（可选，需登录；默认的纯本地体验依然即时、离线）
 - 🧩 **可选 Skills 面板** —— 浏览 250+ 公开 skill（来自 `anthropics/skills`、`ComposioHQ/awesome-claude-skills`、`skills.sh` 以及你自己添加的任何 GitHub 仓库），在 Claude / Codex / Grok / Antigravity / Gemini / OpenCode / Hermes 之间同步，目标 Agent 文字可见、可单独管理、一键撤销
 - 🔒 **隐私优先** —— 只记录 token 数量与时间戳。**绝不**收集 prompt、回复、文件内容
 
@@ -114,30 +96,23 @@ brew install xiufengsun/tokentracker/tokentracker
 
 **Dashboard** —— 用量趋势、模型分布、成本分析
 
-<img src="https://raw.githubusercontent.com/xiufengsun/tokentracker/main/docs/screenshots/dashboard-light.png" alt="Dashboard" />
+<img src="https://raw.githubusercontent.com/mohui666/TokenTracker/main/docs/screenshots/dashboard-light.png" alt="Dashboard" />
 
 </td>
 <td width="50%">
 
 **桌面小组件** —— 把用量钉在桌面
 
-<img src="https://raw.githubusercontent.com/xiufengsun/tokentracker/main/docs/screenshots/widgets-overview.png" alt="Desktop Widgets" />
+<img src="https://raw.githubusercontent.com/mohui666/TokenTracker/main/docs/screenshots/widgets-overview.png" alt="Desktop Widgets" />
 
 </td>
 </tr>
 <tr>
-<td width="50%">
+<td colspan="2">
 
 **菜单栏 App** —— 带动画的 Clawd 小伙伴 + 原生面板
 
-<img src="https://raw.githubusercontent.com/xiufengsun/tokentracker/main/docs/screenshots/menubar.gif" alt="Menu Bar App" />
-
-</td>
-<td width="50%">
-
-**全球排行榜** —— 和世界各地开发者比一比
-
-<img src="https://raw.githubusercontent.com/xiufengsun/tokentracker/main/docs/screenshots/leaderboard.png" alt="Leaderboard" />
+<img src="https://raw.githubusercontent.com/mohui666/TokenTracker/main/docs/screenshots/menubar.gif" alt="Menu Bar App" />
 
 </td>
 </tr>
@@ -146,7 +121,7 @@ brew install xiufengsun/tokentracker/tokentracker
 
 **Skills 管理器** —— 浏览 250+ 公开 skill（GitHub 仓库 & `skills.sh`），一次安装，同步到 Claude / Codex / Grok / Antigravity / Gemini / OpenCode / Hermes。每个 Agent 单独开关，一键撤销，再也不用手动复制文件夹。
 
-<img src="https://raw.githubusercontent.com/xiufengsun/tokentracker/main/docs/screenshots/skills.png" alt="Skills Manager" />
+<img src="https://raw.githubusercontent.com/mohui666/TokenTracker/main/docs/screenshots/skills.png" alt="Skills Manager" />
 
 </td>
 </tr>
@@ -155,7 +130,7 @@ brew install xiufengsun/tokentracker/tokentracker
 
 **桌面宠物** —— 悬浮在桌面上的像素小伙伴，实时响应你的 token 消耗：你写代码它也写，连击时庆祝，休息时打盹。粘贴 [codex-pets.net](https://codex-pets.net) 链接或 `.codex-pet.zip` 即可导入社区宠物，V2 宠物还能 16 方向转头追随你的鼠标。macOS / Windows / Web 三端支持。
 
-<img src="https://raw.githubusercontent.com/xiufengsun/tokentracker/main/docs/screenshots/pet.png" alt="Desktop Pet" />
+<img src="https://raw.githubusercontent.com/mohui666/TokenTracker/main/docs/screenshots/pet.png" alt="Desktop Pet" />
 
 </td>
 </tr>
@@ -209,7 +184,7 @@ brew install xiufengsun/tokentracker/tokentracker
 >
 > 更深入的资料：[OpenClaw 集成与排障](docs/openclaw-integration.md)。
 
-工具没在列表里？[提个 Issue](https://github.com/xiufengsun/TokenTracker/issues/new) —— 加一个新 provider 通常只是加一个 parser 文件的事。
+工具没在列表里？[提个 Issue](https://github.com/mohui666/TokenTracker/issues/new) —— 加一个新 provider 通常只是加一个 parser 文件的事。
 
 ---
 
@@ -235,7 +210,6 @@ flowchart LR
     C --> D[Web Dashboard]
     C --> E[菜单栏 App]
     C --> F[桌面小组件]
-    C -.->|可选| G[(云端排行榜)]
 ```
 
 1. 正常使用 AI CLI 工具时，它们会写 log
@@ -253,9 +227,9 @@ flowchart LR
 | 承诺 | 说明 |
 |---|---|
 | **不上传内容** | 只记录 token 数量和时间戳。**绝不**记录 prompt、回复或文件内容 |
-| **默认纯本地** | 所有数据保留在你的机器上。排行榜是完全 opt-in |
+| **默认纯本地** | 所有数据保留在你的机器上 |
 | **可审计** | 代码开源。[`src/lib/rollout.js`](src/lib/rollout.js) 里只有数字和时间戳 |
-| **仅匿名使用统计** | 只有两类匿名上报：(1) 每天最多一次的心跳——机器 ID 的单向哈希、应用版本、操作系统平台、运行形态（cli/mac/win）；(2) 匿名的 dashboard 页面/功能事件（PostHog——已关闭 autocapture 和会话录制，尊重浏览器 Do-Not-Track）。绝不包含 token 数量、模型名、prompt 或路径。可在 [`src/lib/telemetry.js`](src/lib/telemetry.js) 与 [`dashboard/src/lib/analytics.js`](dashboard/src/lib/analytics.js) 审计；一个开关同时关闭两者：`TOKENTRACKER_NO_TELEMETRY=1`（或 `DO_NOT_TRACK=1`） |
+| **完全不上报** | 本 fork 没有托管后端：没有心跳、没有分析统计、没有任何上传。token 数量、模型名称、prompt 和路径永远不会离开你的设备 |
 
 ---
 
@@ -266,7 +240,6 @@ flowchart LR
 | 变量 | 说明 | 默认值 |
 |---|---|---|
 | `TOKENTRACKER_DEBUG` | 打开 debug 日志（`1` 表示打开） | — |
-| `TOKENTRACKER_NO_TELEMETRY` | 关闭全部匿名遥测——每日心跳与 dashboard 分析（`1` 表示关闭；同样尊重 `DO_NOT_TRACK` 标准） | — |
 | `TOKENTRACKER_HTTP_TIMEOUT_MS` | HTTP 超时时间（毫秒） | `20000` |
 | `TOKENTRACKER_DISABLE_GIT_ATTRIBUTION` | 关闭 Git 提交归因（设为 `1` 关闭）。归因会在每个近期会话的工作目录里执行 `git log`。关闭后 TokenTracker 完全不会进入你的项目目录（Outcomes 页只显示手动记录的结果） | — |
 | `TOKENTRACKER_GIT_ATTRIBUTION_PROTECTED_DIRS` | 允许 Git 归因进入 macOS 受保护目录（设为 `1` 允许）。默认会跳过 `~/Documents`、`~/Downloads`、`~/Desktop`、`~/Library`、影片/音乐/图片以及 `/Volumes` 下的会话，因为 macOS 会为每个位置单独弹一次访问授权提示。只有当你确实把仓库放在这些目录、且不介意授权时才需要开启 | — |
@@ -281,7 +254,7 @@ flowchart LR
 ## 🛠️ 本地开发
 
 ```bash
-git clone https://github.com/xiufengsun/TokenTracker.git
+git clone https://github.com/mohui666/TokenTracker.git
 cd TokenTracker
 npm install
 
@@ -366,7 +339,7 @@ tokentracker status
 tokentracker doctor
 ```
 
-如果你明明在用某个工具却显示未配置，跑一下 `tokentracker activate-if-needed` 重新探测。还不行的话 [提个 Issue](https://github.com/xiufengsun/TokenTracker/issues/new)，把 `doctor` 的输出贴上。
+如果你明明在用某个工具却显示未配置，跑一下 `tokentracker activate-if-needed` 重新探测。还不行的话 [提个 Issue](https://github.com/mohui666/TokenTracker/issues/new)，把 `doctor` 的输出贴上。
 
 </details>
 
@@ -432,46 +405,13 @@ xattr -cr /Applications/TokenTracker.app
 
 ---
 
-## 🪪 README 徽章
-
-把你的 token 用量秀到 GitHub Profile 或项目 README 上。
-
-获取 `你的_USER_ID`：
-1. 运行 `tokentracker`，打开 Dashboard，并登录排行榜。
-2. 进入 **设置 → 账号**。
-3. 使用页面里的 **User ID**。如果是 headless/SSH 机器，`tokentracker device-login` 也会把同一个 `user_id` 写到 `~/.tokentracker/tracker/config.json`。
-
-然后贴一段：
-
-```markdown
-[![tokens](https://srctyff5.us-east.insforge.app/functions/tokentracker-badge-svg?user_id=你的_USER_ID&metric=tokens)](https://github.com/xiufengsun/TokenTracker)
-[![cost](https://srctyff5.us-east.insforge.app/functions/tokentracker-badge-svg?user_id=你的_USER_ID&metric=cost)](https://github.com/xiufengsun/TokenTracker)
-[![rank](https://srctyff5.us-east.insforge.app/functions/tokentracker-badge-svg?user_id=你的_USER_ID&metric=rank)](https://github.com/xiufengsun/TokenTracker)
-```
-
-> 链接默认指向 TokenTracker 仓库，每次点击都能帮其他开发者发现 TokenTracker。如果你想让点击跳到你自己的 leaderboard profile、个人主页或 `https://www.tokentracker.cc`，改 URL 即可。
-
-输出 shields.io 兼容的徽章 SVG，含你当前的累计数据（60 秒缓存）：
-
-| 参数 | 取值 | 默认 |
-|---|---|---|
-| `metric` | `tokens` / `cost` / `rank` | `tokens` |
-| `period` | `week` / `month` / `total` | `total` |
-| `style` | `flat` / `flat-square` | `flat` |
-| `label` | 任意短文本 | 指标名 |
-| `color` | hex，例如 `ff6b35` | 品牌绿 |
-
-> **隐私**：徽章仅对开启了排行榜公开（**设置 → 账号 → 公开 Profile**）的用户生效；未公开的用户会返回 "private" 占位徽章。
-
----
-
 ## ⭐ Star 历史
 
-<a href="https://www.star-history.com/?repos=xiufengsun%2FTokenTracker&type=date&legend=top-left">
+<a href="https://www.star-history.com/?repos=mohui666%2FTokenTracker&type=date&legend=top-left">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=xiufengsun/TokenTracker&type=date&theme=dark&legend=top-left&sealed_token=Vr7qbPNqOTtzQEdtkxS2yArAReX2QkBZKNJgs3n32Q5oJa1iXddLlrT201teNSnt7QnsXtDcHy_T387xvXJ_HXHrPtvH2QQ1xqQZ67N_HV45ulWrt3j6hziDW5eshRCmu8CAT_W31PY0-WVZpFv7NQD-acv1stVK8ndribTokIp9ukSYAedx3icuUrOu" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=xiufengsun/TokenTracker&type=date&legend=top-left&sealed_token=Vr7qbPNqOTtzQEdtkxS2yArAReX2QkBZKNJgs3n32Q5oJa1iXddLlrT201teNSnt7QnsXtDcHy_T387xvXJ_HXHrPtvH2QQ1xqQZ67N_HV45ulWrt3j6hziDW5eshRCmu8CAT_W31PY0-WVZpFv7NQD-acv1stVK8ndribTokIp9ukSYAedx3icuUrOu" />
-    <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=xiufengsun/TokenTracker&type=date&legend=top-left&sealed_token=Vr7qbPNqOTtzQEdtkxS2yArAReX2QkBZKNJgs3n32Q5oJa1iXddLlrT201teNSnt7QnsXtDcHy_T387xvXJ_HXHrPtvH2QQ1xqQZ67N_HV45ulWrt3j6hziDW5eshRCmu8CAT_W31PY0-WVZpFv7NQD-acv1stVK8ndribTokIp9ukSYAedx3icuUrOu" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=mohui666/TokenTracker&type=date&theme=dark&legend=top-left&sealed_token=Vr7qbPNqOTtzQEdtkxS2yArAReX2QkBZKNJgs3n32Q5oJa1iXddLlrT201teNSnt7QnsXtDcHy_T387xvXJ_HXHrPtvH2QQ1xqQZ67N_HV45ulWrt3j6hziDW5eshRCmu8CAT_W31PY0-WVZpFv7NQD-acv1stVK8ndribTokIp9ukSYAedx3icuUrOu" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=mohui666/TokenTracker&type=date&legend=top-left&sealed_token=Vr7qbPNqOTtzQEdtkxS2yArAReX2QkBZKNJgs3n32Q5oJa1iXddLlrT201teNSnt7QnsXtDcHy_T387xvXJ_HXHrPtvH2QQ1xqQZ67N_HV45ulWrt3j6hziDW5eshRCmu8CAT_W31PY0-WVZpFv7NQD-acv1stVK8ndribTokIp9ukSYAedx3icuUrOu" />
+    <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=mohui666/TokenTracker&type=date&legend=top-left&sealed_token=Vr7qbPNqOTtzQEdtkxS2yArAReX2QkBZKNJgs3n32Q5oJa1iXddLlrT201teNSnt7QnsXtDcHy_T387xvXJ_HXHrPtvH2QQ1xqQZ67N_HV45ulWrt3j6hziDW5eshRCmu8CAT_W31PY0-WVZpFv7NQD-acv1stVK8ndribTokIp9ukSYAedx3icuUrOu" />
   </picture>
 </a>
 
@@ -479,10 +419,10 @@ xattr -cr /Applications/TokenTracker.app
 
 ## 🤝 贡献与支持
 
-- **Bug / 功能建议**：[提个 Issue](https://github.com/xiufengsun/TokenTracker/issues/new)
+- **Bug / 功能建议**：[提个 Issue](https://github.com/mohui666/TokenTracker/issues/new)
 - **安全问题**：见 [SECURITY.md](SECURITY.md) —— 请不要在公开 Issue 里提交安全报告
 - **Pull Request**：见 [CONTRIBUTING.md](CONTRIBUTING.md)，里面有开发环境搭建、测试流程和新增 AI 工具集成的指南
-- **提问 / 展示作品**：[GitHub Discussions](https://github.com/xiufengsun/TokenTracker/discussions)
+- **提问 / 展示作品**：[GitHub Discussions](https://github.com/mohui666/TokenTracker/discussions)
 
 ## 🙏 致谢
 
@@ -502,6 +442,6 @@ Clawd 角色设计归属 Anthropic。本项目是社区项目，和 Anthropic �
 
 **Token Tracker** —— 把你的 AI 产出量化。
 
-<a href="https://www.tokentracker.cc">tokentracker.cc</a>  ·  <a href="https://www.npmjs.com/package/tokentracker-cli">npm</a>  ·  <a href="https://github.com/xiufengsun/TokenTracker">GitHub</a>
+<a href="https://github.com/mohui666/TokenTracker">GitHub</a>  ·  <a href="https://www.npmjs.com/package/tokentracker-cli">npm</a>  ·  <a href="https://github.com/xiufengsun/TokenTracker">upstream</a>
 
 </div>

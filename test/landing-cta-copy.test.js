@@ -33,7 +33,7 @@ test("landing CTA copy keys exist", () => {
 
 test("Marketing landing uses CTA copy keys", () => {
   const source = read(marketingLandingPath);
-  const requiredKeys = ["landing.cta.primary", "landing.cta.secondary"];
+  const requiredKeys = ["landing.v2.cta.primary"];
 
   for (const key of requiredKeys) {
     assert.ok(

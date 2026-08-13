@@ -12,7 +12,6 @@ depends=(
   'gtk3'
   'libayatana-appindicator'
   'librsvg'
-  'xdg-utils'
 )
 makedepends=(
   'nodejs'

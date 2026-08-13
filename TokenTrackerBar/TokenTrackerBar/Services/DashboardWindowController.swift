@@ -59,7 +59,6 @@ final class DashboardWindowController: NSObject, NSWindowDelegate, WKNavigationD
 
         // Create WKWebView with persistent data store and shared process pool
         let contentController = WKUserContentController()
-        contentController.add(self, name: "nativeOAuth")
         contentController.add(self, name: "nativeBridge")
         // Earliest paint: transparent root so NSVisualEffectView is visible (index.html also sets native-app via nativeBridge).
         let transparencyBootstrap = """
@@ -124,7 +123,7 @@ final class DashboardWindowController: NSObject, NSWindowDelegate, WKNavigationD
             dragBar.leadingAnchor.constraint(equalTo: container.leadingAnchor),
             dragBar.trailingAnchor.constraint(equalTo: container.trailingAnchor),
             // Must match dashboard `AppLayout` top `h-7` (28pt) drag strip. A taller bar covers the
-            // sidebar Sign in button, causing mouseDown to be consumed by performDrag.
+            // sidebar buttons, causing mouseDown to be consumed by performDrag.
             dragBar.heightAnchor.constraint(equalToConstant: 28),
             overlay.topAnchor.constraint(equalTo: container.topAnchor),
             overlay.bottomAnchor.constraint(equalTo: container.bottomAnchor),
@@ -343,7 +342,7 @@ final class DashboardWindowController: NSObject, NSWindowDelegate, WKNavigationD
     func windowWillClose(_ notification: Notification) {
         guard let closingWindow = notification.object as? NSWindow,
               closingWindow === window else { return }
-        // Keep webView and window alive so cookies/login state persist. The
+        // Keep webView and window alive so cookies and page state persist. The
         // coordinator schedules only the app-level post-close transition.
         DashboardPresentationCoordinator.shared.dashboardWindowWillClose()
     }
@@ -366,38 +365,12 @@ final class DashboardWindowController: NSObject, NSWindowDelegate, WKNavigationD
             NativeBridge.shared.handle(message: body)
             return
         }
-        guard name == "nativeOAuth",
-              let urlString = body as? String,
-              let url = URL(string: urlString) else { return }
-        // Open OAuth in system browser where user has saved Google/GitHub sessions
-        NSWorkspace.shared.open(url)
     }
 
     /// Open the dashboard and navigate directly to the Settings page.
     func showSettings() {
         DashboardPresentationCoordinator.shared.showDashboard()
         if let url = URL(string: Constants.serverBaseURL + "/settings?app=1") {
-            webView?.load(URLRequest(url: url))
-        }
-    }
-
-    /// Called when `tokentracker://auth/done` deep link is received after browser login.
-    func handleAuthDone() {
-        DashboardPresentationCoordinator.shared.showDashboard()
-        // Reload dashboard so InsForge SDK picks up session from server-side cookie relay
-        if let url = URL(string: Constants.serverBaseURL + "?app=1") {
-            webView?.load(URLRequest(url: url))
-        }
-    }
-
-    /// Called when browser relays OAuth code back via `tokentracker://auth/callback?insforge_code=xxx`.
-    /// Loads the callback page in the WebView so the SDK can exchange the code using the
-    /// PKCE verifier that's already in WebView's sessionStorage.
-    func handleAuthCallback(code: String) {
-        DashboardPresentationCoordinator.shared.showDashboard()
-        let encoded = code.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? code
-        let callbackUrl = Constants.serverBaseURL + "/auth/callback?insforge_code=\(encoded)"
-        if let url = URL(string: callbackUrl) {
             webView?.load(URLRequest(url: url))
         }
     }
@@ -532,10 +505,9 @@ private final class TitlebarDragView: NSView {
 
 /// Visual-only overlay for the initial dashboard load.
 ///
-/// WKWebView navigation can swap from the dashboard to an auth callback page
-/// while this overlay is fading or waiting to be removed. Keeping it out of
-/// hit-testing prevents a transparent stale overlay from swallowing button
-/// clicks in the WebView.
+/// WKWebView navigation can swap pages while this overlay is fading or
+/// waiting to be removed. Keeping it out of hit-testing prevents a
+/// transparent stale overlay from swallowing button clicks in the WebView.
 private final class PassthroughOverlayView: NSView {
     override func hitTest(_ point: NSPoint) -> NSView? {
         nil

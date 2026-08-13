@@ -1,6 +1,6 @@
-//! Server lifecycle details that are easy to break silently: the port fallback
-//! that OAuth depends on, the argument shapes passed to the bundled CLI, and the
-//! log file handling that used to `panic!` and grow without bound.
+//! Server lifecycle details that are easy to break silently: the fixed-port
+//! preference and fallback, the argument shapes passed to the bundled CLI, and
+//! the log file handling that used to `panic!` and grow without bound.
 
 use std::ffi::OsString;
 use std::fs;
@@ -54,7 +54,7 @@ fn preferred_port_is_used_when_free() {
     let port = pick_available_port().expect("a port should be available");
     assert_eq!(
         port, PREFERRED_PORT,
-        "OAuth redirect URLs are registered against the fixed port, so it must be preferred"
+        "the fixed port keeps the dashboard URL stable across restarts, so it must be preferred"
     );
 }
 

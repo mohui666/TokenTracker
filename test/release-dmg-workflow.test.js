@@ -196,14 +196,13 @@ test("missing releases cannot be recreated from an existing version tag", () => 
   );
 });
 
-test("homebrew tap is notified only after publish (not mid-build)", () => {
+test("fork has no homebrew tap dispatch (no tap exists)", () => {
   const content = loadWorkflow();
-  // The dispatch must come AFTER the un-draft, so the tap fetches a public,
-  // fully-populated release — never a draft or an asset-less one.
-  const undraft = content.indexOf("--draft=false");
-  const dispatch = content.indexOf("homebrew-tokentracker/dispatches");
-  assert.ok(undraft > 0 && dispatch > 0, "both un-draft and dispatch must exist");
-  assert.ok(dispatch > undraft, "homebrew dispatch must come after un-drafting");
+  // This fork maintains no Homebrew tap, so the release pipeline ends at
+  // flipping the draft live — there must be no tap notification step.
+  assert.ok(!content.includes("homebrew-tokentracker/dispatches"));
+  assert.ok(!content.includes("HOMEBREW_DISPATCH_TOKEN"));
+  assert.ok(content.includes("--draft=false"), "publish must still un-draft the release");
 });
 
 test("workflow has concurrency guard", () => {

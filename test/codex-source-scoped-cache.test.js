@@ -7,7 +7,6 @@ const { test } = require("node:test");
 const {
   cmdSync,
   isCodexColdScanAuditDue,
-  scheduleAutoRetry,
 } = require("../src/commands/sync");
 const { listRolloutFiles } = require("../src/lib/rollout");
 
@@ -264,64 +263,6 @@ test("OpenClaw auto sync does not enumerate Codex sessions", async () => {
 
     assert.equal(count, 0, "OpenClaw lifecycle sync should only inspect OpenClaw state");
   });
-});
-
-test("auto retry refreshes stale source scope without rescheduling later retry", async () => {
-  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "tokentracker-auto-retry-"));
-  try {
-    const trackerDir = path.join(tmp, "tracker");
-    const retryPath = path.join(trackerDir, "auto.retry.json");
-    await fs.mkdir(trackerDir, { recursive: true });
-
-    const laterRetryAtMs = Date.now() + 60_000;
-    await fs.writeFile(
-      retryPath,
-      JSON.stringify({
-        version: 1,
-        retryAtMs: laterRetryAtMs,
-        retryAt: new Date(laterRetryAtMs).toISOString(),
-        reason: "backlog",
-        pendingBytes: 5,
-        scheduledAt: new Date().toISOString(),
-        source: "auto-backlog",
-      }),
-      "utf8",
-    );
-
-    const scoped = await scheduleAutoRetry({
-      trackerDir,
-      retryAtMs: Date.now() + 30_000,
-      reason: "backlog",
-      pendingBytes: 11,
-      source: "gemini-backlog",
-      syncSource: "gemini",
-      autoRetryNoSpawn: true,
-    });
-
-    assert.equal(scoped.scheduled, false);
-    assert.equal(scoped.retryAtMs, laterRetryAtMs);
-    const scopedPayload = JSON.parse(await fs.readFile(retryPath, "utf8"));
-    assert.equal(scopedPayload.retryAtMs, laterRetryAtMs);
-    assert.equal(scopedPayload.syncSource, "gemini");
-
-    const full = await scheduleAutoRetry({
-      trackerDir,
-      retryAtMs: Date.now() + 30_000,
-      reason: "backlog",
-      pendingBytes: 13,
-      source: "auto-backlog",
-      syncSource: null,
-      autoRetryNoSpawn: true,
-    });
-
-    assert.equal(full.scheduled, false);
-    assert.equal(full.retryAtMs, laterRetryAtMs);
-    const fullPayload = JSON.parse(await fs.readFile(retryPath, "utf8"));
-    assert.equal(fullPayload.retryAtMs, laterRetryAtMs);
-    assert.equal(Object.hasOwn(fullPayload, "syncSource"), false);
-  } finally {
-    await fs.rm(tmp, { recursive: true, force: true });
-  }
 });
 
 test("non-Grok notify auto sync leaves pending Grok hook signal untouched", async () => {

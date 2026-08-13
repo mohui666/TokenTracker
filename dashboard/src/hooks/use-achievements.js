@@ -3,9 +3,9 @@ import { getLocalAchievements } from "../lib/api";
 import { getBrowserTimeZone, getBrowserTimeZoneOffsetMinutes } from "../lib/timezone";
 
 /**
- * Local achievements (project_hopper / project_devotion / night_owl) from the
- * local CLI endpoint. Status machine, never throws — the achievements page
- * renders the locked catalog on error.
+ * Achievements from the local CLI endpoint (all 13 catalog badges, computed
+ * on-device). Status machine, never throws — the achievements page renders
+ * the locked catalog on error.
  */
 export function useAchievements({ enabled = true } = {}) {
   const [state, setState] = useState({ status: "loading", achievements: [], error: null });

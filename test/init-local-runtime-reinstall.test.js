@@ -40,7 +40,7 @@ test("init can rerun from installed local runtime without self-deleting app sour
     await fs.writeFile(path.join(env.CODEX_HOME, "config.toml"), "# empty\n", "utf8");
 
     const firstInit = runTracker(
-      ["init", "--yes", "--no-auth", "--no-open", "--base-url", "https://example.invalid"],
+      ["init", "--yes", "--no-open"],
       env,
     );
     assert.equal(
@@ -54,7 +54,7 @@ test("init can rerun from installed local runtime without self-deleting app sour
 
     const secondInit = runLocalTracker(
       trackerBinPath,
-      ["init", "--yes", "--no-auth", "--no-open", "--base-url", "https://example.invalid"],
+      ["init", "--yes", "--no-open"],
       env,
     );
     assert.equal(

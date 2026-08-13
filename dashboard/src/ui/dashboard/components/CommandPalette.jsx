@@ -13,7 +13,7 @@ const IS_LOCAL_HOST =
   (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
 
 // A token tracker's command palette indexes things a skill manager has no concept
-// of: the usage/cost views (Usage, Limits, Leaderboard) alongside installed
+// of: the usage/cost views (Usage, Limits, Achievements) alongside installed
 // skills. Cmd/Ctrl+K from anywhere with the dashboard chrome.
 export function CommandPalette() {
   const navigate = useNavigate();

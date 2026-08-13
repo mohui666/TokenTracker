@@ -1,8 +1,7 @@
 import React from "react";
-import { FlaskConical, Gauge, Monitor, Palette, UserRound } from "lucide-react";
+import { FlaskConical, Gauge, Monitor, Palette } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { LimitsSettingsPanel } from "../components/LimitsSettingsPanel.jsx";
-import { AccountSection } from "../components/settings/AccountSection.jsx";
 import { AppearanceSection } from "../components/settings/AppearanceSection.jsx";
 import { LabsSection } from "../components/settings/LabsSection.jsx";
 import {
@@ -20,7 +19,6 @@ import { copy } from "../lib/copy";
 const SETTINGS_SECTION_IDS = {
   APPEARANCE: "appearance",
   NATIVE_APP: "native-app",
-  ACCOUNT: "account",
   LIMITS: "limits",
   LABS: "labs",
 };
@@ -81,12 +79,6 @@ export function SettingsPage() {
           content: <MenuBarSection />,
         }]
       : []),
-    {
-      id: SETTINGS_SECTION_IDS.ACCOUNT,
-      label: copy("settings.section.account"),
-      Icon: UserRound,
-      content: <AccountSection />,
-    },
     {
       id: SETTINGS_SECTION_IDS.LIMITS,
       label: copy("settings.section.limits"),

@@ -26,7 +26,7 @@
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>com.tokentracker.bar.auth</string>
+			<string>com.tokentracker.bar.deeplink</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>tokentracker</string>

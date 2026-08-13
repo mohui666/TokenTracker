@@ -147,7 +147,6 @@ async function cmdServe(argv) {
       if (
         url.pathname.startsWith("/functions/")
         || url.pathname.startsWith("/api/")
-        || url.pathname.startsWith("/proxy/")
       ) {
         const handled = await handleApi(req, res, url);
         if (handled) return;
@@ -233,19 +232,6 @@ async function cmdServe(argv) {
     onError: (e) =>
       process.stdout.write(`Background local sync warning: ${e?.message || e}\n`),
   });
-
-  // Anonymous daily heartbeat (see src/lib/telemetry.js for the privacy
-  // contract). Fire-and-forget at startup, then re-checked every 6 hours so
-  // long-lived embedded-app servers still count on later days; the shared
-  // 24h throttle state guarantees at most one send per day.
-  {
-    const { maybeSendHeartbeat } = require("../lib/telemetry");
-    const { trackerDir: heartbeatTrackerDir } = await resolveTrackerPaths();
-    const sendHeartbeat = () =>
-      maybeSendHeartbeat({ trackerDir: heartbeatTrackerDir }).catch(() => {});
-    sendHeartbeat();
-    setInterval(sendHeartbeat, 6 * 60 * 60 * 1000).unref();
-  }
 
   server.on("error", (e) => {
     process.stderr.write(`Server error: ${e.message}\n`);
@@ -379,7 +365,6 @@ function isApiPath(pathname) {
   return (
     pathname.startsWith("/api/")
     || pathname.startsWith("/functions/")
-    || pathname.startsWith("/proxy/")
   );
 }
 
