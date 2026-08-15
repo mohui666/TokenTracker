@@ -379,6 +379,13 @@
       "cache_write": 0,
       "note": "Grok Build paid SKU (grok-4.5-build from turn_completed.modelUsage). Rates aligned with xAI/Cursor Grok 4.5 until a dedicated Build price list is published."
     },
+    "grok-4.6-build": {
+      "input": 2.0,
+      "output": 6.0,
+      "cache_read": 0.5,
+      "cache_write": 0,
+      "note": "Grok Build paid SKU (grok-4.6-build from turn_completed.modelUsage). xAI list price for Grok 4.6 (2026-08-12 launch): $2 / $6 per MTok in/out; cache rates mirror the grok-4.5-build estimate until xAI publishes a dedicated Build price list."
+    },
     "grok-build-free": {
       "input": 0,
       "output": 0,
