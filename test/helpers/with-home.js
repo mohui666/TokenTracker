@@ -10,11 +10,22 @@
 //
 // Returns a restore() to call from the test's finally block.
 function withHome(dir) {
-  const prev = { HOME: process.env.HOME, USERPROFILE: process.env.USERPROFILE };
+  const prev = {
+    HOME: process.env.HOME,
+    USERPROFILE: process.env.USERPROFILE,
+    DSH_HOME: process.env.DSH_HOME,
+    TOKENTRACKER_DSH_HOME: process.env.TOKENTRACKER_DSH_HOME,
+  };
   process.env.HOME = dir;
   process.env.USERPROFILE = dir;
+  // The DeepSeek Harness exports DSH_HOME to every child process, so running
+  // the suite inside a dsh session would otherwise leak the real ~/.dsh past
+  // this isolation. Clear both harness-home overrides so the dsh parser
+  // resolves to the isolated HOME's `.dsh` instead.
+  delete process.env.DSH_HOME;
+  delete process.env.TOKENTRACKER_DSH_HOME;
   return function restoreHome() {
-    for (const key of ["HOME", "USERPROFILE"]) {
+    for (const key of ["HOME", "USERPROFILE", "DSH_HOME", "TOKENTRACKER_DSH_HOME"]) {
       if (prev[key] === undefined) delete process.env[key];
       else process.env[key] = prev[key];
     }

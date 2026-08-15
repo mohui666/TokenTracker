@@ -12708,6 +12708,140 @@ function resolveCraftDefaultModel() {
   return "craft-unknown";
 }
 
+// Reasonix persists content-free cumulative usage beside each session JSONL.
+// Reading only these telemetry sidecars keeps prompts and tool output private.
+function resolveReasonixHome(env = process.env) {
+  if (env.TOKENTRACKER_REASONIX_HOME) {
+    return expandHomePath(env.TOKENTRACKER_REASONIX_HOME, env);
+  }
+  if (env.REASONIX_STATE_HOME) {
+    return expandHomePath(env.REASONIX_STATE_HOME, env);
+  }
+  const home = env.HOME || require("node:os").homedir();
+  return path.join(home, ".reasonix");
+}
+
+function collectReasonixTelemetryFiles(dir, files) {
+  if (!fssync.existsSync(dir)) return;
+  let entries;
+  try { entries = fssync.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+  for (const entry of entries) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) collectReasonixTelemetryFiles(full, files);
+    else if (entry.isFile() && entry.name.endsWith(".jsonl.telemetry.json")) files.push(full);
+  }
+}
+
+function resolveReasonixTelemetryFiles(env = process.env) {
+  const reasonixHome = resolveReasonixHome(env);
+  const files = [];
+  collectReasonixTelemetryFiles(path.join(reasonixHome, "projects"), files);
+  collectReasonixTelemetryFiles(path.join(reasonixHome, "sessions"), files);
+  return files.sort((a, b) => a.localeCompare(b));
+}
+
+function readReasonixSnapshot(filePath) {
+  const telemetry = JSON.parse(fssync.readFileSync(filePath, "utf8"));
+  const usage = telemetry?.usage;
+  if (!usage || typeof usage !== "object") return null;
+  const metaPath = filePath.slice(0, -".telemetry.json".length) + ".meta";
+  let meta = {};
+  try { meta = JSON.parse(fssync.readFileSync(metaPath, "utf8")); } catch {}
+  const stat = fssync.statSync(filePath);
+  return { usage, meta, stat };
+}
+
+function normalizeReasonixTotals(usage) {
+  const prompt = toNonNegativeInt(usage.promptTokens);
+  const reasoning = toNonNegativeInt(usage.reasoningTokens);
+  const completion = toNonNegativeInt(usage.completionTokens);
+  const cacheMiss = Math.min(prompt, toNonNegativeInt(usage.cacheMissTokens));
+  const cacheHit = Math.min(prompt, toNonNegativeInt(usage.cacheHitTokens));
+  const hasCacheMiss = usage.cacheMissTokens != null;
+  const uncachedPrompt = hasCacheMiss ? cacheMiss : Math.max(0, prompt - cacheHit);
+  const cacheWrite = Math.min(uncachedPrompt, toNonNegativeInt(usage.cacheWriteTokens));
+  return {
+    input: uncachedPrompt - cacheWrite,
+    cacheRead: hasCacheMiss ? prompt - cacheMiss : cacheHit,
+    cacheWrite,
+    output: Math.max(0, completion - reasoning),
+    reasoning,
+    requests: toNonNegativeInt(usage.requestCount),
+  };
+}
+
+function diffReasonixTotals(current, previous = {}) {
+  const delta = {};
+  for (const key of ["input", "cacheRead", "cacheWrite", "output", "reasoning", "requests"]) {
+    delta[key] = Math.max(0, current[key] - toNonNegativeInt(previous[key]));
+  }
+  return delta;
+}
+
+function reasonixTimestamp(snapshot) {
+  for (const value of [snapshot.meta.updated_at, snapshot.meta.created_at]) {
+    const parsed = Date.parse(value);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+  return snapshot.stat.mtimeMs;
+}
+
+function normalizeReasonixModel(value) {
+  const normalized = normalizeModelInput(value);
+  if (!normalized) return "reasonix-unknown";
+  const segments = normalized.split("/").filter(Boolean);
+  return segments.at(-1) || "reasonix-unknown";
+}
+
+function addReasonixDelta(hourlyState, touchedBuckets, snapshot, delta) {
+  const bucketStart = toUtcHalfHourStart(new Date(reasonixTimestamp(snapshot)).toISOString());
+  if (!bucketStart) return false;
+  const model = normalizeReasonixModel(snapshot.meta.model);
+  const total = delta.input + delta.cacheRead + delta.cacheWrite + delta.output + delta.reasoning;
+  const bucket = getHourlyBucket(hourlyState, "reasonix", model, bucketStart);
+  addTotals(bucket.totals, {
+    input_tokens: delta.input,
+    cached_input_tokens: delta.cacheRead,
+    cache_creation_input_tokens: delta.cacheWrite,
+    output_tokens: delta.output,
+    reasoning_output_tokens: delta.reasoning,
+    total_tokens: total,
+    conversation_count: delta.requests,
+  });
+  touchedBuckets.add(bucketKey("reasonix", model, bucketStart));
+  return true;
+}
+
+async function parseReasonixIncremental({ telemetryFiles, cursors, queuePath, onProgress, env } = {}) {
+  await ensureDir(path.dirname(queuePath));
+  const state = cursors.reasonix && typeof cursors.reasonix === "object" ? cursors.reasonix : {};
+  const sessionTotals = { ...(state.sessionTotals || {}) };
+  const files = Array.isArray(telemetryFiles) ? telemetryFiles : resolveReasonixTelemetryFiles(env);
+  const hourlyState = normalizeHourlyState(cursors?.hourly);
+  const touchedBuckets = new Set();
+  let recordsProcessed = 0;
+  let eventsAggregated = 0;
+  for (const [index, filePath] of files.entries()) {
+    let snapshot;
+    try { snapshot = readReasonixSnapshot(filePath); } catch { continue; }
+    if (!snapshot) continue;
+    recordsProcessed++;
+    const current = normalizeReasonixTotals(snapshot.usage);
+    const delta = diffReasonixTotals(current, sessionTotals[filePath]);
+    const tokenDelta = delta.input + delta.cacheRead + delta.cacheWrite + delta.output + delta.reasoning;
+    if ((tokenDelta > 0 || delta.requests > 0) &&
+        addReasonixDelta(hourlyState, touchedBuckets, snapshot, delta)) eventsAggregated++;
+    sessionTotals[filePath] = current;
+    onProgress?.({ index: index + 1, total: files.length, recordsProcessed, eventsAggregated, bucketsQueued: touchedBuckets.size });
+  }
+  const bucketsQueued = await enqueueTouchedBuckets({ queuePath, hourlyState, touchedBuckets });
+  const updatedAt = new Date().toISOString();
+  hourlyState.updatedAt = updatedAt;
+  cursors.hourly = hourlyState;
+  cursors.reasonix = { ...state, sessionTotals, updatedAt };
+  return { recordsProcessed, eventsAggregated, bucketsQueued };
+}
+
 async function parseCraftIncremental({
   sessionFiles,
   cursors,
@@ -16244,6 +16378,626 @@ function readTraeEntitlementFromStorage(storagePath) {
   };
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// DeepSeek Harness (dsh) — passive reader of the harness's session logs.
+//
+// The DeepSeek Harness SDK persists each agent session as an append-only JSONL
+// log under `<harness-home>/sessions/<project-key>/<session-id>/session.jsonl[.zstd]`
+// (default `~/.dsh/sessions`; `$DSH_HOME` / TOKENTRACKER_DSH_HOME override). The first line is a `type: "session"` header;
+// every following line is a `SessionEvent` carrying `type`, `seq`, `time`
+// (epoch ms), and `data`. Token accounting rides on `assistant/message` events
+// (`data.usage`), and the model on the same event's `data.message.source.model`
+// (falling back to the most recent `request/header` config). Usage counts are
+// DISJOINT — `inputTokens` is uncached input only, cache reads/writes and
+// reasoning travel separately — so the mapping to our queue columns is direct
+// (no cache subtraction, unlike Codex).
+//
+// Zstd artifacts are a concatenated-frame container: Node's
+// `zlib.zstdDecompressSync` decodes only the first frame (silently dropping
+// every event line), so we identify the frame boundaries and feed each frame
+// through `@mongodb-js/zstd`, enforcing a cumulative plaintext bound as we go.
+// Dedup is a per-file `lastSeq` watermark — seq
+// is monotonic within a session log, so an append-only grow re-reads the file
+// and skips everything at or below the watermark; a torn-tail repair or full
+// rewrite re-reads the same seqs and is therefore idempotent.
+const DSH_SESSION_LOG_MAX_BYTES = 64 * 1024 * 1024;
+const DSH_SESSION_TEXT_MAX_BYTES = 128 * 1024 * 1024;
+const DSH_SOURCE = "dsh";
+
+// Precedence mirrors the harness's own resolveDshHome: an explicit
+// TokenTracker override, then the harness's $DSH_HOME, then `~/.dsh`. Tests
+// isolate $DSH_HOME via the `withHome` helper, so honoring it here cannot leak
+// the real home past test isolation.
+function resolveDshHome(env = process.env) {
+  const explicit =
+    (typeof env?.TOKENTRACKER_DSH_HOME === "string" && env.TOKENTRACKER_DSH_HOME.trim()) ||
+    (typeof env?.DSH_HOME === "string" && env.DSH_HOME.trim()) ||
+    "";
+  if (explicit) return path.resolve(explicit);
+  return path.join(os.homedir(), ".dsh");
+}
+
+function isDshSessionLogName(name) {
+  return name === "session.jsonl" || name === "session.jsonl.zstd";
+}
+
+// Walk the harness sessions root for per-session log artifacts. The tree is
+// `<sessions-root>/<project-key>/<session-id>/session.jsonl[.zstd]`; only the
+// exact leaf names are collected so unrelated harness files are ignored.
+async function resolveDshSessionFiles(env = process.env) {
+  const sessionsRoot = path.join(resolveDshHome(env), "sessions");
+  const out = [];
+  const projects = await safeReadDir(sessionsRoot);
+  for (const project of projects) {
+    if (!project.isDirectory()) continue;
+    const projectDir = path.join(sessionsRoot, project.name);
+    const sessions = await safeReadDir(projectDir);
+    for (const session of sessions) {
+      if (!session.isDirectory()) continue;
+      const sessionDir = path.join(projectDir, session.name);
+      const artifacts = await safeReadDir(sessionDir);
+      const transcripts = artifacts.filter(
+        (artifact) => artifact.isFile() && isDshSessionLogName(artifact.name),
+      );
+      if (transcripts.length === 1) {
+        out.push(path.join(sessionDir, transcripts[0].name));
+      } else if (transcripts.length > 1) {
+        // Harness itself rejects mixed encodings in one root. For a passive
+        // reader, choose the actively-written artifact instead of counting the
+        // same session twice; a tie prefers the default zstd encoding.
+        const ranked = await Promise.all(transcripts.map(async (artifact) => {
+          const full = path.join(sessionDir, artifact.name);
+          const handle = await fs.open(full, "r").catch(() => null);
+          if (!handle) return { full, name: artifact.name, mtimeMs: 0 };
+          try {
+            const stat = await handle.stat().catch(() => null);
+            return {
+              full,
+              name: artifact.name,
+              mtimeMs: stat?.isFile() ? Number(stat.mtimeMs || 0) : 0,
+            };
+          } finally {
+            await handle.close().catch(() => {});
+          }
+        }));
+        ranked.sort((left, right) =>
+          right.mtimeMs - left.mtimeMs ||
+          Number(right.name.endsWith(".zstd")) - Number(left.name.endsWith(".zstd")),
+        );
+        if (ranked[0]) out.push(ranked[0].full);
+      }
+    }
+  }
+  out.sort((a, b) => a.localeCompare(b));
+  return out;
+}
+
+// Inspect concatenated Zstandard frames without decompressing them. Harness
+// writes a content size into every independent append frame; summing those
+// declarations lets us reject a decompression bomb before the native decoder
+// allocates its plaintext buffer.
+function inspectDshZstdFrames(data, maxOutputBytes = DSH_SESSION_TEXT_MAX_BYTES) {
+  const input = Buffer.isBuffer(data) ? data : Buffer.from(data || []);
+  const limit = Number.isSafeInteger(maxOutputBytes) && maxOutputBytes >= 0
+    ? maxOutputBytes
+    : DSH_SESSION_TEXT_MAX_BYTES;
+  let offset = 0;
+  let totalContentBytes = 0;
+  let allContentSizesDeclared = true;
+  let frames = 0;
+  const frameRanges = [];
+
+  const need = (count, label) => {
+    if (offset + count > input.length) throw new Error(`Invalid DeepSeek Harness zstd ${label}`);
+  };
+  const readUnsignedLE = (count) => {
+    need(count, "frame header");
+    let value = 0n;
+    for (let i = 0; i < count; i++) value |= BigInt(input[offset + i]) << BigInt(i * 8);
+    offset += count;
+    return value;
+  };
+
+  while (offset < input.length) {
+    const frameStart = offset;
+    need(4, "magic");
+    const magic = input.readUInt32LE(offset);
+    offset += 4;
+
+    if (magic >= 0x184d2a50 && magic <= 0x184d2a5f) {
+      need(4, "skippable frame size");
+      const skipBytes = input.readUInt32LE(offset);
+      offset += 4;
+      need(skipBytes, "skippable frame payload");
+      offset += skipBytes;
+      continue;
+    }
+    if (magic !== 0xfd2fb528) throw new Error("Invalid DeepSeek Harness zstd frame magic");
+
+    need(1, "descriptor");
+    const descriptor = input[offset++];
+    if ((descriptor & 0x08) !== 0) throw new Error("Invalid DeepSeek Harness zstd reserved frame bit");
+    const contentSizeFlag = descriptor >>> 6;
+    const singleSegment = (descriptor & 0x20) !== 0;
+    const hasChecksum = (descriptor & 0x04) !== 0;
+    const dictionaryIdBytes = [0, 1, 2, 4][descriptor & 0x03];
+    let windowSize = null;
+    if (!singleSegment) {
+      need(1, "window descriptor");
+      const windowDescriptor = input[offset++];
+      const windowBase = 2 ** (10 + (windowDescriptor >>> 3));
+      windowSize = windowBase + (windowBase / 8) * (windowDescriptor & 0x07);
+    }
+    need(dictionaryIdBytes, "dictionary id");
+    offset += dictionaryIdBytes;
+
+    const contentSizeBytes = contentSizeFlag === 0
+      ? (singleSegment ? 1 : 0)
+      : [0, 2, 4, 8][contentSizeFlag];
+    let declaredContentBytes = null;
+    if (contentSizeBytes > 0) {
+      declaredContentBytes = readUnsignedLE(contentSizeBytes);
+      if (contentSizeBytes === 2) declaredContentBytes += 256n;
+      if (declaredContentBytes > BigInt(limit)) {
+        throw new Error(`DeepSeek Harness decompressed session log exceeds ${limit} bytes`);
+      }
+      if (singleSegment) windowSize = Number(declaredContentBytes);
+    } else {
+      allContentSizesDeclared = false;
+    }
+
+    let lastBlock = false;
+    let frameUpperBound = 0;
+    while (!lastBlock) {
+      need(3, "block header");
+      const blockHeader = input[offset] | (input[offset + 1] << 8) | (input[offset + 2] << 16);
+      offset += 3;
+      lastBlock = (blockHeader & 1) !== 0;
+      const blockType = (blockHeader >>> 1) & 0x03;
+      const blockSize = blockHeader >>> 3;
+      if (blockType === 3) throw new Error("Invalid DeepSeek Harness zstd reserved block type");
+      const payloadBytes = blockType === 1 ? 1 : blockSize;
+      need(payloadBytes, "block payload");
+      offset += payloadBytes;
+      // A raw block emits blockSize bytes; an RLE block expands to blockSize
+      // repeated bytes; a compressed block cannot emit more than the frame's
+      // window or Zstandard's 128 KiB maximum block size. This gives frames
+      // without FCS a safe allocation bound before native decompression.
+      frameUpperBound += blockType === 2
+        ? Math.min(Number(windowSize) || 128 * 1024, 128 * 1024)
+        : blockSize;
+      if (declaredContentBytes == null && frameUpperBound > limit) {
+        throw new Error(`DeepSeek Harness decompressed session log exceeds ${limit} bytes`);
+      }
+    }
+    if (hasChecksum) {
+      need(4, "checksum");
+      offset += 4;
+    }
+    const boundedFrameBytes = declaredContentBytes == null
+      ? frameUpperBound
+      : Number(declaredContentBytes);
+    totalContentBytes += boundedFrameBytes;
+    if (allContentSizesDeclared && totalContentBytes > limit) {
+      throw new Error(`DeepSeek Harness decompressed session log exceeds ${limit} bytes`);
+    }
+    frameRanges.push({ start: frameStart, end: offset, maxContentBytes: boundedFrameBytes });
+    frames += 1;
+  }
+
+  if (frames === 0) throw new Error("DeepSeek Harness zstd log contains no data frames");
+  return {
+    frames,
+    totalContentBytes: allContentSizesDeclared ? totalContentBytes : null,
+    maxTotalContentBytes: totalContentBytes,
+    frameRanges,
+  };
+}
+
+// Decode one independent Harness append frame at a time. The MongoDB binding
+// understands every Node version we ship; per-frame decoding also lets us
+// enforce the aggregate plaintext limit when the frame omits its content size.
+async function decodeDshZstd(
+  data,
+  { maxOutputBytes = DSH_SESSION_TEXT_MAX_BYTES, inspected = null } = {},
+) {
+  const input = Buffer.isBuffer(data) ? data : Buffer.from(data || []);
+  const frameInfo = inspected || inspectDshZstdFrames(input, maxOutputBytes);
+  const parts = [];
+  let total = 0;
+  for (const frame of frameInfo.frameRanges) {
+    const decoded = Buffer.from(
+      await require("@mongodb-js/zstd").decompress(input.subarray(frame.start, frame.end)),
+    );
+    total += decoded.length;
+    if (total > maxOutputBytes) {
+      throw new Error(`DeepSeek Harness decompressed session log exceeds ${maxOutputBytes} bytes`);
+    }
+    parts.push(decoded);
+  }
+  return Buffer.concat(parts, total);
+}
+
+function dshSessionMetadata(stat) {
+  return {
+    inode: stat?.ino || 0,
+    size: Number.isFinite(stat?.size) ? stat.size : 0,
+    mtimeMs: Number.isFinite(stat?.mtimeMs) ? stat.mtimeMs : 0,
+  };
+}
+
+function sameDshSessionMetadata(previous, current) {
+  return Boolean(
+    previous &&
+    previous.inode === current.inode &&
+    previous.size === current.size &&
+    previous.mtimeMs === current.mtimeMs
+  );
+}
+
+// Open, inspect and read through one handle so a path replacement cannot make
+// the metadata describe a different file from the bytes we parse.
+async function readDshSessionSnapshot(
+  filePath,
+  { maxOutputBytes = DSH_SESSION_TEXT_MAX_BYTES, previous = null } = {},
+) {
+  const handle = await fs.open(filePath, "r").catch(() => null);
+  if (!handle) return null;
+  try {
+    const initialStat = await handle.stat().catch(() => null);
+    if (!initialStat || !initialStat.isFile()) return null;
+    const initialMetadata = dshSessionMetadata(initialStat);
+    if (initialMetadata.size > DSH_SESSION_LOG_MAX_BYTES) {
+      throw new Error(`DeepSeek Harness session log exceeds ${DSH_SESSION_LOG_MAX_BYTES} bytes`);
+    }
+    if (sameDshSessionMetadata(previous, initialMetadata)) {
+      return { ...initialMetadata, unchanged: true, text: null };
+    }
+    const outputLimit = Number.isSafeInteger(maxOutputBytes) && maxOutputBytes >= 0
+      ? maxOutputBytes
+      : DSH_SESSION_TEXT_MAX_BYTES;
+    const data = await handle.readFile();
+    if (data.length > DSH_SESSION_LOG_MAX_BYTES) {
+      throw new Error(`DeepSeek Harness session log exceeds ${DSH_SESSION_LOG_MAX_BYTES} bytes`);
+    }
+    let text;
+    if (filePath.endsWith(".zstd")) {
+      if (data.length === 0) text = "";
+      else {
+        const inspected = inspectDshZstdFrames(data, outputLimit);
+        const decoded = await decodeDshZstd(data, { maxOutputBytes: outputLimit, inspected });
+        if (
+          decoded.length > outputLimit ||
+          (inspected.totalContentBytes != null && decoded.length !== inspected.totalContentBytes)
+        ) {
+          throw new Error(`DeepSeek Harness decompressed session log exceeds ${outputLimit} bytes`);
+        }
+        text = decoded.toString("utf8");
+      }
+    } else {
+      if (data.length > outputLimit) {
+        throw new Error(`DeepSeek Harness decompressed session log exceeds ${outputLimit} bytes`);
+      }
+      text = data.toString("utf8");
+    }
+
+    const finalStat = await handle.stat().catch(() => initialStat);
+    const metadata = dshSessionMetadata(finalStat);
+    // If Harness appended while this handle was being read, force a retry on
+    // the next sync unless the bytes consumed reached the final compressed/raw
+    // file size. This avoids acknowledging a tail that was never parsed.
+    if (metadata.size !== data.length) metadata.mtimeMs = -1;
+    return { ...metadata, unchanged: false, text };
+  } finally {
+    await handle.close().catch(() => {});
+  }
+}
+
+// Read one session log to plaintext, decompressing zstd artifacts. Returns
+// null for a missing/non-file path so callers treat it as a no-op.
+async function readDshSessionText(filePath, options = {}) {
+  const snapshot = await readDshSessionSnapshot(filePath, options);
+  return snapshot?.text ?? null;
+}
+
+// Drop a provider-qualified model id prefix ("deepseek/deepseek-v4-pro" →
+// "deepseek-v4-pro"). The harness emits a bare id today, but the source
+// vocabulary is provider-qualified elsewhere; keep the mapping cheap.
+function normalizeDshModelName(value) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const slash = trimmed.lastIndexOf("/");
+  const name = slash >= 0 ? trimmed.slice(slash + 1) : trimmed;
+  return name ? name : null;
+}
+
+// Convert a harness `TokenUsage` object into our queue `totals` delta. Counts
+// are disjoint, so every column maps 1:1; returns null for an all-zero usage.
+function dshUsageToTotals(usage) {
+  if (!usage || typeof usage !== "object") return null;
+  const input = toNonNegativeInt(usage.inputTokens);
+  const output = toNonNegativeInt(usage.outputTokens);
+  const cacheRead = toNonNegativeInt(usage.cacheReadTokens);
+  const cacheWrite = toNonNegativeInt(usage.cacheWriteTokens);
+  const reasoning = toNonNegativeInt(usage.reasoningTokens);
+  if (input === 0 && output === 0 && cacheRead === 0 && cacheWrite === 0 && reasoning === 0) {
+    return null;
+  }
+  return {
+    input_tokens: input,
+    cached_input_tokens: cacheRead,
+    cache_creation_input_tokens: cacheWrite,
+    output_tokens: output,
+    reasoning_output_tokens: reasoning,
+    total_tokens: input + output + cacheRead + cacheWrite + reasoning,
+    conversation_count: 1,
+  };
+}
+
+// Return one top-level JSON object property's raw value slice without parsing
+// sibling values. In particular this lets the Harness reader skip message
+// content byte-for-byte and materialize only routing metadata plus token
+// counters. It is intentionally small and JSON-syntax aware (strings, escapes,
+// nested arrays/objects), not a regex over potentially nested content.
+function findDshJsonProperty(raw, wantedKey) {
+  const text = String(raw || "");
+  const skipWhitespace = (index) => {
+    while (index < text.length && /\s/.test(text[index])) index += 1;
+    return index;
+  };
+  const stringEnd = (start) => {
+    if (text[start] !== '"') return -1;
+    for (let index = start + 1; index < text.length; index++) {
+      if (text[index] === "\\") {
+        index += 1;
+      } else if (text[index] === '"') {
+        return index + 1;
+      }
+    }
+    return -1;
+  };
+  const valueEnd = (start) => {
+    const first = text[start];
+    if (first === '"') return stringEnd(start);
+    if (first === "{" || first === "[") {
+      const stack = [first === "{" ? "}" : "]"];
+      let inString = false;
+      for (let index = start + 1; index < text.length; index++) {
+        const char = text[index];
+        if (inString) {
+          if (char === "\\") index += 1;
+          else if (char === '"') inString = false;
+          continue;
+        }
+        if (char === '"') {
+          inString = true;
+        } else if (char === "{") {
+          stack.push("}");
+        } else if (char === "[") {
+          stack.push("]");
+        } else if (char === stack.at(-1)) {
+          stack.pop();
+          if (stack.length === 0) return index + 1;
+        }
+      }
+      return -1;
+    }
+    let index = start;
+    while (index < text.length && !/[\s,}\]]/.test(text[index])) index += 1;
+    return index > start ? index : -1;
+  };
+
+  let index = skipWhitespace(0);
+  if (text[index] !== "{") return null;
+  index += 1;
+  while (index < text.length) {
+    index = skipWhitespace(index);
+    if (text[index] === "}") return null;
+    const keyStart = index;
+    const keyEnd = stringEnd(keyStart);
+    if (keyEnd < 0) return null;
+    let key;
+    try {
+      key = JSON.parse(text.slice(keyStart, keyEnd));
+    } catch {
+      return null;
+    }
+    index = skipWhitespace(keyEnd);
+    if (text[index] !== ":") return null;
+    index = skipWhitespace(index + 1);
+    const start = index;
+    const end = valueEnd(start);
+    if (end < 0) return null;
+    if (key === wantedKey) return text.slice(start, end);
+    index = skipWhitespace(end);
+    if (text[index] === ",") {
+      index += 1;
+      continue;
+    }
+    if (text[index] === "}") return null;
+    return null;
+  }
+  return null;
+}
+
+function parseDshJsonString(raw) {
+  if (typeof raw !== "string" || raw[0] !== '"') return null;
+  try {
+    const value = JSON.parse(raw);
+    return typeof value === "string" ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function parseDshJsonNumber(raw) {
+  if (typeof raw !== "string") return NaN;
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : NaN;
+}
+
+function parseDshUsageSlice(raw) {
+  if (typeof raw !== "string") return null;
+  return {
+    inputTokens: parseDshJsonNumber(findDshJsonProperty(raw, "inputTokens")),
+    outputTokens: parseDshJsonNumber(findDshJsonProperty(raw, "outputTokens")),
+    cacheReadTokens: parseDshJsonNumber(findDshJsonProperty(raw, "cacheReadTokens")),
+    cacheWriteTokens: parseDshJsonNumber(findDshJsonProperty(raw, "cacheWriteTokens")),
+    reasoningTokens: parseDshJsonNumber(findDshJsonProperty(raw, "reasoningTokens")),
+  };
+}
+
+// Parse one session log's plaintext into usage deltas, skipping events whose
+// seq is at or below the watermark. Returns the deltas (each carrying the
+// model and epoch-ms timestamp), the highest seq seen, and the session id.
+function extractDshSessionUsage(text, lastSeq = -1) {
+  const deltas = [];
+  const watermark = Number.isFinite(lastSeq) ? lastSeq : -1;
+  let maxSeq = watermark;
+  let sessionId = null;
+  let headerModel = null;
+
+  const lines = String(text || "").split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line || !line.trim()) continue;
+    const eventType = parseDshJsonString(findDshJsonProperty(line, "type"));
+    if (!eventType) continue;
+
+    if (eventType === "session") {
+      const id = parseDshJsonString(findDshJsonProperty(line, "id"));
+      if (id) sessionId = id;
+      continue;
+    }
+
+    const seq = parseDshJsonNumber(findDshJsonProperty(line, "seq"));
+    const seqKnown = Number.isFinite(seq) && seq >= 0;
+    if (seqKnown && seq > maxSeq) maxSeq = seq;
+
+    const data = findDshJsonProperty(line, "data");
+    if (!data) continue;
+
+    if (eventType === "request/header") {
+      const header = findDshJsonProperty(data, "header");
+      const config = findDshJsonProperty(header, "config");
+      const model = parseDshJsonString(findDshJsonProperty(config, "model"));
+      const normalized = normalizeDshModelName(model);
+      if (normalized) headerModel = normalized;
+      continue;
+    }
+
+    if (eventType !== "assistant/message") continue;
+    if (seqKnown && seq <= watermark) continue;
+
+    const message = findDshJsonProperty(data, "message");
+    const source = findDshJsonProperty(message, "source");
+    const model = normalizeDshModelName(
+      parseDshJsonString(findDshJsonProperty(source, "model")),
+    ) || headerModel;
+    const totals = dshUsageToTotals(
+      parseDshUsageSlice(findDshJsonProperty(data, "usage")),
+    );
+    if (!model || !totals) continue;
+
+    const timeMs = parseDshJsonNumber(findDshJsonProperty(line, "time"));
+    if (!Number.isFinite(timeMs) || timeMs <= 0) continue;
+
+    deltas.push({ model, timeMs, totals });
+  }
+
+  return { deltas, maxSeq, sessionId };
+}
+
+// Incremental parser entrypoint. Mirrors the other passive JSONL readers:
+// identity-check each file (inode/size/mtime), re-read + re-parse only when it
+// changed, dedup via the per-file seq watermark, accumulate into hourly
+// buckets, then flush touched buckets to the queue.
+async function parseDshIncremental({ sessionFiles, cursors, queuePath, onProgress }) {
+  await ensureDir(path.dirname(queuePath));
+  if (!cursors || typeof cursors !== "object") cursors = {};
+  if (!cursors.dsh || typeof cursors.dsh !== "object") cursors.dsh = {};
+  const dshState = cursors.dsh;
+  const fileState =
+    dshState.files && typeof dshState.files === "object" ? dshState.files : {};
+
+  const hourlyState = normalizeHourlyState(cursors?.hourly);
+  const touchedBuckets = new Set();
+  const cb = typeof onProgress === "function" ? onProgress : null;
+
+  const files = Array.isArray(sessionFiles) ? sessionFiles : [];
+  const presentFiles = new Set(files.filter((filePath) => typeof filePath === "string"));
+  const total = files.length;
+  let recordsProcessed = 0;
+  let eventsAggregated = 0;
+
+  for (let idx = 0; idx < files.length; idx++) {
+    const filePath = files[idx];
+    const prev = fileState[filePath] || null;
+    let snapshot;
+    let parsed;
+    try {
+      snapshot = await readDshSessionSnapshot(filePath, { previous: prev });
+      if (!snapshot || snapshot.unchanged) {
+        if (cb) {
+          cb({ index: idx + 1, total, recordsProcessed, eventsAggregated, bucketsQueued: touchedBuckets.size });
+        }
+        continue;
+      }
+
+      const lastSeq = Number.isFinite(prev?.lastSeq) ? prev.lastSeq : -1;
+      parsed = extractDshSessionUsage(snapshot.text, lastSeq);
+      if (prev && parsed.sessionId && parsed.sessionId !== prev.sessionId) {
+        parsed = extractDshSessionUsage(snapshot.text, -1);
+      }
+    } catch (error) {
+      if (process.env.TOKENTRACKER_DEBUG) {
+        process.stderr.write(`[dsh] skipped ${filePath}: ${error?.message || error}\n`);
+      }
+      if (cb) {
+        cb({ index: idx + 1, total, recordsProcessed, eventsAggregated, bucketsQueued: touchedBuckets.size });
+      }
+      continue;
+    }
+
+    for (const delta of parsed.deltas) {
+      const bucketStart = toUtcHalfHourStart(delta.timeMs);
+      if (!bucketStart) continue;
+      const bucket = getHourlyBucket(hourlyState, DSH_SOURCE, delta.model, bucketStart);
+      addTotals(bucket.totals, delta.totals);
+      touchedBuckets.add(bucketKey(DSH_SOURCE, delta.model, bucketStart));
+      eventsAggregated += 1;
+    }
+
+    fileState[filePath] = {
+      inode: snapshot.inode,
+      size: snapshot.size,
+      mtimeMs: snapshot.mtimeMs,
+      sessionId: parsed.sessionId || null,
+      lastSeq: parsed.maxSeq,
+      updatedAt: new Date().toISOString(),
+    };
+    recordsProcessed += 1;
+
+    if (cb) {
+      cb({ index: idx + 1, total, recordsProcessed, eventsAggregated, bucketsQueued: touchedBuckets.size });
+    }
+  }
+
+  for (const filePath of Object.keys(fileState)) {
+    if (!presentFiles.has(filePath)) delete fileState[filePath];
+  }
+
+  const bucketsQueued = await enqueueTouchedBuckets({ queuePath, hourlyState, touchedBuckets });
+  hourlyState.updatedAt = new Date().toISOString();
+  cursors.hourly = hourlyState;
+  dshState.files = fileState;
+  dshState.updatedAt = new Date().toISOString();
+
+  return { recordsProcessed, eventsAggregated, bucketsQueued };
+}
+
+
 module.exports = {
   listRolloutFiles,
   listRolloutFilesDeep,
@@ -16380,6 +17134,10 @@ module.exports = {
   resolveCraftSessionFiles,
   resolveCraftDefaultModel,
   parseCraftIncremental,
+  resolveReasonixHome,
+  resolveReasonixTelemetryFiles,
+  normalizeReasonixModel,
+  parseReasonixIncremental,
   // Exposed for regression tests covering cache-token accounting.
   normalizeGeminiTokens,
   normalizeOpencodeTokens,
@@ -16415,4 +17173,14 @@ module.exports = {
   resolveTraePath,
   resolveTraeStoragePath,
   readTraeEntitlementFromStorage,
+  // DeepSeek Harness (dsh) — passive session-log reader
+  resolveDshHome,
+  resolveDshSessionFiles,
+  readDshSessionText,
+  decodeDshZstd,
+  inspectDshZstdFrames,
+  normalizeDshModelName,
+  dshUsageToTotals,
+  extractDshSessionUsage,
+  parseDshIncremental,
 };

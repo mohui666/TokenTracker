@@ -11,6 +11,7 @@ const nativeSettingsMock = vi.hoisted(() => ({
     confettiOnReset: true,
     launchAtLogin: false,
     launchAtLoginSupported: true,
+    autoUpdateEnabled: true,
   },
   setSetting: vi.fn(),
   runAction: vi.fn(),
@@ -59,5 +60,29 @@ describe("MenuBarSection limit-reset feedback", () => {
 
     expect(nativeSettingsMock.setSetting).toHaveBeenCalledWith("toastOnReset", false);
     expect(nativeSettingsMock.setSetting).toHaveBeenCalledWith("confettiOnReset", false);
+  });
+
+  it("toggles automatic updates independently of manual checks", async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <MenuBarSection />
+      </MemoryRouter>,
+    );
+
+    const autoUpdateSwitch = screen.getByRole("switch", {
+      name: "settings.menubar.autoUpdate",
+    });
+    expect(autoUpdateSwitch).toHaveAttribute("aria-checked", "true");
+
+    await act(async () => {
+      await user.click(autoUpdateSwitch);
+    });
+
+    expect(nativeSettingsMock.setSetting).toHaveBeenCalledWith("autoUpdateEnabled", false);
+    // Manual check stays available: the button is untouched by the toggle.
+    expect(
+      screen.getByRole("button", { name: /settings\.menubar\.checkUpdates/ }),
+    ).toBeEnabled();
   });
 });

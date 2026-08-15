@@ -94,6 +94,8 @@ async function withTempSyncEnv(fn) {
     CODE_HOME: process.env.CODE_HOME,
     GEMINI_HOME: process.env.GEMINI_HOME,
     OPENCODE_HOME: process.env.OPENCODE_HOME,
+    DSH_HOME: process.env.DSH_HOME,
+    TOKENTRACKER_DSH_HOME: process.env.TOKENTRACKER_DSH_HOME,
     TOKENTRACKER_DEVICE_TOKEN: process.env.TOKENTRACKER_DEVICE_TOKEN,
     TOKENTRACKER_AUTO_RETRY_NO_SPAWN: process.env.TOKENTRACKER_AUTO_RETRY_NO_SPAWN,
   };
@@ -106,6 +108,8 @@ async function withTempSyncEnv(fn) {
     process.env.OPENCODE_HOME = path.join(home, ".opencode");
     process.env.TOKENTRACKER_DEVICE_TOKEN = "test-device-token";
     process.env.TOKENTRACKER_AUTO_RETRY_NO_SPAWN = "1";
+    delete process.env.DSH_HOME;
+    delete process.env.TOKENTRACKER_DSH_HOME;
     return await fn(home);
   } finally {
     for (const [key, value] of Object.entries(saved)) {

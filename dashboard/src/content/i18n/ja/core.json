@@ -233,6 +233,8 @@
   "settings.menubar.syncNowHint": "ローカルの AI ツールログの解析とアップロードをすぐに実行します。",
   "settings.menubar.syncing": "同期中...",
   "settings.menubar.updates": "更新",
+  "settings.menubar.autoUpdate": "自動アップデート",
+  "settings.menubar.autoUpdateHint": "新しいバージョンをバックグラウンドで自動的にダウンロードしてインストールします。オフにしても手動での更新確認は引き続き利用できます。",
   "settings.menubar.checkUpdates": "更新を確認",
   "settings.footer.statusPage": "システムステータス",
   "menubar.slot.primary": "1 番目の位置",

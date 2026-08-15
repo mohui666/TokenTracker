@@ -66,6 +66,7 @@ const {
   resolvePiAgentDir,
   piAgentDirCollidesWithOmp,
   resolveAnythingllmDbPath,
+  resolveReasonixHome,
   resolveTraeStoragePath,
 } = require("../lib/rollout");
 const {
@@ -119,6 +120,7 @@ const SUPPORTED_PROVIDERS = [
   "oh-my-pi",
   "pi",
   "Craft Agents",
+  "Reasonix",
   "Kilo CLI",
   "Kilo Code",
   "Roo Code",
@@ -130,6 +132,7 @@ const SUPPORTED_PROVIDERS = [
   "Qoder",
   "AnythingLLM Desktop",
   "Claude Science",
+  "DeepSeek Harness",
 ];
 
 async function cmdInit(argv) {
@@ -676,6 +679,14 @@ async function applyIntegrationSetup({
     const craftConfigDir = process.env.CRAFT_CONFIG_DIR || path.join(home, ".craft-agent");
     if (fssync.existsSync(craftConfigDir)) {
       summary.push({ label: "Craft Agents", status: "detected", detail: "Passive reader (no hook needed)" });
+    }
+  }
+
+  // Reasonix: passive reader of content-free *.jsonl.telemetry.json sidecars.
+  {
+    const reasonixHome = resolveReasonixHome(process.env);
+    if (fssync.existsSync(reasonixHome)) {
+      summary.push({ label: "Reasonix", status: "detected", detail: "Passive telemetry reader (no hook needed)" });
     }
   }
 

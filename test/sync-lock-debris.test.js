@@ -67,6 +67,8 @@ async function withTempHome(fn) {
     CODEX_HOME: process.env.CODEX_HOME,
     CODE_HOME: process.env.CODE_HOME,
     XDG_DATA_HOME: process.env.XDG_DATA_HOME,
+    DSH_HOME: process.env.DSH_HOME,
+    TOKENTRACKER_DSH_HOME: process.env.TOKENTRACKER_DSH_HOME,
   };
   try {
     process.env.HOME = home;
@@ -74,6 +76,8 @@ async function withTempHome(fn) {
     process.env.CODEX_HOME = path.join(home, ".codex");
     process.env.CODE_HOME = path.join(home, ".code");
     process.env.XDG_DATA_HOME = path.join(home, ".local", "share");
+    delete process.env.DSH_HOME;
+    delete process.env.TOKENTRACKER_DSH_HOME;
     return await fn(home);
   } finally {
     for (const [key, value] of Object.entries(saved)) {

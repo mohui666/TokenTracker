@@ -165,6 +165,8 @@
   "settings.menubar.syncNowHint": "Analysiere und lade lokale KI-Tool-Protokolle sofort hoch.",
   "settings.menubar.syncing": "Synchronisiere…",
   "settings.menubar.updates": "Updates",
+  "settings.menubar.autoUpdate": "Automatische Updates",
+  "settings.menubar.autoUpdateHint": "Neue Versionen im Hintergrund automatisch herunterladen und installieren. Die manuelle Suche bleibt auch deaktiviert verfügbar.",
   "settings.menubar.checkUpdates": "Nach Updates suchen",
   "settings.footer.statusPage": "Systemstatus",
   "menubar.slot.primary": "Position 1",

@@ -33,8 +33,25 @@ final class UpdateChecker {
 
     // MARK: - Public
 
+    /// Whether launch-time silent checks may run (and thereby auto-download/install).
+    /// Storage lives in `AutoUpdatePolicy` (GitHub discussion #424); manual
+    /// "Check for Updates" (non-silent) is never gated.
+    var autoUpdateEnabled: Bool {
+        get { AutoUpdatePolicy.isEnabled() }
+        set { UserDefaults.standard.set(newValue, forKey: AutoUpdatePolicy.enabledKey) }
+    }
+
     func check(silent: Bool = false) {
         guard !isBusy else { return }
+
+        // Auto-update toggle: silent checks are exclusively launch-time background
+        // checks whose success path downloads and installs without prompting, so the
+        // toggle short-circuits them before any network call. Manual (non-silent)
+        // checks stay available regardless of the toggle.
+        if silent, !AutoUpdatePolicy.isEnabled() {
+            Swift.print("[UpdateChecker] Skipping silent update check: auto-update is disabled")
+            return
+        }
 
         // Developer / Debug path guard:
         // Skip automatic silent background checks if the application is running from outside

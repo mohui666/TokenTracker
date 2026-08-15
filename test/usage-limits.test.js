@@ -1692,6 +1692,84 @@ describe("getUsageLimits", () => {
     }
   });
 
+  it("flags reauth when the credential entry exists but its token fields are blank", async () => {
+    resetUsageLimitsCache();
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "tokentracker-limits-claude-blank-token-"));
+    try {
+      // What an expired Claude Code login actually leaves behind: the entry survives,
+      // the secrets are emptied in place.
+      const claudeDir = path.join(tmp, ".claude");
+      fs.mkdirSync(claudeDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(claudeDir, ".credentials.json"),
+        JSON.stringify({
+          claudeAiOauth: {
+            accessToken: "",
+            refreshToken: "",
+            expiresAt: 0,
+            subscriptionType: "max",
+          },
+        }),
+      );
+
+      // Throwing alone proves nothing here: provider failures are collected with
+      // allSettled and this branch never reads claudeResult, so a forbidden call
+      // would be swallowed. Track it and assert it never happened.
+      let usageApiCalled = false;
+      const result = await getUsageLimits({
+        home: tmp,
+        platform: "linux",
+        providerTimeoutMs: 1000,
+        securityRunner() {
+          return { status: 1, stdout: "" };
+        },
+        commandRunner() {
+          return { status: 1, stdout: "" };
+        },
+        fetchImpl(url) {
+          if (typeof url === "string" && url === "https://api.anthropic.com/api/oauth/usage") {
+            usageApiCalled = true;
+            throw new Error("must not call the usage API without a token");
+          }
+          return pendingUnlessCodexReset(url);
+        },
+      });
+
+      assert.equal(result.claude.configured, true);
+      assert.match(result.claude.error, /token expired/i);
+      assert.equal(result.claude.auth_action_required, "reauth");
+      assert.equal(usageApiCalled, false);
+    } finally {
+      resetUsageLimitsCache();
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("stays unconfigured when no Claude credential entry exists at all", async () => {
+    resetUsageLimitsCache();
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "tokentracker-limits-claude-no-creds-"));
+    try {
+      const result = await getUsageLimits({
+        home: tmp,
+        platform: "linux",
+        providerTimeoutMs: 1000,
+        securityRunner() {
+          return { status: 1, stdout: "" };
+        },
+        commandRunner() {
+          return { status: 1, stdout: "" };
+        },
+        fetchImpl: pendingUnlessCodexReset,
+      });
+
+      assert.equal(result.claude.configured, false);
+      assert.equal(result.claude.auth_action_required, undefined);
+    } finally {
+      resetUsageLimitsCache();
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
   for (const status of [401, 403, 404]) {
     it(`Codex reset headers do not fetch reset list when wham ${status} returns no-data`, async () => {
       resetUsageLimitsCache();

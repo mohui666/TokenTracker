@@ -95,6 +95,8 @@ async function withTempSyncEnv(fn) {
     TOKENTRACKER_OPENCLAW_SESSION_KEY: process.env.TOKENTRACKER_OPENCLAW_SESSION_KEY,
     TOKENTRACKER_OPENCLAW_HOME: process.env.TOKENTRACKER_OPENCLAW_HOME,
     TOKENTRACKER_INSFORGE_BASE_URL: process.env.TOKENTRACKER_INSFORGE_BASE_URL,
+    DSH_HOME: process.env.DSH_HOME,
+    TOKENTRACKER_DSH_HOME: process.env.TOKENTRACKER_DSH_HOME,
   };
   try {
     process.env.HOME = home;
@@ -110,6 +112,8 @@ async function withTempSyncEnv(fn) {
     delete process.env.TOKENTRACKER_OPENCLAW_SESSION_KEY;
     delete process.env.TOKENTRACKER_DEVICE_TOKEN;
     delete process.env.TOKENTRACKER_INSFORGE_BASE_URL;
+    delete process.env.DSH_HOME;
+    delete process.env.TOKENTRACKER_DSH_HOME;
     return await fn(home);
   } finally {
     for (const [key, value] of Object.entries(saved)) {

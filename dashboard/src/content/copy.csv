@@ -338,6 +338,8 @@ settings.menubar.syncNow,ui,SettingsPage,SettingsPage,mb_sync_now,"Sync now",,ac
 settings.menubar.syncNowHint,ui,SettingsPage,SettingsPage,mb_sync_now_hint,"Trigger an immediate parse and upload of local AI tool logs.",,active
 settings.menubar.syncing,ui,SettingsPage,SettingsPage,mb_syncing,"Syncing…",,active
 settings.menubar.updates,ui,SettingsPage,SettingsPage,mb_updates,"Updates",,active
+settings.menubar.autoUpdate,ui,SettingsPage,MenuBarSection,mb_auto_update,"Automatic updates",,active
+settings.menubar.autoUpdateHint,ui,SettingsPage,MenuBarSection,mb_auto_update_hint,"Download and install new versions in the background. Manual checks stay available when this is off.",,active
 settings.menubar.checkUpdates,ui,SettingsPage,SettingsPage,mb_check_updates,"Check for updates",,active
 settings.footer.statusPage,ui,SettingsPage,NativeAppFooter,status_page,"System status",,active
 menubar.slot.primary,ui,WidgetsPage,MenuBarDisplayCard,slot_primary,"Primary slot",,active
@@ -484,6 +486,7 @@ limits.provider.copilot,ui,LimitsPage,UsageLimitsPanel,provider_copilot,"GitHub 
 limits.provider.antigravity,ui,LimitsPage,UsageLimitsPanel,provider_antigravity,"Antigravity",,active
 limits.provider.zcode,ui,LimitsPage,UsageLimitsPanel,provider_zcode,"ZCode",,active
 provider.display.omp,ui,*,ProviderDisplay,omp,"oh-my-pi",,active
+provider.display.deepseek_harness,ui,*,ProviderDisplay,deepseek_harness,"DeepSeek Harness",,active
 limits.label.zcode_glm52,ui,LimitsPage,UsageLimitsPanel,zcode_glm52,"GLM-5.2",,active
 limits.label.zcode_glm5t,ui,LimitsPage,UsageLimitsPanel,zcode_glm5t,"GLM-5-Turbo",,active
 limits.label.zcode_5h,ui,LimitsPage,UsageLimitsPanel,zcode_5h,"5h",,active

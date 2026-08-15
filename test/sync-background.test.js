@@ -74,6 +74,28 @@ async function writeClaudeSession(home, date, sessionId, totalTokens) {
   return filePath;
 }
 
+async function writeReasonixTelemetry(home, sessionId) {
+  const dir = path.join(home, ".reasonix", "projects", "sample", "sessions");
+  await fs.mkdir(dir, { recursive: true });
+  const basePath = path.join(dir, `${sessionId}.jsonl`);
+  await fs.writeFile(`${basePath}.telemetry.json`, JSON.stringify({
+    version: 2,
+    usage: {
+      promptTokens: 61,
+      cacheMissTokens: 21,
+      cacheWriteTokens: 5,
+      completionTokens: 9,
+      reasoningTokens: 4,
+      requestCount: 2,
+    },
+  }));
+  await fs.writeFile(`${basePath}.meta`, JSON.stringify({
+    id: sessionId,
+    model: "route/deepseek-reasoner",
+    updated_at: "2026-06-30T00:00:00.000Z",
+  }));
+}
+
 async function withTempSyncEnv(fn) {
   const home = await fs.mkdtemp(path.join(os.tmpdir(), "tokentracker-background-"));
   const saved = {
@@ -84,6 +106,9 @@ async function withTempSyncEnv(fn) {
     GEMINI_HOME: process.env.GEMINI_HOME,
     OPENCODE_HOME: process.env.OPENCODE_HOME,
     XDG_DATA_HOME: process.env.XDG_DATA_HOME,
+    TOKENTRACKER_REASONIX_HOME: process.env.TOKENTRACKER_REASONIX_HOME,
+    REASONIX_STATE_HOME: process.env.REASONIX_STATE_HOME,
+    QODER_CN_DB_PATH: process.env.QODER_CN_DB_PATH,
     TOKENTRACKER_DEVICE_TOKEN: process.env.TOKENTRACKER_DEVICE_TOKEN,
     TOKENTRACKER_INSFORGE_BASE_URL: process.env.TOKENTRACKER_INSFORGE_BASE_URL,
     TOKENTRACKER_OPENCLAW_HOME: process.env.TOKENTRACKER_OPENCLAW_HOME,
@@ -100,6 +125,10 @@ async function withTempSyncEnv(fn) {
     process.env.OPENCODE_HOME = path.join(home, ".opencode");
     process.env.XDG_DATA_HOME = path.join(home, ".local", "share");
     process.env.TOKENTRACKER_OPENCLAW_HOME = path.join(home, ".openclaw");
+    delete process.env.TOKENTRACKER_REASONIX_HOME;
+    delete process.env.REASONIX_STATE_HOME;
+    // Keep a real QoderCN install on the dev machine out of the temp-home sync.
+    process.env.QODER_CN_DB_PATH = path.join(home, ".qoder-cn-absent", "state.vscdb");
     delete process.env.TOKENTRACKER_DEVICE_TOKEN;
     delete process.env.TOKENTRACKER_INSFORGE_BASE_URL;
     delete process.env.TOKENTRACKER_OPENCLAW_AGENT_ID;
@@ -339,6 +368,40 @@ test("all-local background sync includes Claude while preserving lightweight beh
       fs.stat(path.join(home, ".tokentracker", "tracker", "queue.state.json")),
       { code: "ENOENT" },
     );
+  });
+});
+
+test("all-local background sync includes Reasonix telemetry", async () => {
+  await withTempSyncEnv(async (home) => {
+    await writeReasonixTelemetry(home, "reasonix-all-local");
+
+    await cmdSync(["--auto", "--background", "--all-local-sources"]);
+
+    const firstQueue = await readQueue(home);
+    const [row] = firstQueue.trim().split("\n").map(JSON.parse);
+    assert.equal(row.source, "reasonix");
+    assert.equal(row.model, "deepseek-reasoner");
+    assert.equal(row.input_tokens, 16);
+    assert.equal(row.cached_input_tokens, 40);
+    assert.equal(row.cache_creation_input_tokens, 5);
+    assert.equal(row.output_tokens, 5);
+    assert.equal(row.reasoning_output_tokens, 4);
+    assert.equal(row.total_tokens, 70);
+
+    await cmdSync(["--auto", "--background", "--all-local-sources"]);
+    assert.equal(await readQueue(home), firstQueue);
+  });
+});
+
+test("default background auto sync includes Reasonix telemetry", async () => {
+  await withTempSyncEnv(async (home) => {
+    await writeReasonixTelemetry(home, "reasonix-default-background");
+
+    await cmdSync(["--auto", "--background"]);
+
+    const queue = await readQueue(home);
+    assert.match(queue, /"source":"reasonix"/);
+    assert.match(queue, /"model":"deepseek-reasoner"/);
   });
 });
 

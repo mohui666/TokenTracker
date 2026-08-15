@@ -235,6 +235,7 @@ final class NativeBridge {
             "animatedIcon": MenuBarIconStyle.current() != .static,
             "toastOnReset": WeeklyLimitResetDetector.toastEnabled(),
             "confettiOnReset": WeeklyLimitResetDetector.confettiEnabled(),
+            "autoUpdateEnabled": UpdateChecker.shared.autoUpdateEnabled,
             "launchAtLogin": launchAtLoginValue,
             "launchAtLoginSupported": launchAtLoginSupported,
             "dynamicIslandEnabled": UserDefaults.standard.bool(forKey: DynamicIslandController.enabledDefaultsKey),
@@ -309,6 +310,11 @@ final class NativeBridge {
         case "confettiOnReset":
             if let bool = value as? Bool {
                 UserDefaults.standard.set(bool, forKey: WeeklyLimitResetDetector.confettiEnabledKey)
+                NotificationCenter.default.post(name: .nativeSettingsChanged, object: nil)
+            }
+        case "autoUpdateEnabled":
+            if let bool = value as? Bool {
+                UpdateChecker.shared.autoUpdateEnabled = bool
                 NotificationCenter.default.post(name: .nativeSettingsChanged, object: nil)
             }
         case "launchAtLogin":

@@ -31,6 +31,45 @@ describe("buildFleetData", () => {
     expect(fleet[2].totalPercentValue).toBeGreaterThan(0);
     expect(fleet[2].totalPercentValue).toBeLessThan(0.01);
   });
+
+  it("folds the deprecated deepseek source alias into dsh and merges models", () => {
+    const fleet = buildFleetData({
+      sources: [
+        {
+          source: "deepseek",
+          totals: { billable_total_tokens: 100, total_cost_usd: "1.00" },
+          models: [
+            { model_id: "deepseek-v4-pro", totals: { billable_total_tokens: 70 } },
+            { model_id: "deepseek-v4-flash", totals: { billable_total_tokens: 30 } },
+          ],
+        },
+        {
+          source: "dsh",
+          totals: { billable_total_tokens: 400, total_cost_usd: "4.00" },
+          models: [
+            { model_id: "deepseek-v4-pro", totals: { billable_total_tokens: 300 } },
+            { model_id: "deepseek-v4-flash", totals: { billable_total_tokens: 100 } },
+          ],
+        },
+      ],
+    });
+
+    expect(fleet.map(({ source }) => source)).toEqual(["dsh"]);
+    expect(fleet[0].usage).toBe(500);
+    expect(fleet[0].usd).toBe(5);
+    const byId = Object.fromEntries(fleet[0].models.map((m: any) => [m.id, m.usage]));
+    expect(byId).toEqual({ "deepseek-v4-pro": 370, "deepseek-v4-flash": 130 });
+  });
+
+  it("ignores malformed non-array model collections while preserving source totals", () => {
+    expect(() => buildFleetData({
+      sources: [{
+        source: "dsh",
+        totals: { billable_total_tokens: 42 },
+        models: { model_id: "not-an-array" },
+      }],
+    })).not.toThrow();
+  });
 });
 
 describe("buildAllModels", () => {

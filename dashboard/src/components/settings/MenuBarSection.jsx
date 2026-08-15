@@ -21,6 +21,7 @@ export function MenuBarSection() {
   const toastOnReset = settings?.toastOnReset !== false;
   const confettiOnReset = settings?.confettiOnReset !== false;
   const launchAtLoginSupported = settings?.launchAtLoginSupported !== false;
+  const autoUpdateEnabled = settings?.autoUpdateEnabled !== false;
   const updateStatus = settings?.updateStatus || null;
   const updateBusy = Boolean(settings?.updateBusy);
   const isSyncing = Boolean(settings?.isSyncing);
@@ -88,6 +89,17 @@ export function MenuBarSection() {
             <RefreshCw className={cn("h-3.5 w-3.5", isSyncing && "animate-spin")} aria-hidden />
             {isSyncing ? copy("settings.menubar.syncing") : copy("settings.menubar.syncNow")}
           </button>
+        }
+      />
+      <SettingsRow
+        label={copy("settings.menubar.autoUpdate")}
+        hint={copy("settings.menubar.autoUpdateHint")}
+        control={
+          <ToggleSwitch
+            checked={autoUpdateEnabled}
+            onChange={() => setSetting("autoUpdateEnabled", !autoUpdateEnabled)}
+            ariaLabel={copy("settings.menubar.autoUpdate")}
+          />
         }
       />
       <SettingsRow

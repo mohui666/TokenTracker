@@ -9,6 +9,8 @@ const SPECIAL_PROVIDER_NAMES = {
 };
 
 const SPECIAL_PROVIDER_COPY_KEYS = {
+  deepseek: "provider.display.deepseek_harness",
+  dsh: "provider.display.deepseek_harness",
   omp: "provider.display.omp",
 };
 

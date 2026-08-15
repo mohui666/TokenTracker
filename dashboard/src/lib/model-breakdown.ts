@@ -57,9 +57,89 @@ export function resolveDisplayTokens(totals: any, fallback = 0) {
   return billableTokens ?? totalTokens ?? fallback;
 }
 
+// Deprecated source names folded into their canonical spelling at display
+// time. "deepseek" was the first dsh-integration source name; it was renamed
+// to "dsh", but a cloud upload from before the rename still carries the old
+// name. Folding it back keeps one "DeepSeek Harness" provider instead of two
+// ("DEEPSEEK" + "DeepSeek Harness"). This only changes presentation; the
+// underlying cloud rows are not rewritten.
+const SOURCE_ALIASES: Record<string, string> = {
+  deepseek: "dsh",
+};
+
+function canonicalSource(source: any): string {
+  const raw = typeof source === "string" ? source : "";
+  return SOURCE_ALIASES[raw] || raw;
+}
+
+const TOKEN_TOTAL_KEYS = [
+  "total_tokens",
+  "billable_total_tokens",
+  "input_tokens",
+  "output_tokens",
+  "cached_input_tokens",
+  "cache_creation_input_tokens",
+  "reasoning_output_tokens",
+];
+
+function addTotalsInto(target: any, add: any) {
+  for (const key of TOKEN_TOTAL_KEYS) {
+    target[key] = (Number(target[key]) || 0) + (Number(add?.[key]) || 0);
+  }
+  target.total_cost_usd = String(
+    Number(target.total_cost_usd || 0) + Number(add?.total_cost_usd || 0),
+  );
+}
+
+function emptyTotals() {
+  return {
+    total_tokens: 0,
+    billable_total_tokens: 0,
+    input_tokens: 0,
+    output_tokens: 0,
+    cached_input_tokens: 0,
+    cache_creation_input_tokens: 0,
+    reasoning_output_tokens: 0,
+    total_cost_usd: "0",
+  };
+}
+
+// Merge API sources whose canonical name collides after alias resolution
+// (e.g. a stale "deepseek" plus the current "dsh"), summing totals and
+// combining per-model rows keyed by model id.
+function mergeSourcesByAlias(sources: any[]) {
+  const bySource = new Map();
+  for (const entry of sources || []) {
+    const source = canonicalSource(entry?.source);
+    if (!source) continue;
+    let merged = bySource.get(source);
+    if (!merged) {
+      merged = { source, source_scope: entry?.source_scope, totals: emptyTotals(), models: new Map() };
+      bySource.set(source, merged);
+    }
+    addTotalsInto(merged.totals, entry?.totals);
+    for (const model of Array.isArray(entry?.models) ? entry.models : []) {
+      const id = model?.model_id || model?.model || "";
+      if (!id) continue;
+      let modelRow = merged.models.get(id);
+      if (!modelRow) {
+        modelRow = { model: model?.model || id, model_id: id, totals: emptyTotals() };
+        merged.models.set(id, modelRow);
+      }
+      addTotalsInto(modelRow.totals, model?.totals);
+    }
+  }
+  return Array.from(bySource.values()).map((s) => ({
+    ...s,
+    models: Array.from(s.models.values()),
+  }));
+}
+
 export function buildFleetData(modelBreakdown: any, { copyFn }: AnyRecord = {}) {
   const safeCopy = typeof copyFn === "function" ? copyFn : (key: string) => key;
-  const sources: any[] = Array.isArray(modelBreakdown?.sources) ? modelBreakdown.sources : [];
+  const sources: any[] = mergeSourcesByAlias(
+    Array.isArray(modelBreakdown?.sources) ? modelBreakdown.sources : [],
+  );
   const normalizedSources = sources
     .map((entry: any) => {
       const totalTokens = resolveDisplayTokens(entry?.totals);

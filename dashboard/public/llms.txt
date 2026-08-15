@@ -1,7 +1,7 @@
 # Token Tracker LLMs Index
 
 Token Tracker is a free, open-source, local-first AI coding usage and cost
-tracker for 29 tools. Its distinctive desktop experience includes a pixel pet
+tracker for 31 tools. Its distinctive desktop experience includes a pixel pet
 powered by real token activity, four desktop widgets, and achievements. The
 same data powers a cross-platform CLI, a native macOS menu bar app, a native
 Windows system tray app, and a dashboard. It records token counts and
@@ -17,7 +17,7 @@ timestamps, never prompts, responses, or source code.
 - macOS app: `TokenTrackerBar.dmg` from the latest GitHub Release
 - Windows app: `TokenTracker-Setup.exe` from the latest GitHub Release
 
-## Supported AI coding tools (29)
+## Supported AI coding tools (31)
 - Claude Code
 - Codex CLI
 - Cursor
@@ -36,6 +36,7 @@ timestamps, never prompts, responses, or source code.
 - oh-my-pi
 - pi
 - Craft Agents
+- Reasonix
 - Kilo CLI
 - Kilo Code
 - Roo Code
@@ -47,6 +48,7 @@ timestamps, never prompts, responses, or source code.
 - Qoder
 - AnythingLLM Desktop
 - Claude Science
+- DeepSeek Harness
 
 ## Capabilities
 - Desktop pet that reacts to real token burn, streaks, and rest

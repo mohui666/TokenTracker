@@ -539,7 +539,9 @@ test("an inode rewrite still uses historical Codex hashes without rematerializin
     const cursors = {
       version: 1,
       files: {
-        [rolloutPath]: { inode: stat.ino + 1, offset: stat.size, lastTotal: null },
+        // +4, not +1: on Windows `stat.ino` (NTFS file index) exceeds 2**53,
+        // so `ino + 1` can round back to `ino` itself and fake a same-inode hit.
+        [rolloutPath]: { inode: stat.ino + 4, offset: stat.size, lastTotal: null },
       },
       codexHashes: observedHashes.proxy,
     };

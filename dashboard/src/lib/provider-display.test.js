@@ -24,4 +24,9 @@ describe("formatProviderDisplayName", () => {
     expect(formatProviderDisplayName("omp")).toBe("oh-my-pi");
     expect(formatProviderDisplayName("OMP")).toBe("oh-my-pi");
   });
+
+  it("uses the registered DeepSeek Harness product name for current and legacy sources", () => {
+    expect(formatProviderDisplayName("dsh")).toBe("DeepSeek Harness");
+    expect(formatProviderDisplayName("deepseek")).toBe("DeepSeek Harness");
+  });
 });
