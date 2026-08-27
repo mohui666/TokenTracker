@@ -4,7 +4,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary.jsx";
 import { useLocale } from "./hooks/useLocale.js";
 import { ThemeProvider } from "./ui/foundation/ThemeProvider.jsx";
 import { getBackendBaseUrl } from "./lib/config";
-import { isMockEnabled } from "./lib/mock-data";
+import { isMockEnabled } from "./lib/mock-mode";
 import { isScreenshotModeEnabled } from "./lib/screenshot-mode";
 import {
   markDashboardMainContentVisible,

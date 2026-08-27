@@ -4,6 +4,9 @@ import {
   getHeatmapRangeLocal,
 } from "./activity-heatmap";
 import { formatDateLocal, formatDateUTC } from "./date-range";
+import { isMockEnabled } from "./mock-mode";
+
+export { isMockEnabled } from "./mock-mode";
 
 type AnyRecord = Record<string, any>;
 type HourRow = {
@@ -30,21 +33,6 @@ const MOCK_PROJECT_REPOS = [
   "lumen/core",
   "delta/horizon",
 ];
-
-export function isMockEnabled() {
-  if (typeof window !== "undefined") {
-    const params = new URLSearchParams(window.location.search);
-    const q = String(params.get("mock") || "").toLowerCase();
-    // 显式关闭：?mock=0 / false / off 优先于环境变量（便于联调真实接口）
-    if (q === "0" || q === "false" || q === "off" || q === "no") return false;
-    if (q === "1" || q === "true" || q === "on" || q === "yes") return true;
-  }
-  if (typeof import.meta !== "undefined" && import.meta.env) {
-    const flag = String(import.meta.env.VITE_TOKENTRACKER_MOCK || "").toLowerCase();
-    if (flag === "1" || flag === "true") return true;
-  }
-  return false;
-}
 
 function readMockNowRaw() {
   if (typeof import.meta !== "undefined" && import.meta.env) {

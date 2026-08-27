@@ -1363,6 +1363,48 @@ test("parseRolloutIncremental keeps project EOF fast path scoped to codex source
   }
 });
 
+test("parseRolloutIncremental bounds concurrent metadata reads while preserving parse order", async () => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "tokentracker-rollout-stat-"));
+  const realStat = fs.stat;
+  try {
+    const queuePath = path.join(tmp, "queue.jsonl");
+    const rolloutFiles = [];
+    const cursors = { version: 1, files: {}, updatedAt: null };
+    for (let index = 0; index < 40; index += 1) {
+      const rolloutPath = path.join(tmp, `rollout-${String(index).padStart(2, "0")}.jsonl`);
+      await fs.writeFile(rolloutPath, "", "utf8");
+      const stat = await realStat(rolloutPath);
+      rolloutFiles.push(rolloutPath);
+      cursors.files[rolloutPath] = { inode: stat.ino || 0, offset: stat.size };
+    }
+
+    let inFlight = 0;
+    let maxInFlight = 0;
+    fs.stat = async function delayedStat(target, ...args) {
+      if (!rolloutFiles.includes(String(target))) {
+        return realStat.call(this, target, ...args);
+      }
+      inFlight += 1;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        return await realStat.call(this, target, ...args);
+      } finally {
+        inFlight -= 1;
+      }
+    };
+
+    const result = await parseRolloutIncremental({ rolloutFiles, cursors, queuePath });
+    assert.equal(result.filesProcessed, 0);
+    assert.ok(maxInFlight > 1, `expected concurrent stat calls, observed ${maxInFlight}`);
+    assert.ok(maxInFlight <= 32, `stat concurrency must stay bounded, observed ${maxInFlight}`);
+    assert.deepEqual(Object.keys(cursors.files), rolloutFiles);
+  } finally {
+    fs.stat = realStat;
+    await fs.rm(tmp, { recursive: true, force: true });
+  }
+});
+
 test("filterColdCodexRolloutFiles skips historical EOF Codex files without statting them", async () => {
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "tokentracker-rollout-"));
   const realStat = fs.stat;

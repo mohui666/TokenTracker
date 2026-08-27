@@ -34,7 +34,7 @@ vi.mock("./hooks/useLocale.js", () => ({
   useLocale: () => ({ resolvedLocale: "en" }),
 }));
 
-vi.mock("./lib/mock-data", () => ({
+vi.mock("./lib/mock-mode", () => ({
   isMockEnabled: () => false,
 }));
 

@@ -7,9 +7,9 @@ import { createRequire } from "node:module";
 import react from "@vitejs/plugin-react";
 import { defineConfig, loadEnv } from "vite";
 import os from "node:os";
+import { copyRegistryPlugin } from "./scripts/copy-registry-plugin.mjs";
 
 const ROOT_DIR = path.dirname(fileURLToPath(import.meta.url));
-const COPY_PATH = path.join(ROOT_DIR, "src", "content", "copy.csv");
 const PACKAGE_JSON_PATH = path.resolve(ROOT_DIR, "..", "package.json");
 const REPO_ROOT = path.resolve(ROOT_DIR, "..");
 const LOCAL_SYNC_TIMEOUT_MS = 120_000;
@@ -881,7 +881,7 @@ export default defineConfig(({ mode }) => {
   }
 
   return {
-    plugins: [react(), localDataApiPlugin()],
+    plugins: [copyRegistryPlugin(), react(), localDataApiPlugin()],
     ...(Object.keys(define).length ? { define } : {}),
     build: {
       rollupOptions: {

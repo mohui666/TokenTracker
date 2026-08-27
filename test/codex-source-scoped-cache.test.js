@@ -460,6 +460,48 @@ test("full auto sync still scans flat Codex archives", async () => {
   });
 });
 
+test("full sync discovers live and archived Codex roots concurrently", async () => {
+  await withTempSyncEnv(async () => {
+    const codexHome = process.env.CODEX_HOME;
+    await writeCodexRollout(
+      codexHome,
+      "2026-06-30",
+      "019f16bd-aaaa-7222-8333-444444444444",
+      12,
+    );
+    await writeArchivedCodexRollout(
+      codexHome,
+      "2026-06-29",
+      "019f16bd-bbbb-7222-8333-444444444444",
+      8,
+    );
+
+    const liveRoot = path.join(codexHome, "sessions");
+    const archiveRoot = path.join(codexHome, "archived_sessions");
+    const realReaddir = fs.readdir;
+    let inFlight = 0;
+    let maxInFlight = 0;
+    fs.readdir = async function delayedRootReaddir(target, ...args) {
+      const tracked = String(target) === liveRoot || String(target) === archiveRoot;
+      if (!tracked) return realReaddir.call(this, target, ...args);
+      inFlight += 1;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        return await realReaddir.call(this, target, ...args);
+      } finally {
+        inFlight -= 1;
+      }
+    };
+    try {
+      await cmdSync(["--auto"]);
+    } finally {
+      fs.readdir = realReaddir;
+    }
+    assert.equal(maxInFlight, 2);
+  });
+});
+
 test("background auto sync stays bounded and skips deep Codex archives", async () => {
   await withTempSyncEnv(async (home) => {
     const codexHome = process.env.CODEX_HOME;
@@ -788,6 +830,46 @@ test("Codex day inventory cache reduces repeated old-day readdir", async () => {
       `codex day inventory cache readdir counts: first=${first.count} second=${second.count}`,
     );
   } finally {
+    await fs.rm(tmp, { recursive: true, force: true });
+  }
+});
+
+test("Codex rollout discovery bounds concurrent day-directory reads", async () => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "tokentracker-codex-discovery-"));
+  const realReaddir = fs.readdir;
+  try {
+    const sessionsDir = path.join(tmp, "sessions");
+    const expected = [];
+    for (let day = 1; day <= 31; day += 1) {
+      expected.push(await writeCodexRollout(
+        tmp,
+        `2026-07-${String(day).padStart(2, "0")}`,
+        `019f16bd-${String(day).padStart(4, "0")}-7000-8000-aaaaaaaaaaaa`,
+        day,
+      ));
+    }
+
+    let inFlight = 0;
+    let maxInFlight = 0;
+    fs.readdir = async function delayedReaddir(target, ...args) {
+      const isDayDirectory = path.dirname(String(target)) === path.join(sessionsDir, "2026", "07");
+      if (!isDayDirectory) return realReaddir.call(this, target, ...args);
+      inFlight += 1;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        return await realReaddir.call(this, target, ...args);
+      } finally {
+        inFlight -= 1;
+      }
+    };
+
+    const found = await listRolloutFiles(sessionsDir);
+    assert.deepEqual(found, expected.sort((a, b) => a.localeCompare(b)));
+    assert.ok(maxInFlight > 1, `expected concurrent day reads, observed ${maxInFlight}`);
+    assert.ok(maxInFlight <= 32, `day read concurrency must stay bounded, observed ${maxInFlight}`);
+  } finally {
+    fs.readdir = realReaddir;
     await fs.rm(tmp, { recursive: true, force: true });
   }
 });

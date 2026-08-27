@@ -24,6 +24,26 @@ const CLAUDE_MEM_OBSERVER_PROJECT_REF =
   "https://local.tokentracker/claude-mem/observer-sessions";
 const PROJECT_ABSENT_CONTEXT_RESCAN_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_CODEX_COLD_SKIP_RECENT_DAYS = 2;
+const FILE_METADATA_CONCURRENCY = 32;
+
+async function mapConcurrent(items, concurrency, mapper) {
+  if (!Array.isArray(items) || items.length === 0) return [];
+  const results = new Array(items.length);
+  let nextIndex = 0;
+  const workerCount = Math.min(
+    items.length,
+    Math.max(1, Math.floor(Number(concurrency) || 1)),
+  );
+  const workers = Array.from({ length: workerCount }, async () => {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await mapper(items[index], index);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
 
 async function listRolloutFiles(sessionsDir, options = {}) {
   const out = [];
@@ -41,23 +61,37 @@ async function listRolloutFiles(sessionsDir, options = {}) {
       dayInventoryCache.days = {};
     }
   }
-  const years = await safeReadDir(sessionsDir);
-  for (const y of years) {
-    if (!/^[0-9]{4}$/.test(y.name) || !y.isDirectory()) continue;
-    const yearDir = path.join(sessionsDir, y.name);
-    const months = await safeReadDir(yearDir);
-    for (const m of months) {
-      if (!/^[0-9]{2}$/.test(m.name) || !m.isDirectory()) continue;
-      const monthDir = path.join(yearDir, m.name);
+  const years = (await safeReadDir(sessionsDir))
+    .filter((entry) => /^[0-9]{4}$/.test(entry.name) && entry.isDirectory());
+  const monthGroups = await mapConcurrent(
+    years,
+    FILE_METADATA_CONCURRENCY,
+    async (year) => {
+      const yearDir = path.join(sessionsDir, year.name);
+      const months = await safeReadDir(yearDir);
+      return months
+        .filter((entry) => /^[0-9]{2}$/.test(entry.name) && entry.isDirectory())
+        .map((entry) => path.join(yearDir, entry.name));
+    },
+  );
+  const monthDirs = monthGroups.flat();
+  const dayGroups = await mapConcurrent(
+    monthDirs,
+    FILE_METADATA_CONCURRENCY,
+    async (monthDir) => {
       const days = await safeReadDir(monthDir);
-      for (const d of days) {
-        if (!/^[0-9]{2}$/.test(d.name) || !d.isDirectory()) continue;
-        const dayDir = path.join(monthDir, d.name);
-        const files = await listRolloutDayFiles(dayDir, { dayInventoryCache, stats });
-        out.push(...files);
-      }
-    }
-  }
+      return days
+        .filter((entry) => /^[0-9]{2}$/.test(entry.name) && entry.isDirectory())
+        .map((entry) => path.join(monthDir, entry.name));
+    },
+  );
+  const dayDirs = dayGroups.flat();
+  const fileGroups = await mapConcurrent(
+    dayDirs,
+    FILE_METADATA_CONCURRENCY,
+    (dayDir) => listRolloutDayFiles(dayDir, { dayInventoryCache, stats }),
+  );
+  for (const files of fileGroups) out.push(...files);
 
   out.sort((a, b) => a.localeCompare(b));
   return out;
@@ -354,6 +388,18 @@ async function parseRolloutIncremental({
     return false;
   };
 
+  // Metadata reads are independent while parsing and bucket mutation are not.
+  // Prefetch stats with bounded concurrency, then retain the original stable
+  // file order for parsing, deduplication, cursor updates, and queue writes.
+  const rolloutStats = await mapConcurrent(
+    rolloutFiles,
+    FILE_METADATA_CONCURRENCY,
+    async (entry) => {
+      const filePath = typeof entry === "string" ? entry : entry?.path;
+      if (!filePath) return null;
+      return fs.stat(filePath).catch(() => null);
+    },
+  );
   for (let idx = 0; idx < rolloutFiles.length; idx++) {
     const entry = rolloutFiles[idx];
     const filePath = typeof entry === "string" ? entry : entry?.path;
@@ -363,7 +409,7 @@ async function parseRolloutIncremental({
         ? defaultSource
         : normalizeSourceInput(entry?.source) || defaultSource;
     if (syncDiagnostics && fileSource === DEFAULT_SOURCE) syncDiagnostics.stat_candidates += 1;
-    const st = await fs.stat(filePath).catch(() => null);
+    const st = rolloutStats[idx];
     if (!st || !st.isFile()) continue;
 
     const key = filePath;

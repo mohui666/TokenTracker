@@ -637,14 +637,21 @@ async function cmdSync(argv, context = {}) {
         ? cursors.codexDayInventoryCache
         : { version: 1, days: {} };
     if (sourceAllowed("codex")) cursors.codexDayInventoryCache = codexDayInventoryCache;
-    for (const entry of sources) {
-      if (seenSessions.has(entry.sessionsDir)) continue;
+    const uniqueSources = sources.filter((entry) => {
+      if (seenSessions.has(entry.sessionsDir)) return false;
       seenSessions.add(entry.sessionsDir);
-      const files = entry.deep
-        ? await listRolloutFilesDeep(entry.sessionsDir)
-        : await listRolloutFiles(entry.sessionsDir, entry.codexInventoryCache
+      return true;
+    });
+    const sourceFileGroups = await Promise.all(uniqueSources.map((entry) => (
+      entry.deep
+        ? listRolloutFilesDeep(entry.sessionsDir)
+        : listRolloutFiles(entry.sessionsDir, entry.codexInventoryCache
           ? { dayInventoryCache: codexDayInventoryCache }
-          : undefined);
+          : undefined)
+    )));
+    for (let sourceIndex = 0; sourceIndex < uniqueSources.length; sourceIndex++) {
+      const entry = uniqueSources[sourceIndex];
+      const files = sourceFileGroups[sourceIndex];
       for (const filePath of files) {
         rolloutFiles.push({ path: filePath, source: entry.source });
       }

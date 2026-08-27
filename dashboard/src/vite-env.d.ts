@@ -19,6 +19,11 @@ declare module "*?raw" {
   export default content;
 }
 
+declare module "virtual:tokentracker-copy-registry" {
+  const registry: Record<string, string>;
+  export default registry;
+}
+
 declare module "react" {
   export type Dispatch<T> = (value: T) => void;
   export type SetStateAction<T> = T | ((prev: T) => T);
