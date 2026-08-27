@@ -21,7 +21,7 @@
     "access": "public"
   },
   "scripts": {
-    "ci:local": "npm test && npm run validate:copy && npm run validate:locale && npm run validate:ui-hardcode && npm run validate:guardrails && npm run validate:versions && node --test test/architecture-guardrails.test.js && npm --prefix dashboard run build",
+    "ci:local": "npm test && npm run validate:copy && npm run validate:locale && npm run validate:ui-hardcode && npm run validate:guardrails && npm run validate:versions && npm run validate:bot-frames && node --test test/architecture-guardrails.test.js && npm --prefix dashboard run build",
     "copy:pull": "node scripts/copy-sync.cjs pull",
     "copy:push": "node scripts/copy-sync.cjs push",
     "dashboard:build": "npm --prefix dashboard run build",
@@ -35,6 +35,7 @@
     "audit:tokens": "node scripts/audit-token-correctness.cjs",
     "graph:auto-index": "node scripts/graph/auto-index.cjs",
     "graph:scip": "node scripts/graph/generate-scip.cjs",
+    "gen:bot-frames": "node scripts/gen-bot-frames.cjs",
     "pricing:build-seed": "node scripts/build-pricing-seed.cjs",
     "prepublishOnly": "node scripts/build-pricing-seed.cjs",
     "test": "node --test test/*.test.js",
@@ -45,6 +46,7 @@
     "validate:ui-hardcode": "node scripts/ops/validate-ui-hardcode.cjs",
     "sync-versions": "node scripts/sync-versions.cjs",
     "validate:versions": "node scripts/validate-versions.cjs",
+    "validate:bot-frames": "node scripts/gen-bot-frames.cjs --check",
     "version": "node scripts/sync-versions.cjs && git add TokenTrackerBar/project.yml TokenTrackerWin/TokenTrackerWin.csproj TokenTrackerLinux/package.json TokenTrackerLinux/package-lock.json TokenTrackerLinux/src-tauri/Cargo.toml TokenTrackerLinux/src-tauri/Cargo.lock TokenTrackerLinux/src-tauri/tauri.conf.json TokenTrackerLinux/packaging/arch/tokentracker-linux/PKGBUILD"
   },
   "dependencies": {

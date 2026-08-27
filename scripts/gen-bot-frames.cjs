@@ -53,8 +53,8 @@ function loadEngine() {
     ].join("\n"),
   );
   execFileSync(
-    path.join(ROOT, "node_modules/.bin/esbuild"),
-    [entry, "--bundle", "--platform=node", "--format=cjs", "--log-level=warning", `--outfile=${bundle}`],
+    process.execPath,
+    [require.resolve("esbuild/bin/esbuild"), entry, "--bundle", "--platform=node", "--format=cjs", "--log-level=warning", `--outfile=${bundle}`],
     { stdio: "inherit" },
   );
   const loaded = require(bundle);
