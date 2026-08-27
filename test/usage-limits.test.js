@@ -26,6 +26,7 @@ const {
   fetchAntigravityLimits,
   fetchCopilotLimits,
 } = require("../src/lib/usage-limits");
+const { writeArkCodingPlanLimitsCache } = require("../src/lib/ark-coding-plan-limits");
 
 // Match a fetch URL by host (exact or subdomain) rather than substring, so the
 // filter can't be fooled by lookalike hosts — and so CodeQL's
@@ -3073,8 +3074,8 @@ lang      123 me    23u  IPv4 0x124                0t0  TCP 127.0.0.1:51235 (LIS
 
   it("detects Antigravity from native Windows process enumeration", async () => {
     const calls = [];
-    const commandRunner = (command, args) => {
-      calls.push({ command, args });
+    const commandRunner = (command, args, options) => {
+      calls.push({ command, args, options });
       return {
         stdout: JSON.stringify([
           { ProcessId: 321, CommandLine: "C:\\Program Files\\Windsurf\\language_server_windows_x64.exe --app_data_dir windsurf" },
@@ -3088,6 +3089,10 @@ lang      123 me    23u  IPv4 0x124                0t0  TCP 127.0.0.1:51235 (LIS
 
     assert.equal(calls[0].command, "powershell.exe");
     assert.deepEqual(calls[0].args.slice(0, 3), ["-NoProfile", "-NonInteractive", "-Command"]);
+    // Regression guard: the -Command script contains a literal `|`; with
+    // shell execution cmd.exe would split it there and break the query.
+    // Direct spawn is the contract for every pre-existing call site.
+    assert.equal(calls[0].options.useShell, false);
     assert.equal(result.configured, true);
     assert.equal(result.pid, 654);
     assert.equal(result.csrfToken, "win-token");
@@ -3574,6 +3579,60 @@ describe("getUsageLimits plan_label", () => {
       assert.equal(result.claude.configured, true);
       assert.equal(result.claude.error, null);
       assert.equal(result.claude.plan_label, null);
+    } finally {
+      resetUsageLimitsCache();
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("getUsageLimits Ark timeout fallback", () => {
+  it("does not return an unverified Ark cache after timeout and forwards the requested platform", async () => {
+    resetUsageLimitsCache();
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "tokentracker-limits-ark-timeout-"));
+    try {
+      // Install-evidence dir: without ~/.arkcli the provider bails out
+      // before any probe, and the timeout path below never runs.
+      fs.mkdirSync(path.join(tmp, ".arkcli"), { recursive: true });
+      const nowMs = Date.now();
+      writeArkCodingPlanLimitsCache({
+        configured: true,
+        error: null,
+        plan_label: "Lite",
+        primary_window: {
+          used_percent: 42,
+          reset_at: new Date(nowMs + 3_600_000).toISOString(),
+          unit: "calls",
+        },
+      }, { home: tmp, nowMs });
+
+      const calls = [];
+      const result = await getUsageLimits({
+        home: tmp,
+        platform: "win32",
+        providerTimeoutMs: 20,
+        securityRunner() {
+          return { status: 1, stdout: "" };
+        },
+        commandRunner(command, args) {
+          calls.push({ command, args });
+          if (command === "where") {
+            return { status: 0, stdout: "C:\\Program Files\\arkcli.exe\n", stderr: "" };
+          }
+          // The provider spawns the resolved absolute path, never a bare
+          // "arkcli" — hang it so the outer provider timeout fires.
+          if (/arkcli(\.exe)?$/i.test(command)) return new Promise(() => {});
+          return { status: 1, stdout: "", stderr: "" };
+        },
+        fetchImpl() {
+          return new Promise(() => {});
+        },
+      });
+
+      assert.deepEqual(calls.find(({ command }) => command === "where")?.args, ["arkcli"]);
+      assert.equal(result.codingPlan.configured, true);
+      assert.equal(result.codingPlan.stale, undefined);
+      assert.match(result.codingPlan.error, /timed out/i);
     } finally {
       resetUsageLimitsCache();
       fs.rmSync(tmp, { recursive: true, force: true });

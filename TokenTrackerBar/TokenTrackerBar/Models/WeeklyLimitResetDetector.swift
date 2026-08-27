@@ -36,6 +36,7 @@ enum LimitResetProviderIconCatalog {
         case "zcode": return "zcode.svg"
         case "opencodeGo": return "opencode.svg"
         case "qoder": return "qoder.svg"
+        case "codingPlan": return "volcano-ark.svg"
         default: return nil
         }
     }
@@ -241,8 +242,21 @@ extension UsageLimitsResponse {
         }
         if let qoder {
             addGeneric("qoder", qoder.configured, qoder.error, [
-                ("primary", "Credits", qoder.primaryWindow),
-                ("secondary", "Ultimate Free Calls", qoder.secondaryWindow),
+                ("primary", Strings.qoderPlanLabel, qoder.primaryWindow),
+                ("secondary", Strings.qoderBonusLabel, qoder.secondaryWindow),
+            ])
+        }
+        if let qoderCn {
+            addGeneric("qoderCn", qoderCn.configured, qoderCn.error, [
+                ("primary", Strings.qoderPlanLabel, qoderCn.primaryWindow),
+                ("secondary", Strings.qoderBonusLabel, qoderCn.secondaryWindow),
+            ])
+        }
+        if let codingPlan {
+            addGeneric("codingPlan", codingPlan.configured, codingPlan.error, [
+                ("primary", "5h", codingPlan.primaryWindow),
+                ("secondary", "Weekly", codingPlan.secondaryWindow),
+                ("tertiary", "Monthly", codingPlan.tertiaryWindow),
             ])
         }
 

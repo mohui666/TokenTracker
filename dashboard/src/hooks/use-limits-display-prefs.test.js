@@ -104,6 +104,7 @@ describe("useLimitsDisplayPrefs", () => {
         "antigravity",
         "claude",
         "codex",
+        "codingPlan",
         "copilot",
         "cursor",
         "gemini",

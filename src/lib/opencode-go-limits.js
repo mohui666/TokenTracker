@@ -414,7 +414,18 @@ function buildLocalWindow({ used, limit, resetMs }) {
 // so we sum in SQLite and return a single row rather than streaming every
 // opencode-go turn into JS — keeps the limits poll cheap, cf. the spawnSync
 // freeze lesson).
-function buildGoAggregateSql({ sessionStart, weekStart, weekEnd, monthStart, monthEnd }) {
+//
+// Two schema generations share the same file (see src/lib/rollout.js):
+//   v1 keeps the `message` table with `$.role`/flat `$.providerID`.
+//   v2 (`opencode2`) moved messages to `session_message` (role is now the
+//     `type` column) and nests the provider under `$.model.providerID`.
+function buildGoAggregateSql({ sessionStart, weekStart, weekEnd, monthStart, monthEnd }, variant = "v1") {
+  const isV2 = variant === "v2";
+  const table = isV2 ? "session_message" : "message";
+  const rolePredicate = isV2 ? "type = 'assistant'" : "json_extract(data,'$.role') = 'assistant'";
+  const providerPredicate = isV2
+    ? "json_extract(data,'$.model.providerID') = 'opencode-go'"
+    : "json_extract(data,'$.providerID') = 'opencode-go'";
   return (
     "SELECT " +
     `COALESCE(SUM(CASE WHEN createdMs >= ${sessionStart} THEN cost ELSE 0 END), 0) AS sessionCost, ` +
@@ -425,13 +436,39 @@ function buildGoAggregateSql({ sessionStart, weekStart, weekEnd, monthStart, mon
     "FROM (" +
     "SELECT CAST(COALESCE(json_extract(data,'$.time.created'), time_created) AS INTEGER) AS createdMs, " +
     "CAST(json_extract(data,'$.cost') AS REAL) AS cost " +
-    "FROM message " +
+    `FROM ${table} ` +
     "WHERE json_valid(data) " +
-    "AND json_extract(data,'$.providerID') = 'opencode-go' " +
-    "AND json_extract(data,'$.role') = 'assistant' " +
+    `AND ${providerPredicate} ` +
+    `AND ${rolePredicate} ` +
     "AND json_type(data,'$.cost') IN ('integer','real')" +
     ")"
   );
+}
+
+// Detect whether the database has any rows in session_message. This is the
+// shared opencode2 probe (see src/lib/rollout.js): a pure v1 database has an
+// empty session_message table, and blindly running the v2 aggregate against it
+// is harmless here (no JOIN, no directory lookup) — but the probe result still
+// drives variant ordering so v2 is preferred when data exists.
+//
+// A database carrying BOTH tables resolves to "v1 first" on purpose: unlike the
+// message parser (which dedups rows by sessionID|messageID), this aggregate is
+// a blind SUM with no key to dedup on, so unioning two generations could
+// double-count cost if the tables overlap. Undercounting an opt-in estimate is
+// the safe side of that trade.
+async function detectOpencodeGoHasSessionMessages(dbPath, sqliteOptions = {}) {
+  let rows;
+  try {
+    rows = await readSqliteJsonRowsAsync(
+      dbPath,
+      `SELECT (SELECT 1 FROM session_message LIMIT 1) AS hasRows`,
+      { label: "OpenCode Go", timeout: 5_000, ...sqliteOptions },
+    );
+  } catch (_e) {
+    return null;
+  }
+  if (!Array.isArray(rows) || rows.length === 0) return null;
+  return Boolean(rows[0]?.hasRows);
 }
 
 // Returns { source:'local', primary/secondary/tertiary_window } or null when no
@@ -445,32 +482,42 @@ async function collectOpencodeGoLocal({ home, env = process.env, nowMs = Date.no
   const weekStart = weekStartMs(nowMs);
   const weekEnd = weekStart + WEEK_MS;
   const { startMs: monthStart, endMs: monthEnd } = monthBoundsMs(nowMs);
-  const sql = buildGoAggregateSql({ sessionStart, weekStart, weekEnd, monthStart, monthEnd });
+  const windowArgs = { sessionStart, weekStart, weekEnd, monthStart, monthEnd };
 
   let agg = null;
   for (const dbPath of paths) {
-    let rows;
-    try {
-      rows = await readSqliteJsonRowsAsync(dbPath, sql, {
-        label: "OpenCode Go",
-        timeout: 5_000,
-        ...sqliteOptions,
-      });
-    } catch (_e) {
-      continue;
-    }
-    const row = rows && rows[0];
-    if (!row) continue;
-    const rowCount = Number(row.rowCount) || 0;
-    if (rowCount <= 0) continue;
-    if (!agg) agg = { sessionCost: 0, weeklyCost: 0, monthlyCost: 0, sessionOldest: null, rowCount: 0 };
-    agg.sessionCost += Number(row.sessionCost) || 0;
-    agg.weeklyCost += Number(row.weeklyCost) || 0;
-    agg.monthlyCost += Number(row.monthlyCost) || 0;
-    agg.rowCount += rowCount;
-    const oldest = row.sessionOldest == null ? null : Number(row.sessionOldest);
-    if (oldest != null && Number.isFinite(oldest)) {
-      agg.sessionOldest = agg.sessionOldest == null ? oldest : Math.min(agg.sessionOldest, oldest);
+    // Each database can be a different OpenCode generation. When sqlite_master
+    // is unreadable, fall back to v1-then-v2 so the legacy query runs first.
+    const hasRows = await detectOpencodeGoHasSessionMessages(dbPath, sqliteOptions);
+    const variants = hasRows === true ? ["v2", "v1"] : hasRows === false ? ["v1", "v2"] : ["v1", "v2"];
+
+    for (const variant of variants) {
+      const sql = buildGoAggregateSql(windowArgs, variant);
+      let rows;
+      try {
+        rows = await readSqliteJsonRowsAsync(dbPath, sql, {
+          label: "OpenCode Go",
+          timeout: 5_000,
+          ...sqliteOptions,
+          throwOnReadFailure: true,
+        });
+      } catch (_e) {
+        continue;
+      }
+      const row = rows && rows[0];
+      if (!row) continue;
+      const rowCount = Number(row.rowCount) || 0;
+      if (rowCount <= 0) continue;
+      if (!agg) agg = { sessionCost: 0, weeklyCost: 0, monthlyCost: 0, sessionOldest: null, rowCount: 0 };
+      agg.sessionCost += Number(row.sessionCost) || 0;
+      agg.weeklyCost += Number(row.weeklyCost) || 0;
+      agg.monthlyCost += Number(row.monthlyCost) || 0;
+      agg.rowCount += rowCount;
+      const oldest = row.sessionOldest == null ? null : Number(row.sessionOldest);
+      if (oldest != null && Number.isFinite(oldest)) {
+        agg.sessionOldest = agg.sessionOldest == null ? oldest : Math.min(agg.sessionOldest, oldest);
+      }
+      break; // this database answered — don't re-run the other schema on it
     }
   }
   if (!agg || agg.rowCount <= 0) return null;
@@ -543,21 +590,39 @@ async function fetchOpencodeGoApiLimits({ apiKey, fetchImpl, nowMs, timeoutMs })
     };
   }
 
-  const rolling = buildWindow({
-    usagePercent: payload?.rollingUsage?.usagePercent,
-    resetInSec: payload?.rollingUsage?.resetInSec,
-    nowMs,
-  });
-  const weekly = buildWindow({
-    usagePercent: payload?.weeklyUsage?.usagePercent,
-    resetInSec: payload?.weeklyUsage?.resetInSec,
-    nowMs,
-  });
-  const monthly = buildWindow({
-    usagePercent: payload?.monthlyUsage?.usagePercent,
-    resetInSec: payload?.monthlyUsage?.resetInSec,
-    nowMs,
-  });
+  // Upstream has shipped two shapes:
+  // - Early spec (anomalyco/opencode#16513): { rollingUsage: { usagePercent, resetInSec } ... }
+  // - Live API (2026-08): { usage: { rolling: { percent, resetsAt }, weekly: {}, monthly: {} } }
+  const resolveApiWindow = (legacy, modern) => {
+    if (modern && typeof modern === "object") {
+      const pct = modern.percent ?? modern.usagePercent ?? modern.usage_percent;
+      const resetsAt = modern.resetsAt ?? modern.resets_at ?? modern.resetAt ?? modern.reset_at;
+      if (pct != null || resetsAt != null) {
+        const resetInSec = (() => {
+          if (typeof modern.resetInSec === "number" || typeof modern.resetInSec === "string") return Number(modern.resetInSec);
+          if (typeof modern.reset_in_sec === "number" || typeof modern.reset_in_sec === "string") return Number(modern.reset_in_sec);
+          if (typeof resetsAt === "string" && resetsAt) {
+            const ts = Date.parse(resetsAt);
+            if (Number.isFinite(ts)) return Math.max(0, Math.floor((ts - nowMs) / 1000));
+          }
+          return undefined;
+        })();
+        const modernWindow = buildWindow({ usagePercent: pct, resetInSec, nowMs });
+        // Only prefer the modern window when it actually parsed; an incomplete
+        // modern object (e.g. percent without reset info) must fall through to
+        // a valid legacy window instead of losing it.
+        if (modernWindow) return modernWindow;
+      }
+    }
+    if (legacy && typeof legacy === "object") {
+      return buildWindow({ usagePercent: legacy.usagePercent ?? legacy.percent, resetInSec: legacy.resetInSec ?? legacy.reset_in_sec, nowMs });
+    }
+    return null;
+  };
+
+  const rolling = resolveApiWindow(payload?.rollingUsage, payload?.usage?.rolling ?? payload?.rolling);
+  const weekly = resolveApiWindow(payload?.weeklyUsage, payload?.usage?.weekly ?? payload?.weekly);
+  const monthly = resolveApiWindow(payload?.monthlyUsage, payload?.usage?.monthly ?? payload?.monthly);
 
   if (!rolling && !weekly && !monthly) {
     return {

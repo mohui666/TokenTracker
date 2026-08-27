@@ -6,14 +6,17 @@ const { stripDebugFlag } = require('../src/lib/debug-flags');
 const {
   relaunchWithProxyEnvIfNeeded,
   applyUndiciProxyIfNeeded,
+  readPersistedProxyConfig,
 } = require('../src/lib/proxy-env');
 
 const { argv, debug } = stripDebugFlag(process.argv.slice(2));
 if (debug) process.env.TOKENTRACKER_DEBUG = '1';
 
+const persistedProxy = readPersistedProxyConfig();
 const relaunch = relaunchWithProxyEnvIfNeeded({
   argv,
   originalArgv: process.argv.slice(1),
+  proxyConfig: persistedProxy,
 });
 if (relaunch) {
   if (typeof relaunch.status === 'number') process.exit(relaunch.status);
@@ -29,7 +32,12 @@ if (relaunch) {
 // with older macOS app builds), set an undici ProxyAgent so fetch() actually
 // honors HTTPS_PROXY. Safe to run on modern Node too — explicit dispatcher
 // takes precedence over the env-var-driven default.
-applyUndiciProxyIfNeeded();
+const applyResult = applyUndiciProxyIfNeeded({ proxyConfig: persistedProxy });
+if (applyResult && applyResult.unprotected === true) {
+  console.error('[proxy] Manual proxy could not be applied and outbound traffic could not be blocked; aborting.');
+  console.error('[proxy] 手动代理无法生效且无法阻断出站流量，已中止。');
+  process.exit(1);
+}
 
 run(argv).catch((err) => {
   console.error(err?.stack || String(err));

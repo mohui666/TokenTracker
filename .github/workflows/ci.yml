@@ -49,6 +49,12 @@ jobs:
       - name: Test dashboard limits preferences
         run: npm --prefix dashboard test -- src/hooks/use-limits-display-prefs.test.js
 
+      # The bot character's renderer and its cross-host contracts live on the dashboard
+      # side, so npm test alone does not cover them; test/bot-parity.test.js only pins
+      # the values, not the rendering.
+      - name: Test bot companion renderer
+        run: npm --prefix dashboard test -- src/ui/foundation/BotAnimated.test.jsx src/lib/pets-api.test.js
+
       # Same checks as `npm run ci:local`, with the dashboard build hoisted above.
       - name: Test and validate
         run: |
@@ -58,6 +64,7 @@ jobs:
           npm run validate:ui-hardcode
           npm run validate:guardrails
           npm run validate:versions
+          npm run validate:bot-frames
           node --test test/architecture-guardrails.test.js
 
   linux-client:
@@ -113,14 +120,27 @@ jobs:
         with:
           node-version: 24
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            dashboard/package-lock.json
 
-      - name: Test OpenClaw parser on macOS
-        run: |
-          npm ci
-          node --test test/openclaw-parser.test.js
+      - name: Install root dependencies
+        run: npm ci
 
-      - name: Test macOS native pet limit reset interpolation
-        run: node --test test/native-pet-limit-reset.test.js
+      - name: Install dashboard dependencies
+        run: npm ci --prefix dashboard
+
+      # Same reason as the Linux job: the local-runtime install test asserts the
+      # bundled dashboard/dist/index.html exists, and a fresh checkout has none.
+      - name: Build dashboard
+        run: npm run dashboard:build
+
+      # The whole suite, not a hand-picked pair of files: host assumptions that
+      # only hold on GNU userland (coreutils, GNU sed, ...) are invisible to the
+      # Linux job by construction, and `npm test` is what CONTRIBUTING asks
+      # contributors to run before opening a PR.
+      - name: Test suite on macOS
+        run: npm test
 
       - name: Install xcodegen
         run: brew install xcodegen
@@ -162,6 +182,7 @@ jobs:
           npm ci
           node --test test/openclaw-parser.test.js
           node --test --test-name-pattern="native Windows" test/usage-limits.test.js
+          node --test test/command-runner.test.js
 
       - name: Test Windows updater
         run: dotnet test TokenTrackerWin.Tests/TokenTrackerWin.Tests.csproj --configuration Release

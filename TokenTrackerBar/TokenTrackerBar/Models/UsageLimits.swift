@@ -14,10 +14,12 @@ struct UsageLimitsResponse: Codable, Equatable {
     let zcode: ZcodeLimits?
     let opencodeGo: OpencodeGoLimits?
     let qoder: QoderLimits?
+    let qoderCn: QoderLimits?
+    let codingPlan: CodingPlanLimits?
 
     enum CodingKeys: String, CodingKey {
         case fetchedAt = "fetched_at"
-        case claude, codex, cursor, gemini, kimi, kiro, grok, antigravity, copilot, zcode, qoder
+        case claude, codex, cursor, gemini, kimi, kiro, grok, antigravity, copilot, zcode, qoder, qoderCn, codingPlan
         case opencodeGo = "opencodeGo"
     }
 }
@@ -492,6 +494,26 @@ struct QoderLimits: Codable, Equatable {
     }
 }
 
+struct CodingPlanLimits: Codable, Equatable {
+    let configured: Bool
+    let error: String?
+    let planLabel: String?
+    let primaryWindow: GenericLimitWindow?
+    let secondaryWindow: GenericLimitWindow?
+    let tertiaryWindow: GenericLimitWindow?
+    let cachedAt: String?
+    let stale: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case configured, error, stale
+        case planLabel = "plan_label"
+        case primaryWindow = "primary_window"
+        case secondaryWindow = "secondary_window"
+        case tertiaryWindow = "tertiary_window"
+        case cachedAt = "cached_at"
+    }
+}
+
 struct AntigravityLimits: Codable, Equatable {
     let configured: Bool
     let error: String?
@@ -534,6 +556,8 @@ extension UsageLimitsResponse {
             (zcode?.configured ?? false, zcode?.error),
             (opencodeGo?.configured ?? false, opencodeGo?.error),
             (qoder?.configured ?? false, qoder?.error),
+            (qoderCn?.configured ?? false, qoderCn?.error),
+            (codingPlan?.configured ?? false, codingPlan?.error),
         ]
         return providers.contains { $0.0 && $0.1 == nil }
     }

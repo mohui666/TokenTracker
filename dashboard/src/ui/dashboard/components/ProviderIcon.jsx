@@ -117,6 +117,63 @@ function CodeBuddyIcon({ size = 16, className = "" }) {
   );
 }
 
+// TRAE Work CN — official app-logo mark reverse-engineered from
+// https://work.trae.cn/ favicon (48×48) and PWA manifest icon-512.png
+// (pixel-accurate geometry, 512×512 canvas).
+//
+// Structure (confirmed against 512px source RGBA raster):
+//   • White rounded square (#FFFFFF, corners transparent so the circular
+//     alpha mask reads correctly on any browser tab chrome).
+//   • Pure black (#000000) bracket-frame glyph over it:
+//       – a full-width top crossbar,
+//       – two 36px-thick vertical arms (left arm floats; right arm anchors
+//         the bottom crossbar which therefore sits 36px inset on the left),
+//       – two spindle accents midway inside the arms (rhombic ellipses,
+//         rx≈24 ry≈22).
+//
+// The white plate + solid black ink matches the favicon pixel-for-pixel and
+// therefore stays consistent with the brand assets served from work.trae.cn.
+function TraeCnIcon({ size = 16, className = "" }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 512 512"
+      className={className}
+      data-brand="trae-cn"
+      aria-hidden="true"
+    >
+      {/* White rounded square plate — corners inherit transparent background */}
+      <rect x="48" y="48" width="416" height="416" rx="76" fill="#FFFFFF" />
+
+      {/* Top crossbar + right arm + bottom crossbar (one contiguous polygon) */}
+      <path
+        fill="#000000"
+        d="M130 168 H381 V344 H166 V312 H346 V204 H130 Z"
+      />
+
+      {/* Free-standing left arm (stops 36px above the bottom crossbar, which
+          leaves the characteristic step-clear on the lower-left) */}
+      <path
+        fill="#000000"
+        d="M130 204 H165 V308 H130 Z"
+      />
+
+      {/* Left spindle accent (rhombic ellipse, rx≈24 ry≈22) */}
+      <path
+        fill="#000000"
+        d="M231 234 C244 234 254 244 254 256 C254 268 244 278 231 278 C218 278 207 268 207 256 C207 244 218 234 231 234 Z"
+      />
+
+      {/* Right spindle accent (rhombic ellipse, rx=24 ry=22) */}
+      <path
+        fill="#000000"
+        d="M302 234 C315 234 326 244 326 256 C326 268 315 278 302 278 C289 278 278 268 278 256 C278 244 289 234 302 234 Z"
+      />
+    </svg>
+  );
+}
+
 function HermesIcon({ size = 16, className = "" }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" fillRule="evenodd" clipRule="evenodd" className={className}>
@@ -313,6 +370,7 @@ const PROVIDER_ICON_MAP = {
   "PI-GITHUB-COPILOT": PiIcon,
   "PI-COPILOT": PiIcon,
   ROOCODE: RoocodeIcon,
+  "TRAE-CN": TraeCnIcon,
   ZED: ZedIcon,
 };
 
@@ -330,22 +388,27 @@ const PROVIDER_LOGO_MAP = {
   "KILO-CLI": "/brand-logos/kilo.svg",
   "KILO-CODE": "/brand-logos/kilo.svg",
   MIMO: "/brand-logos/mimo.svg",
-  // oh-my-pi / pi: multi-color brand marks (pi letterform + plugin connector).
+  // oh-my-pi: multi-color brand mark (pi letterform + plugin connector). pi
+  // itself publishes a white-only mark (pi.dev/logo.svg), so it gets the same
+  // <img> luminance treatment as AnythingLLM in PROVIDER_LOGO_CLASS_MAP.
   OMP: "/brand-logos/omp.svg",
   OPENCLAW: "/brand-logos/openclaw.svg",
   OPENCODE: "/brand-logos/opencode.svg",
   PI: "/brand-logos/pi.svg",
-  "PI-ANTHROPIC": "/brand-logos/pi.svg",
-  "PI-DEEPSEEK": "/brand-logos/pi.svg",
-  "PI-GITHUB-COPILOT": "/brand-logos/pi.svg",
-  "PI-COPILOT": "/brand-logos/pi.svg",
-  "PI-OPENAI-CODEX": "/brand-logos/pi.svg",
+  // Dots Studio's sail mark (right triangle + hull bar), not the chat-app
+  // droplet — Dots has its own recognizable brand mark, so it overrides the
+  // generic pi fallback below for both the standalone "dots" provider and the
+  // pi-routed source.
+  DOTS: "/brand-logos/dots.png",
+  "PI-DOTS": "/brand-logos/dots.png",
   QODER: "/brand-logos/qoder.svg",
   REASONIX: "/brand-logos/reasonix.png",
   // Qoder CN ships its own brand mark — the domestic edition's icon (a green
   // crescent) differs from the international black double-crescent, so it gets
   // its own traced asset instead of reusing qoder.svg.
   "QODER-CN": "/brand-logos/qoder-cn.svg",
+  // Volcano Ark (火山方舟) Coding Plan — the Volcengine 3-mountain mark.
+  "VOLCANO-ARK": "/brand-logos/volcano-ark.svg",
 };
 
 // AnythingLLM publishes this compact mark in white. Keep the official asset
@@ -353,8 +416,24 @@ const PROVIDER_LOGO_MAP = {
 // (which may differ from the OS preference) always has sufficient contrast.
 const PROVIDER_LOGO_CLASS_MAP = {
   ANYTHINGLLM: "brightness-0 dark:brightness-100",
+  // pi publishes its mark in white only (pi.dev/logo.svg) — same treatment
+  // as AnythingLLM: black on light backgrounds, native white on dark.
+  PI: "brightness-0 dark:brightness-100",
   QODER: "dark:invert",
+  // The sail PNG is solid black on transparent — invert to white in dark
+  // mode so it doesn't disappear against the dark dashboard background.
+  DOTS: "dark:invert",
+  "PI-DOTS": "dark:invert",
 };
+
+// pi is a router: rollout.js mints one source per routed backend
+// (`pi-anthropic`, `pi-xai`, `pi-opencode-go`, …) from an open-ended provider
+// slug, so the brand mark is resolved by prefix rather than by enumerating
+// backends — an unlisted one used to fall through to the dashed placeholder.
+function piAwareLogoKey(normalized) {
+  if (PROVIDER_LOGO_MAP[normalized]) return normalized;
+  return normalized.startsWith("PI-") ? "PI" : normalized;
+}
 
 function PlaceholderIcon({ size = 16, className = "" }) {
   return (
@@ -380,10 +459,11 @@ function PlaceholderIcon({ size = 16, className = "" }) {
  */
 export function ProviderIcon({ provider, size = 16, color, className = "" }) {
   const normalized = provider?.toUpperCase?.() || "";
-  const logoSrc = PROVIDER_LOGO_MAP[normalized];
+  const logoKey = piAwareLogoKey(normalized);
+  const logoSrc = PROVIDER_LOGO_MAP[logoKey];
 
   if (logoSrc) {
-    const logoClassName = `${PROVIDER_LOGO_CLASS_MAP[normalized] || ""} ${className}`.trim();
+    const logoClassName = `${PROVIDER_LOGO_CLASS_MAP[logoKey] || ""} ${className}`.trim();
     return (
       <img
         src={logoSrc}

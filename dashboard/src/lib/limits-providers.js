@@ -15,6 +15,7 @@ export const LIMIT_PROVIDER_IDS = [
   "opencodeGo",
   "qoder",
   "qoderCn",
+  "codingPlan",
 ];
 
 /** Keys for ProviderIcon — mono logos use inline SVG; colored logos use /brand-logos/. */
@@ -36,6 +37,8 @@ export const LIMIT_PROVIDER_ICON_KEYS = {
   // The CN edition ships its own green-crescent brand mark, distinct from the
   // international black double-crescent — resolved to the QODER-CN icon asset.
   qoderCn: "QODER-CN",
+  // Volcano Engine Ark Coding Plan — own brand mark under /brand-logos/.
+  codingPlan: "VOLCANO-ARK",
 };
 
 export function limitProviderIconKey(id) {
@@ -70,6 +73,8 @@ export function limitProviderName(id) {
       return copy("limits.provider.qoder");
     case "qoderCn":
       return copy("limits.provider.qoder_cn");
+    case "codingPlan":
+      return copy("limits.provider.ark_coding_plan");
     default:
       return String(id || "");
   }

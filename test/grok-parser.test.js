@@ -18,9 +18,11 @@ function makeSession({
   turns = [],
   contextMetas = [],
   signals = {},
+  cwd = "/tmp/project",
+  summaryInfo,
 } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "tt-grok-parser-"));
-  const encodedCwd = encodeURIComponent("/tmp/project");
+  const encodedCwd = encodeURIComponent(cwd);
   const sessionDir = path.join(root, "sessions", encodedCwd, sessionId);
   fs.mkdirSync(sessionDir, { recursive: true });
 
@@ -85,17 +87,46 @@ function makeSession({
       ...signals,
     }),
   );
-  fs.writeFileSync(
-    path.join(sessionDir, "summary.json"),
-    JSON.stringify({ updated_at: "2026-07-18T10:00:00.000Z" }),
-  );
+  const summary = { updated_at: "2026-07-18T10:00:00.000Z" };
+  if (summaryInfo && typeof summaryInfo === "object") summary.info = summaryInfo;
+  fs.writeFileSync(path.join(sessionDir, "summary.json"), JSON.stringify(summary));
 
   return {
     root,
     sessionDir,
     sessionId,
+    cwd,
+    encodedCwd,
     env: { TOKENTRACKER_GROK_HOME: root, GROK_HOME: root },
   };
+}
+
+function writeGitOrigin(repoDir, url) {
+  fs.mkdirSync(path.join(repoDir, ".git"), { recursive: true });
+  fs.writeFileSync(path.join(repoDir, ".git", "config"), `[remote "origin"]\n\turl = ${url}\n`);
+}
+
+function appendGrokTurn(sessionDir, turn, { timestampMs, eventId } = {}) {
+  const sessionId = path.basename(sessionDir);
+  const line = JSON.stringify({
+    timestamp: Math.floor((timestampMs || Date.now()) / 1000),
+    method: "session/update",
+    params: {
+      sessionId,
+      update: {
+        sessionUpdate: "turn_completed",
+        prompt_id: turn.promptId || "prompt-growth",
+        stop_reason: "end_turn",
+        usage: turn.usage,
+      },
+      _meta: {
+        totalTokens: turn.contextWindowTokens ?? 12_000,
+        eventId: eventId || `${sessionId}-growth`,
+        agentTimestampMs: timestampMs || Date.now(),
+      },
+    },
+  });
+  fs.appendFileSync(path.join(sessionDir, "updates.jsonl"), `${line}\n`);
 }
 
 function readQueue(queuePath) {
@@ -357,3 +388,340 @@ test("v3 -> v4 migration rebuilds from turn usage and does not keep old watermar
   assert.equal(row.input_tokens, 80_000);
   assert.equal(row.output_tokens, 1_000);
 });
+
+function grokTurnUsage(overrides = {}) {
+  const { modelName = "grok-4.5-build", timestampMs, promptId, ...usageOverrides } = overrides;
+  const usage = {
+    inputTokens: 1000,
+    outputTokens: 200,
+    totalTokens: 1220,
+    cachedReadTokens: 100,
+    reasoningTokens: 20,
+    ...usageOverrides,
+  };
+  return {
+    usage: {
+      ...usage,
+      modelUsage: {
+        [modelName]: {
+          inputTokens: usage.inputTokens,
+          outputTokens: usage.outputTokens,
+          totalTokens: usage.totalTokens,
+          cachedReadTokens: usage.cachedReadTokens,
+          reasoningTokens: usage.reasoningTokens,
+        },
+      },
+    },
+    timestampMs: timestampMs || Date.parse("2026-07-18T10:05:00.000Z"),
+    promptId,
+  };
+}
+
+test("parseGrokBuildIncremental backfills project usage from session cwd", async () => {
+  const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), "tt-grok-git-"));
+  writeGitOrigin(repoDir, "https://github.com/acme/grok-project.git");
+
+  const fixture = makeSession({
+    cwd: repoDir,
+    summaryInfo: { cwd: repoDir },
+    turns: [grokTurnUsage()],
+  });
+  const queuePath = path.join(fixture.root, "queue.jsonl");
+  const projectQueuePath = path.join(fixture.root, "project.queue.jsonl");
+  const cursors = {
+    hourly: { version: 3, buckets: {}, groupQueued: {} },
+    grok: { version: 4 },
+  };
+
+  await parseGrokBuildIncremental({
+    sessions: resolveGrokBuildSessions(fixture.env),
+    cursors,
+    queuePath,
+    env: fixture.env,
+  });
+  const globalRowsBefore = readQueue(queuePath).length;
+  assert.ok(globalRowsBefore > 0);
+  assert.equal(cursors.grok.version, 4);
+  assert.equal(fs.existsSync(projectQueuePath), false);
+
+  const result = await parseGrokBuildIncremental({
+    sessions: resolveGrokBuildSessions(fixture.env),
+    cursors,
+    queuePath,
+    projectQueuePath,
+    env: fixture.env,
+  });
+  assert.equal(readQueue(queuePath).length, globalRowsBefore, "project backfill must not re-emit global usage");
+  assert.equal(result.projectBucketsQueued, 1);
+  assert.equal(cursors.grok.version, 4);
+
+  const projectRows = readQueue(projectQueuePath);
+  assert.equal(projectRows.length, 1);
+  assert.equal(projectRows[0].source, "grok");
+  assert.equal(projectRows[0].project_key, "acme/grok-project");
+  assert.equal(projectRows[0].project_ref, "https://github.com/acme/grok-project");
+  assert.equal(projectRows[0].total_tokens, 1220);
+  assert.equal(projectRows[0].input_tokens, 900);
+  assert.equal(projectRows[0].cached_input_tokens, 100);
+  assert.equal(projectRows[0].output_tokens, 200);
+  assert.equal(projectRows[0].reasoning_output_tokens, 20);
+
+  const unchanged = await parseGrokBuildIncremental({
+    sessions: resolveGrokBuildSessions(fixture.env),
+    cursors,
+    queuePath,
+    projectQueuePath,
+    env: fixture.env,
+  });
+  assert.equal(unchanged.bucketsQueued, 0);
+  assert.equal(unchanged.projectBucketsQueued, 0);
+  assert.equal(readQueue(queuePath).length, globalRowsBefore);
+  assert.equal(readQueue(projectQueuePath).length, 1);
+
+  appendGrokTurn(
+    fixture.sessionDir,
+    grokTurnUsage({
+      inputTokens: 500,
+      outputTokens: 80,
+      totalTokens: 590,
+      cachedReadTokens: 50,
+      reasoningTokens: 10,
+      timestampMs: Date.parse("2026-07-18T10:20:00.000Z"),
+    }),
+    {
+      timestampMs: Date.parse("2026-07-18T10:20:00.000Z"),
+      eventId: `${fixture.sessionId}-growth`,
+    },
+  );
+
+  const growth = await parseGrokBuildIncremental({
+    sessions: resolveGrokBuildSessions(fixture.env),
+    cursors,
+    queuePath,
+    projectQueuePath,
+    env: fixture.env,
+  });
+  assert.equal(growth.bucketsQueued, 1);
+  assert.equal(growth.projectBucketsQueued, 1);
+  assert.equal(readQueue(queuePath).at(-1).total_tokens, 1810);
+  assert.equal(readQueue(projectQueuePath).at(-1).total_tokens, 1810);
+  assert.equal(readQueue(projectQueuePath).at(-1).conversation_count, 2);
+});
+
+test("parseGrokBuildIncremental attributes project usage from encodedCwd only", async () => {
+  const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), "tt-grok-encoded-cwd-"));
+  writeGitOrigin(repoDir, "https://github.com/acme/grok-project.git");
+
+  const fixture = makeSession({
+    cwd: repoDir,
+    turns: [grokTurnUsage()],
+  });
+  const summaryPath = path.join(fixture.sessionDir, "summary.json");
+  fs.writeFileSync(summaryPath, JSON.stringify({ updated_at: "2026-07-18T10:00:00.000Z" }));
+
+  const queuePath = path.join(fixture.root, "queue.jsonl");
+  const projectQueuePath = path.join(fixture.root, "project.queue.jsonl");
+  const cursors = {
+    hourly: { version: 3, buckets: {}, groupQueued: {} },
+    grok: { version: 4 },
+  };
+
+  const sessions = resolveGrokBuildSessions(fixture.env);
+  assert.equal(sessions.length, 1);
+  assert.ok(sessions[0].encodedCwd.includes("%"));
+  delete sessions[0].cwd;
+
+  const result = await parseGrokBuildIncremental({
+    sessions,
+    cursors,
+    queuePath,
+    projectQueuePath,
+    env: fixture.env,
+  });
+  assert.equal(result.projectBucketsQueued, 1);
+  const projectRows = readQueue(projectQueuePath);
+  assert.equal(projectRows.length, 1);
+  assert.equal(projectRows[0].project_key, "acme/grok-project");
+  assert.equal(projectRows[0].source, "grok");
+  assert.equal(projectRows[0].total_tokens, 1220);
+});
+
+test("parseGrokBuildIncremental prefers hook sess.cwd over a non-git encodedCwd", async () => {
+  const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), "tt-grok-hook-cwd-"));
+  writeGitOrigin(repoDir, "https://github.com/acme/grok-project.git");
+  const fixture = makeSession({
+    cwd: "/tmp/not-a-git-workspace",
+    turns: [grokTurnUsage()],
+  });
+  const queuePath = path.join(fixture.root, "queue.jsonl");
+  const projectQueuePath = path.join(fixture.root, "project.queue.jsonl");
+  const sessions = resolveGrokBuildSessions(fixture.env);
+  sessions[0].cwd = repoDir;
+
+  const result = await parseGrokBuildIncremental({
+    sessions,
+    cursors: {
+      hourly: { version: 3, buckets: {}, groupQueued: {} },
+      grok: { version: 4 },
+    },
+    queuePath,
+    projectQueuePath,
+    env: fixture.env,
+  });
+  assert.equal(result.projectBucketsQueued, 1);
+  assert.equal(readQueue(projectQueuePath)[0].project_key, "acme/grok-project");
+});
+
+test("parseGrokBuildIncremental skips project attribution when cwd has no git", async () => {
+  const cwdDir = fs.mkdtempSync(path.join(os.tmpdir(), "tt-grok-nogit-"));
+  const fixture = makeSession({
+    cwd: cwdDir,
+    summaryInfo: { cwd: cwdDir },
+    turns: [grokTurnUsage()],
+  });
+  const queuePath = path.join(fixture.root, "queue.jsonl");
+  const projectQueuePath = path.join(fixture.root, "project.queue.jsonl");
+  const cursors = {
+    hourly: { version: 3, buckets: {}, groupQueued: {} },
+    grok: { version: 4 },
+  };
+
+  const first = await parseGrokBuildIncremental({
+    sessions: resolveGrokBuildSessions(fixture.env),
+    cursors,
+    queuePath,
+    projectQueuePath,
+    env: fixture.env,
+  });
+  assert.ok(first.bucketsQueued > 0);
+  assert.equal(first.projectBucketsQueued, 0);
+  assert.equal(fs.existsSync(projectQueuePath), false);
+  assert.equal(cursors.grok.version, 4);
+  const updatesPath = path.join(fixture.sessionDir, "updates.jsonl");
+  assert.equal(cursors.grok.projectUpdateOffsets?.[updatesPath], undefined);
+
+  writeGitOrigin(cwdDir, "https://github.com/acme/grok-project.git");
+  const retry = await parseGrokBuildIncremental({
+    sessions: resolveGrokBuildSessions(fixture.env),
+    cursors,
+    queuePath,
+    projectQueuePath,
+    env: fixture.env,
+  });
+  assert.equal(retry.bucketsQueued, 0);
+  assert.equal(retry.projectBucketsQueued, 1);
+  const projectRows = readQueue(projectQueuePath);
+  assert.equal(projectRows.length, 1);
+  assert.equal(projectRows[0].project_key, "acme/grok-project");
+  assert.equal(projectRows[0].total_tokens, 1220);
+});
+
+test("parseGrokBuildIncremental project backfill uses independent watermark snapshots", async () => {
+  const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), "tt-grok-wm-"));
+  writeGitOrigin(repoDir, "https://github.com/acme/grok-project.git");
+  const fixture = makeSession({
+    cwd: repoDir,
+    summaryInfo: { cwd: repoDir },
+    turns: [],
+    contextMetas: [5_000, 12_000, 8_000, 20_000],
+    signals: { contextTokensUsed: 18_000, totalTokensBeforeCompaction: 0 },
+  });
+  const queuePath = path.join(fixture.root, "queue.jsonl");
+  const projectQueuePath = path.join(fixture.root, "project.queue.jsonl");
+  const cursors = {
+    hourly: { version: 3, buckets: {}, groupQueued: {} },
+    grok: { version: 4 },
+  };
+
+  await parseGrokBuildIncremental({
+    sessions: resolveGrokBuildSessions(fixture.env),
+    cursors,
+    queuePath,
+    env: fixture.env,
+  });
+  const globalRowsBefore = readQueue(queuePath).length;
+
+  const result = await parseGrokBuildIncremental({
+    sessions: resolveGrokBuildSessions(fixture.env),
+    cursors,
+    queuePath,
+    projectQueuePath,
+    env: fixture.env,
+  });
+  assert.equal(readQueue(queuePath).length, globalRowsBefore);
+  assert.equal(result.projectBucketsQueued, 1);
+  const projectRows = readQueue(projectQueuePath);
+  assert.equal(projectRows.length, 1);
+  assert.equal(projectRows[0].source, "grok");
+  assert.equal(projectRows[0].project_key, "acme/grok-project");
+  assert.equal(projectRows[0].total_tokens, 20_000);
+  assert.equal(cursors.grok.sessionSnapshots[fixture.sessionId].totalTokens, 20_000);
+  assert.equal(cursors.grok.projectSessionSnapshots[fixture.sessionId].totalTokens, 20_000);
+  assert.notEqual(
+    cursors.grok.projectUpdateOffsets,
+    cursors.grok.updateOffsets,
+  );
+});
+
+test("parseGrokBuildIncremental drops project offsets for deleted session files", async () => {
+  const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), "tt-grok-prune-git-"));
+  writeGitOrigin(repoDir, "https://github.com/acme/grok-project.git");
+
+  const keep = makeSession({
+    sessionId: "019f0000-keep-session",
+    cwd: repoDir,
+    summaryInfo: { cwd: repoDir },
+    turns: [grokTurnUsage()],
+  });
+  const drop = makeSession({
+    sessionId: "019f0000-drop-session",
+    cwd: repoDir,
+    summaryInfo: { cwd: repoDir },
+    turns: [grokTurnUsage({ promptId: "prompt-drop" })],
+  });
+  const keepUpdates = path.join(keep.sessionDir, "updates.jsonl");
+  const dropUpdates = path.join(drop.sessionDir, "updates.jsonl");
+  const queuePath = path.join(keep.root, "queue.jsonl");
+  const projectQueuePath = path.join(keep.root, "project.queue.jsonl");
+  const cursors = {
+    hourly: { version: 3, buckets: {}, groupQueued: {} },
+    grok: { version: 4 },
+  };
+
+  await parseGrokBuildIncremental({
+    sessions: [
+      { sessionDir: keep.sessionDir, sessionId: keep.sessionId, encodedCwd: keep.encodedCwd },
+      { sessionDir: drop.sessionDir, sessionId: drop.sessionId, encodedCwd: drop.encodedCwd },
+    ],
+    cursors,
+    queuePath,
+    projectQueuePath,
+    env: keep.env,
+  });
+  assert.ok(cursors.grok.projectUpdateOffsets[keepUpdates]);
+  assert.ok(cursors.grok.projectUpdateOffsets[dropUpdates]);
+
+  fs.rmSync(drop.sessionDir, { recursive: true, force: true });
+  const stalePath = path.join(keep.root, "missing-updates.jsonl");
+  cursors.grok.projectUpdateOffsets[stalePath] = { size: 12, mtimeMs: 1, ino: 1 };
+
+  await parseGrokBuildIncremental({
+    sessions: [
+      { sessionDir: keep.sessionDir, sessionId: keep.sessionId, encodedCwd: keep.encodedCwd },
+    ],
+    cursors,
+    queuePath,
+    projectQueuePath,
+    env: keep.env,
+  });
+  assert.ok(cursors.grok.projectUpdateOffsets[keepUpdates]);
+  assert.equal(cursors.grok.projectUpdateOffsets[dropUpdates], undefined);
+  assert.equal(cursors.grok.projectUpdateOffsets[stalePath], undefined);
+});
+
+test("sync.js does not skip cursor commit when Grok only queues project buckets", () => {
+  const src = fs.readFileSync(path.join(__dirname, "../src/commands/sync.js"), "utf8");
+  assert.match(src, /grokScanResult\.projectBucketsQueued/);
+  assert.match(src, /!\(grokResult\.projectBucketsQueued > 0\)/);
+});
+

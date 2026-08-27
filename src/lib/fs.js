@@ -10,8 +10,17 @@ async function writeFileAtomic(filePath, content) {
   const dir = path.dirname(filePath);
   await ensureDir(dir);
   const tmp = `${filePath}.tmp.${Date.now()}`;
-  await fs.writeFile(tmp, content, { encoding: "utf8" });
-  await fs.rename(tmp, filePath);
+  try {
+    await fs.writeFile(tmp, content, { encoding: "utf8" });
+    await fs.rename(tmp, filePath);
+  } catch (err) {
+    try {
+      await fs.unlink(tmp);
+    } catch {
+      /* tmp may not exist if writeFile failed before creating it */
+    }
+    throw err;
+  }
 }
 
 async function readJson(filePath) {

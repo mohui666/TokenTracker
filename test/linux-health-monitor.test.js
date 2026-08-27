@@ -120,6 +120,29 @@ test('Linux tray does not ship a click handler that cannot fire', () => {
   assert.match(tray, /Linux/, 'the platform limitation should be documented in place');
 });
 
+test('Linux configures the WebKitGTK DMA-BUF fallback before Tauri starts', () => {
+  const main = read('TokenTrackerLinux/src-tauri/src/main.rs');
+
+  // WebKitGTK's DMA-BUF renderer paints a blank webview on some Wayland/NVIDIA
+  // setups. The override only takes effect if it is set before GTK/WebKit is
+  // initialized, so it has to be the first thing main() does.
+  assert.match(
+    main,
+    /fn main\(\) \{\s*configure_webkit_runtime\(\);/,
+    'configure_webkit_runtime() must run before tauri::Builder',
+  );
+
+  // An explicit user value stays authoritative, so WEBKIT_DISABLE_DMABUF_RENDERER=0
+  // can still opt back into the accelerated renderer.
+  assert.match(main, /var_os\(WEBKIT_DMABUF_ENV\)\.is_none\(\)/);
+  assert.match(main, /const WEBKIT_DMABUF_ENV: &str = "WEBKIT_DISABLE_DMABUF_RENDERER";/);
+
+  // The assigned value matters: WebKitGTK reads the variable as "set and not
+  // 0", so defaulting it to "0" would silently re-enable the DMA-BUF renderer
+  // this guards against while every other assertion here still passed.
+  assert.match(main, /set_var\(WEBKIT_DMABUF_ENV, "1"\)/);
+});
+
 test('GitHub CI validates synchronized platform versions', () => {
   const workflow = read('.github/workflows/ci.yml');
   assert.match(workflow, /npm run validate:versions/);

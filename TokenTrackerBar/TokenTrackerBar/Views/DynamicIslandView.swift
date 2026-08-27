@@ -26,6 +26,7 @@ struct DynamicIslandView: View {
 
     @State private var menuBarIcon: NSImage? = nil
     @State private var wingMetrics = WingSelection.default
+    @State private var compactModeEnabled = false
 
     var body: some View {
         // Referenced so currency/locale changes force a re-render.
@@ -55,9 +56,11 @@ struct DynamicIslandView: View {
         .onAppear {
             self.menuBarIcon = StatusBarController.currentMenuBarIcon
             self.wingMetrics = resolveWingMetrics()
+            self.compactModeEnabled = DynamicIslandCompactPolicy.isEnabled()
         }
         .onChange(of: state.settingsTick) { _ in
             self.wingMetrics = resolveWingMetrics()
+            self.compactModeEnabled = DynamicIslandCompactPolicy.isEnabled()
         }
     }
 
@@ -156,11 +159,17 @@ struct DynamicIslandView: View {
         let geo = state.geometry
         let metrics = wingMetrics
         return HStack(spacing: 0) {
-            buildWingView(for: metrics.left)
-                .frame(width: geo.wingWidth)
+            Group {
+                if compactModeEnabled {
+                    compactRingWingView()
+                } else {
+                    buildWingView(for: metrics.left)
+                }
+            }
+            .frame(width: geo.wingWidth)
             Spacer()
                 .frame(width: geo.centerGapWidth)
-            buildWingView(for: metrics.right)
+            buildWingView(for: metrics.right, suppressValue: compactModeEnabled)
                 .frame(width: geo.wingWidth)
         }
         .frame(height: geo.collapsedHeight)
@@ -168,8 +177,12 @@ struct DynamicIslandView: View {
         // drives the shared wing width, keeping the island tight + symmetric.
         .background(
             HStack(spacing: 0) {
-                measured(buildWingView(for: metrics.left))
-                measured(buildWingView(for: metrics.right))
+                if compactModeEnabled {
+                    measured(compactRingWingView())
+                } else {
+                    measured(buildWingView(for: metrics.left))
+                }
+                measured(buildWingView(for: metrics.right, suppressValue: compactModeEnabled))
             }
             .hidden()
         )
@@ -204,13 +217,19 @@ struct DynamicIslandView: View {
     /// `.todayTokens` slot) — gates icon-frame notification re-renders.
     private var wingsShowMenuBarIcon: Bool {
         let metrics = wingMetrics
+        if compactModeEnabled {
+            return metrics.right == .todayTokens
+        }
         return metrics.left == .todayTokens || metrics.right == .todayTokens
     }
 
     @ViewBuilder
-    private func buildWingView(for metric: MenuBarDisplayMetric?) -> some View {
+    private func buildWingView(
+        for metric: MenuBarDisplayMetric?,
+        suppressValue: Bool = false
+    ) -> some View {
         if let metric {
-            buildMetricWingView(for: metric)
+            buildMetricWingView(for: metric, suppressValue: suppressValue)
         } else {
             // Explicit "none" slot: contribute nothing to the wing (the
             // shared minWingWidth floor keeps the island shape balanced).
@@ -218,7 +237,10 @@ struct DynamicIslandView: View {
         }
     }
 
-    private func buildMetricWingView(for metric: MenuBarDisplayMetric) -> some View {
+    private func buildMetricWingView(
+        for metric: MenuBarDisplayMetric,
+        suppressValue: Bool = false
+    ) -> some View {
         let content = wingContent(for: metric)
         return HStack(spacing: 4) {
             if let providerKey = metric.providerKey,
@@ -249,10 +271,68 @@ struct DynamicIslandView: View {
                     .foregroundStyle(Color.white.opacity(0.55))
             }
 
-            if !content.value.isEmpty {
+            if !content.value.isEmpty && !(metric == .todayTokens && suppressValue) {
                 wingLabel(content.value)
             }
         }
+    }
+
+    private var ringMetric: MenuBarDisplayMetric? {
+        DynamicIslandCompactPolicy.resolveRingMetric(
+            primarySlot: wingMetrics.left,
+            secondarySlot: wingMetrics.right,
+            limits: viewModel.usageLimits,
+            hiddenProviders: LimitsSettingsStore.shared.hiddenProviders
+        )
+    }
+
+    private var ringValues: (trim: Double, color: Double)? {
+        guard let ringMetric else { return nil }
+        return DynamicIslandCompactPolicy.ringValues(
+            pct: viewModel.usageLimits?.utilizationPercent(for: ringMetric),
+            displayMode: LimitsSettingsStore.shared.displayMode
+        )
+    }
+
+    private func compactRingWingView() -> some View {
+        let metric = ringMetric
+        let values = ringValues
+        let icon = metric.flatMap(\.providerKey).flatMap { LimitsSettingsStore.iconNames[$0] }
+        let fallbackIcon = NSApp.applicationIconImage ?? NSImage(named: NSImage.applicationIconName) ?? NSImage()
+        let tier = DynamicIslandCompactPolicy.quotaColor(colorValue: values?.color ?? 0)
+        let color: Color = switch tier {
+        case .green: .green
+        case .yellow: .yellow
+        case .red: .red
+        }
+
+        return ZStack {
+            Circle()
+                .stroke(Color.white.opacity(0.15), lineWidth: 2.5)
+            if let values {
+                Circle()
+                    .trim(from: 0, to: values.trim)
+                    .stroke(color, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                    .animation(.easeInOut(duration: 0.35), value: values.trim)
+            }
+            if let icon {
+                Image(icon)
+                    .renderingMode(.original)
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFit()
+                    .frame(width: 9, height: 9)
+            } else {
+                Image(nsImage: fallbackIcon)
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFit()
+                    .frame(width: 9, height: 9)
+            }
+        }
+        .frame(width: 18, height: 18)
+        .id(metric?.rawValue ?? "empty")
     }
 
     private func wingContent(for metric: MenuBarDisplayMetric) -> (icon: String?, label: String?, value: String) {

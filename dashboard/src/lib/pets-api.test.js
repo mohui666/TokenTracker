@@ -6,14 +6,16 @@ describe("pets api catalog", () => {
     vi.unstubAllGlobals();
   });
 
-  it("keeps Clawd and filters bundled pets hidden by the local runtime", async () => {
+  it("keeps the atlas-less built-ins and filters bundled pets hidden by the local runtime", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
       pets: [{
         id: "community-pet",
         displayName: "Community Pet",
         custom: true,
       }],
-      hiddenBuiltinIds: ["byte", "ember", "clawd", "unknown"],
+      // clawd and bot are listed to prove they cannot be hidden: neither has an
+      // atlas to reclaim, so neither is removable.
+      hiddenBuiltinIds: ["byte", "ember", "clawd", "bot", "unknown"],
     }), {
       status: 200,
       headers: { "content-type": "application/json" },
@@ -23,6 +25,7 @@ describe("pets api catalog", () => {
 
     expect(pets.map((pet) => pet.id)).toEqual([
       "clawd",
+      "bot",
       "sprout",
       "community-pet",
     ]);

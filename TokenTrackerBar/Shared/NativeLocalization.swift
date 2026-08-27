@@ -38,10 +38,13 @@ public enum NativeLocalization {
     }
 
     public static var currentPreference: String {
-        if let shared = sharedDefaults?.string(forKey: preferenceKey) {
-            return normalizePreference(shared)
+        // The dashboard writes the main-app preference. Prefer it when present
+        // so an old widget App Group value cannot force the menu bar back to a
+        // previous language after an update.
+        if let local = UserDefaults.standard.string(forKey: preferenceKey) {
+            return normalizePreference(local)
         }
-        return normalizePreference(UserDefaults.standard.string(forKey: preferenceKey))
+        return normalizePreference(sharedDefaults?.string(forKey: preferenceKey))
     }
 
     public static var currentResolvedLocale: String {
@@ -75,5 +78,11 @@ public enum NativeLocalization {
         let normalized = normalizePreference(value)
         UserDefaults.standard.set(normalized, forKey: preferenceKey)
         sharedDefaults?.set(normalized, forKey: preferenceKey)
+    }
+
+    /// Repair an App Group preference left behind by an older build.
+    public static func synchronizeSharedPreference() {
+        guard let local = UserDefaults.standard.string(forKey: preferenceKey) else { return }
+        sharedDefaults?.set(normalizePreference(local), forKey: preferenceKey)
     }
 }

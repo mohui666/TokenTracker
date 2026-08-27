@@ -470,7 +470,7 @@ function MenuBarDisplayCard() {
     return { slot, currentValue, options, item };
   });
 
-  const iconStyles = ["clawd", "cat", "pet", "static"];
+  const iconStyles = ["clawd", "bot", "cat", "pet", "static"];
   const iconStyle = iconStyles.includes(settings?.menuBarIconStyle)
     ? settings.menuBarIconStyle
     : "clawd";
@@ -509,6 +509,7 @@ function MenuBarDisplayCard() {
           disabled={!available}
           options={[
             { value: "clawd", label: copy("settings.menubar.iconStyle.clawd") },
+            { value: "bot", label: copy("settings.menubar.iconStyle.bot") },
             { value: "cat", label: copy("settings.menubar.iconStyle.cat") },
             { value: "pet", label: copy("settings.menubar.iconStyle.pet") },
             { value: "static", label: copy("settings.menubar.iconStyle.static") },

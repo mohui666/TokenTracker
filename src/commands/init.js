@@ -65,6 +65,7 @@ const {
   resolveOmpAgentDir,
   resolvePiAgentDir,
   piAgentDirCollidesWithOmp,
+  resolvePrimeAgentDir,
   resolveAnythingllmDbPath,
   resolveReasonixHome,
   resolveTraeStoragePath,
@@ -100,7 +101,7 @@ const ASCII_LOGO = [
 const DIVIDER = "----------------------------------------------";
 
 // Single source of truth for the welcome screen's provider count + sample list.
-// test/discovery-metadata.test.js keeps this aligned with public 27-tool copy.
+// test/discovery-metadata.test.js keeps this aligned with public 32-tool copy.
 const SUPPORTED_PROVIDERS = [
   "Claude Code",
   "Codex CLI",
@@ -119,6 +120,8 @@ const SUPPORTED_PROVIDERS = [
   "Grok Build",
   "oh-my-pi",
   "pi",
+  "Dots",
+  "Prime Agent",
   "Craft Agents",
   "Reasonix",
   "Kilo CLI",
@@ -133,6 +136,7 @@ const SUPPORTED_PROVIDERS = [
   "AnythingLLM Desktop",
   "Claude Science",
   "DeepSeek Harness",
+  "TRAE Work CN",
 ];
 
 async function cmdInit(argv) {
@@ -669,6 +673,14 @@ async function applyIntegrationSetup({
     const piAgentDir = resolvePiAgentDir(process.env);
     if (piAgentDir && fssync.existsSync(path.join(piAgentDir, "sessions"))) {
       summary.push({ label: "pi", status: "detected", detail: "Passive reader (no hook needed)" });
+    }
+  }
+
+  // Prime Agent: metadata-only passive reader — no hook installation needed.
+  {
+    const primeAgentDir = resolvePrimeAgentDir(process.env);
+    if (primeAgentDir && fssync.existsSync(path.join(primeAgentDir, "sessions"))) {
+      summary.push({ label: "Prime Agent", status: "detected", detail: "Passive usage reader (no hook needed)" });
     }
   }
 

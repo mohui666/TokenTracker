@@ -1,13 +1,16 @@
 import AppKit
 
-/// Animated menu bar icon with four styles (`MenuBarIconStyle`):
+/// Animated menu bar icon with five styles (`MenuBarIconStyle`):
 /// - `clawd`  — pixel-art Clawd drawn procedurally from clawd-static-base.svg
 ///              coordinates (idle blink / syncing bounce / disconnected "?")
 /// - `cat`    — RunCat-style running cat (5 Apache-2.0 frames from
 ///              Kyome22/menubar_runcat, see THIRD_PARTY_NOTICES.md); state is
 ///              expressed through running speed, sleeping curls up
-/// - `pet`    — silhouette of the desktop pet selected on the Pet page,
-///              frames built by `MenuBarPetFrameProvider`
+/// - `bot`    — the vector `bot` character, frames pre-rendered at build time and
+///              turned into template images by `MenuBarBotFrameProvider`; state is
+///              expressed through WHICH clip plays, not through speed
+/// - `pet`    — silhouette of the desktop pet selected on the Pet page, frames built
+///              by `MenuBarPetFrameProvider` (a vector character routes to `bot`)
 /// - `static` — the original lightning-bolt icon, no animation
 ///
 /// Runner styles sprint for `MenuBarRunnerPace.sprintWindow` after
@@ -34,6 +37,7 @@ final class MenuBarAnimator {
     private var renderedImage: NSImage
 
     private let petFrameProvider = MenuBarPetFrameProvider()
+    private let botFrameProvider = MenuBarBotFrameProvider()
     private var sprintUntil: Date = .distantPast
 
     /// Static fallback icon (original lightning bolt)
@@ -120,6 +124,8 @@ final class MenuBarAnimator {
             applyClawd()
         case .cat:
             applyCat()
+        case .bot:
+            applyBot()
         case .pet:
             applyPet()
         }
@@ -178,6 +184,13 @@ final class MenuBarAnimator {
     // MARK: - Pet (desktop pet silhouette)
 
     private func applyPet() {
+        // "My pet" with a vector character: route to the vector provider instead of
+        // falling through to Clawd. The atlas provider correctly returns nil for a
+        // character with no sheet, but that made a working renderer unreachable.
+        if PetCharacterStore.shared.character.renderer == .vector {
+            applyBot()
+            return
+        }
         guard let frames = petFrameProvider.frames(for: PetCharacterStore.shared.character) else {
             // Clawd is selected (no atlas) or the atlas failed to load.
             applyClawd()
@@ -206,6 +219,41 @@ final class MenuBarAnimator {
 
     private var petInterval: TimeInterval {
         MenuBarRunnerPace.frameInterval(style: .pet, motion: runnerMotion)
+    }
+
+    // MARK: - Bot (vector morphing character)
+
+    /// Same shape as `applyPet`, but every tier is a real clip rather than one still:
+    /// `bot` expresses state by WHICH clip plays, so `disconnected` animates too.
+    private func applyBot() {
+        guard let frames = botFrameProvider.frames() else {
+            // BotFrames.json missing or schema-stale — run gen:bot-frames.
+            applyClawd()
+            return
+        }
+
+        if reduceMotion {
+            setButtonImage(frames.idle[0])
+            return
+        }
+
+        switch currentState {
+        case .disconnected:
+            startAnimation(frames: frames.disconnected, interval: botInterval)
+        case .sleeping where !isSprinting:
+            startAnimation(frames: frames.sleeping, interval: botInterval)
+        case .syncing:
+            startAnimation(frames: frames.active, interval: botInterval)
+        case .idle, .sleeping:
+            startAnimation(
+                frames: isSprinting ? frames.active : frames.idle,
+                interval: botInterval
+            )
+        }
+    }
+
+    private var botInterval: TimeInterval {
+        MenuBarRunnerPace.frameInterval(style: .bot, motion: runnerMotion)
     }
 
     private var runnerMotion: MenuBarRunnerMotion {

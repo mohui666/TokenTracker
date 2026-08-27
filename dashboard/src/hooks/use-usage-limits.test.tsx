@@ -42,6 +42,7 @@ const existingLimits = {
   zcode: { configured: false },
   opencodeGo: { configured: false },
   qoder: { configured: false },
+  codingPlan: { configured: false },
 };
 
 const freshLimits = {

@@ -71,6 +71,11 @@ enum Strings {
     static var kimiTotalLabel: String { t("Total", "总量", "總量", "合計", "총량") }
     static var kiroMonthLabel: String { t("Month", "本月", "本月", "今月", "이번 달") }
     static var kiroBonusLabel: String { t("Bonus", "奖励", "獎勵", "ボーナス", "보너스") }
+    // Qoder / Qoder CN plan and bonus windows — shared by the menu-bar panel
+    // (UsageLimitsView) and the reset notification detector so both surfaces
+    // render the same label.
+    static var qoderPlanLabel: String { t("Plan", "套餐", "套餐", "プラン", "플랜") }
+    static var qoderBonusLabel: String { t("Bonus", "奖励", "獎勵", "ボーナス", "보너스") }
     static var grokMonthLabel: String { t("Month", "月度", "月度", "月間", "월간") }
     static var grokWeekLabel: String { t("Weekly", "周", "週", "週間", "주간") }
     static var grokDayLabel: String { t("Daily", "日", "日", "日", "일") }
@@ -229,6 +234,8 @@ enum Strings {
     static var menuStarOnGitHub: String { t("★ Star on GitHub", "★ 在 GitHub 上标星", "★ 在 GitHub 上標星", "★ GitHub でスターを付ける", "★ GitHub에서 스타하기") }
     static var menuShowStats: String { t("Show Numeric Values", "显示数值", "顯示數值", "数値の表示", "수치 표시") }
     static var menuDisplayMetrics: String { t("Display Metrics", "显示指标", "顯示指標", "表示メトリクス", "표시 메트릭") }
+    static var menuDynamicIslandCompactMode: String { t("Compact Mode (Ring)", "紧凑模式（圆环）", "緊湊模式（圓環）", "コンパクトモード（リング）", "컴팩트 모드(링)") }
+    static var menuRingShowsRemaining: String { t("Show Remaining", "显示剩余量", "顯示剩餘量", "残りを表示", "남은 양 표시") }
     static var menuPrimarySlot: String { t("Primary", "主指标", "主指標", "プライマリ", "기본") }
     static var menuSecondarySlot: String { t("Secondary", "副指标", "副指標", "セカンダリ", "보조") }
     static var menuSlotNone: String { t("None", "不显示", "不顯示", "表示しない", "표시 안 함") }
@@ -247,6 +254,7 @@ enum Strings {
     static var menuPetSize: String { t("Pet Size", "桌宠大小", "桌寵大小", "ペットのサイズ", "펫 크기") }
     static var menuPetCharacter: String { t("Pet Character", "宠物形象", "寵物形象", "ペットのキャラクター", "펫 캐릭터") }
     static var petCharacterClawd: String { "Clawd" }
+    static var petCharacterBot: String { "Bot" }
     static var petCharacterSprout: String { "Sprout" }
     static var petCharacterByte: String { "Byte" }
     static var petCharacterEmber: String { "Ember" }

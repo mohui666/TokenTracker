@@ -28,6 +28,7 @@ const zlib = require("node:zlib");
 
 const {
   resolveDshHome,
+  resolveDshHomes,
   resolveDshSessionFiles,
   readDshSessionText,
   normalizeDshModelName,
@@ -115,6 +116,60 @@ test("resolveDshHome honors TOKENTRACKER_DSH_HOME, DSH_HOME, then default", () =
   assert.equal(resolveDshHome({ TOKENTRACKER_DSH_HOME: "  ", DSH_HOME: "/tmp/b" }), path.resolve("/tmp/b"));
   assert.equal(resolveDshHome({ DSH_HOME: "/tmp/c" }), path.resolve("/tmp/c"));
   assert.equal(resolveDshHome({}), path.join(os.homedir(), ".dsh"));
+});
+
+test("resolveDshHomes follows the Windows native/WSL mode matrix", () => {
+  const nativeHome = "/native/.dsh";
+  const wslHome = "\\\\wsl$\\Ubuntu\\home\\dev\\.dsh";
+  const deps = {
+    platform: "win32",
+    nativeHome,
+    existsSync(candidate) {
+      return candidate === nativeHome;
+    },
+    discoverWslHome() {
+      return wslHome;
+    },
+  };
+
+  assert.deepEqual(resolveDshHomes({}, deps), [wslHome], "default is wsl-first");
+  assert.deepEqual(
+    resolveDshHomes({ TOKENTRACKER_WSL_MODE: "native-first" }, deps),
+    [nativeHome],
+  );
+  assert.deepEqual(
+    resolveDshHomes({ TOKENTRACKER_WSL_MODE: "wsl-only" }, deps),
+    [wslHome],
+  );
+  assert.deepEqual(
+    resolveDshHomes({ TOKENTRACKER_WSL_MODE: "native-only" }, deps),
+    [nativeHome],
+  );
+  assert.deepEqual(
+    resolveDshHomes({ TOKENTRACKER_WSL_MODE: "both" }, deps),
+    [nativeHome, wslHome],
+  );
+});
+
+test("resolveDshHomes keeps explicit overrides authoritative and never probes WSL off Windows", () => {
+  let probes = 0;
+  const overridden = resolveDshHomes(
+    { TOKENTRACKER_DSH_HOME: "/custom/.dsh", TOKENTRACKER_WSL_MODE: "both" },
+    {
+      platform: "win32",
+      discoverWslHome() {
+        probes += 1;
+        return "\\\\wsl$\\Ubuntu\\home\\dev\\.dsh";
+      },
+    },
+  );
+  assert.deepEqual(overridden, [path.resolve("/custom/.dsh")]);
+  assert.equal(probes, 0, "an explicit home must suppress automatic WSL discovery");
+
+  assert.deepEqual(
+    resolveDshHomes({}, { platform: "darwin", nativeHome: "/Users/dev/.dsh" }),
+    ["/Users/dev/.dsh"],
+  );
 });
 
 test("normalizeDshModelName drops provider-qualified prefixes", () => {
@@ -227,6 +282,39 @@ test("readDshSessionText reassembles concatenated-frame zstd", async () => {
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
+test("zstd sessions decode without the @mongodb-js/zstd native binding (issue #465)", async (t) => {
+  // The desktop bundles install dependencies with --ignore-scripts, so the
+  // MongoDB binding's zstd.node never exists there and require() throws. The
+  // decoder must therefore succeed on the built-in zlib path alone.
+  if (typeof zlib.zstdDecompressSync !== "function") {
+    t.skip("built-in zlib zstd unavailable on this Node; fallback path is the only path");
+    return;
+  }
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dsh-nozstd-"));
+  const lines = [headerLine(), assistantLine(1, { inputTokens: 1, outputTokens: 1 })];
+  const full = lines.join("\n") + "\n";
+  const f1 = await zstdCompress(Buffer.from(full.slice(0, 80)));
+  const f2 = await zstdCompress(Buffer.from(full.slice(80)));
+  const p = path.join(dir, "session.jsonl.zstd");
+  fs.writeFileSync(p, Buffer.concat([f1, f2]));
+
+  const Module = require("node:module");
+  const originalLoad = Module._load;
+  Module._load = function (request, ...rest) {
+    if (request === "@mongodb-js/zstd") {
+      throw new Error("Cannot find module '@mongodb-js/zstd' (native binding missing)");
+    }
+    return originalLoad.call(this, request, ...rest);
+  };
+  try {
+    const text = await readDshSessionText(p);
+    assert.equal(text, full, "zstd sessions must decode via built-in zlib when the native binding is absent");
+  } finally {
+    Module._load = originalLoad;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("resolveDshSessionFiles only accepts exact project/session transcript leaves", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dsh-files-"));
   const root = path.join(dir, ".dsh", "sessions");
@@ -254,6 +342,31 @@ test("resolveDshSessionFiles only accepts exact project/session transcript leave
     activeZstd,
   ]);
   fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("resolveDshSessionFiles discovers a WSL-only Harness install on Windows", async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dsh-wsl-files-"));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const nativeHome = path.join(dir, "windows", ".dsh");
+  const wslHome = path.join(dir, "wsl", ".dsh");
+  const sessionDir = path.join(wslHome, "sessions", "--proj--", "sess-wsl");
+  fs.mkdirSync(sessionDir, { recursive: true });
+  const logPath = path.join(sessionDir, "session.jsonl.zstd");
+  fs.writeFileSync(logPath, "fixture");
+
+  const files = await resolveDshSessionFiles(
+    { TOKENTRACKER_WSL_MODE: "wsl-only" },
+    {
+      platform: "win32",
+      nativeHome,
+      discoverWslHome(providerDir) {
+        assert.equal(providerDir, ".dsh");
+        return wslHome;
+      },
+    },
+  );
+
+  assert.deepEqual(files, [logPath]);
 });
 
 test("parseDshIncremental writes queue rows, dedups on rerun, and adds appended delta", async () => {

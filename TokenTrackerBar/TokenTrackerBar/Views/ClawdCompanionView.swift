@@ -476,9 +476,20 @@ struct ClawdCompanionView: View {
 
     private var characterView: some View {
         Group {
-            if activeCharacter == .clawd {
+            switch activeCharacter.renderer {
+            case .clawd:
                 clawdCanvas
-            } else {
+            case .vector where BotFrames.isAvailable:
+                BotSpriteView(
+                    state: clawdState.petStateName,
+                    colorId: characterStore.botColor
+                )
+            case .vector:
+                // Pre-rendered clips missing or schema-stale (run gen:bot-frames).
+                // Fall back to Clawd rather than an empty transparent window, matching
+                // what MenuBarAnimator.applyBot does.
+                clawdCanvas
+            case .atlas:
                 PetAtlasSpriteView(
                     character: activeCharacter,
                     state: clawdState,
@@ -489,7 +500,17 @@ struct ClawdCompanionView: View {
                 )
             }
         }
-        .scaleEffect(activeCharacter.visualScale)
+        // Scaled by what is actually being DRAWN, not by the selected character: the
+        // vector fallback above draws Clawd, and applying bot's 1.35 to Clawd's tightly
+        // cropped artwork would render it 61% oversized and clipped by the window.
+        .scaleEffect(paintedVisualScale)
+    }
+
+    private var paintedVisualScale: CGFloat {
+        if activeCharacter.renderer == .vector && !BotFrames.isAvailable {
+            return PetCharacter.clawd.visualScale
+        }
+        return activeCharacter.visualScale
     }
 
     private var activeCharacter: PetCharacter {
@@ -2077,6 +2098,38 @@ private struct PetLookHoverModifier: ViewModifier {
             }
         } else {
             content
+        }
+    }
+}
+
+extension ClawdCompanionView.ClawdState {
+    /// The web vocabulary for this state, as used by `dashboard/src/lib/bot-appearance.js`.
+    ///
+    /// The two sides genuinely have different vocabularies — a Swift enum here, string
+    /// state names there — so this bridge is unavoidable. `test/bot-parity.test.js`
+    /// asserts every name below is one the web mapping actually knows.
+    var petStateName: String {
+        switch self {
+        case .idleLiving: return "idle-living"
+        case .idleLook: return "idle-look"
+        case .idleDoze: return "idle-doze"
+        case .sleeping: return "sleeping"
+        case .workingTyping: return "working-typing"
+        case .workingThinking: return "working-thinking"
+        case .workingUltrathink: return "working-ultrathink"
+        case .workingJuggling: return "working-juggling"
+        case .workingWizard: return "working-wizard"
+        case .workingOverheated: return "working-overheated"
+        case .happy: return "happy"
+        case .disconnected: return "disconnected"
+        case .error: return "error"
+        case .yawning: return "idle-yawn"
+        case .waking: return "waking"
+        case .miniIdle: return "mini-idle"
+        case .miniPeek: return "mini-peek"
+        case .miniAlert: return "mini-alert"
+        case .miniHappy: return "mini-happy"
+        case .miniSleep: return "mini-sleep"
         }
     }
 }

@@ -1,7 +1,6 @@
 const os = require("node:os");
 const path = require("node:path");
 const fs = require("node:fs");
-const https = require("node:https");
 
 const { readJson } = require("./fs");
 const { readSqliteFirstValue } = require("./sqlite-reader");
@@ -139,58 +138,73 @@ const CURSOR_CSV_URL = "https://cursor.com/api/dashboard/export-usage-events-csv
 const CURSOR_SUMMARY_URL = "https://cursor.com/api/usage-summary";
 const CURSOR_SOURCE_SCOPE = "account";
 
+function isCursorFetchTimeout(err) {
+  return Boolean(err && (err.name === "TimeoutError" || err.name === "AbortError"));
+}
+
+function remapCursorFetchTimeout(err) {
+  if (isCursorFetchTimeout(err)) {
+    throw new Error("Cursor API request timed out");
+  }
+  throw err;
+}
+
+const CURSOR_REDIRECT_HOSTS = new Set(["cursor.com", "www.cursor.com"]);
+
+/**
+ * Resolve a redirect `Location` before the session cookie is forwarded to it.
+ *
+ * The header is attacker-influenced in principle, and the next hop carries the
+ * Cursor session cookie, so an off-origin redirect would disclose it. Resolving
+ * against the request URL also handles a relative Location, which bare
+ * `fetch(location)` would reject.
+ */
+function resolveCursorRedirect(location, baseUrl) {
+  let url;
+  try {
+    url = new URL(location, baseUrl);
+  } catch {
+    throw new Error("Cursor API redirect to an untrusted origin");
+  }
+  if (url.protocol !== "https:" || !CURSOR_REDIRECT_HOSTS.has(url.hostname)) {
+    throw new Error("Cursor API redirect to an untrusted origin");
+  }
+  return url.toString();
+}
+
 /**
  * Fetch full usage CSV from Cursor API.
  * Returns raw CSV string or throws on error.
  */
-function fetchCursorUsageCsv({ cookie, timeoutMs = 30000 }) {
-  return new Promise((resolve, reject) => {
-    const url = new URL(CURSOR_CSV_URL);
-    const req = https.request(
-      {
-        hostname: url.hostname,
-        path: url.pathname + url.search,
-        method: "GET",
-        headers: {
-          Accept: "*/*",
-          Cookie: cookie,
-          Referer: "https://www.cursor.com/settings",
-          "User-Agent":
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        },
-        timeout: timeoutMs,
-      },
-      (res) => {
-        if (res.statusCode === 401 || res.statusCode === 403) {
-          res.resume();
-          return reject(new Error("Cursor session expired — re-login in Cursor to refresh"));
-        }
-        if (res.statusCode === 308 || res.statusCode === 301 || res.statusCode === 302) {
-          // Follow redirect once
-          const location = res.headers.location;
-          res.resume();
-          if (!location) return reject(new Error(`Cursor API redirect without Location header`));
-          return fetchUrlRaw({ urlStr: location, cookie, timeoutMs }).then(resolve, reject);
-        }
-        if (res.statusCode !== 200) {
-          res.resume();
-          return reject(new Error(`Cursor API returned ${res.statusCode}`));
-        }
-        let data = "";
-        res.on("data", (chunk) => {
-          data += chunk;
-        });
-        res.on("end", () => resolve(data));
-        res.on("error", reject);
-      },
-    );
-    req.on("error", reject);
-    req.on("timeout", () => {
-      req.destroy();
-      reject(new Error("Cursor API request timed out"));
-    });
-    req.end();
-  });
+function fetchCursorUsageCsv({ cookie, timeoutMs = 30000, fetchImpl = fetch }) {
+  return fetchImpl(CURSOR_CSV_URL, {
+    method: "GET",
+    headers: {
+      Accept: "*/*",
+      Cookie: cookie,
+      Referer: "https://www.cursor.com/settings",
+      "User-Agent":
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    },
+    redirect: "manual",
+    signal: AbortSignal.timeout(timeoutMs),
+  }).then(async (res) => {
+    if (res.status === 401 || res.status === 403) {
+      throw new Error("Cursor session expired — re-login in Cursor to refresh");
+    }
+    if (res.status === 308 || res.status === 301 || res.status === 302) {
+      // Follow redirect once. Keep this hop on redirect:"manual" so the
+      // Location + Cookie are forwarded explicitly (cursor.com → www.cursor.com).
+      const location = res.headers.get("location");
+      if (!location) throw new Error("Cursor API redirect without Location header");
+      const target = resolveCursorRedirect(location, CURSOR_CSV_URL);
+      return fetchUrlRaw({ urlStr: target, cookie, timeoutMs, fetchImpl });
+    }
+    if (res.status !== 200) {
+      throw new Error(`Cursor API returned ${res.status}`);
+    }
+    return res.text();
+  }).catch(remapCursorFetchTimeout);
 }
 
 /**
@@ -220,43 +234,27 @@ function fetchCursorUsageSummary({ cookie, timeoutMs = 30000, fetchImpl = fetch 
   });
 }
 
-function fetchUrlRaw({ urlStr, cookie, timeoutMs }) {
-  return new Promise((resolve, reject) => {
-    const url = new URL(urlStr);
-    const req = https.request(
-      {
-        hostname: url.hostname,
-        path: url.pathname + url.search,
-        method: "GET",
-        headers: {
-          Accept: "*/*",
-          Cookie: cookie,
-          Referer: "https://www.cursor.com/settings",
-          "User-Agent":
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        },
-        timeout: timeoutMs,
-      },
-      (res) => {
-        if (res.statusCode !== 200) {
-          res.resume();
-          return reject(new Error(`Cursor API returned ${res.statusCode} from ${urlStr}`));
-        }
-        let data = "";
-        res.on("data", (chunk) => {
-          data += chunk;
-        });
-        res.on("end", () => resolve(data));
-        res.on("error", reject);
-      },
-    );
-    req.on("error", reject);
-    req.on("timeout", () => {
-      req.destroy();
-      reject(new Error("Cursor API request timed out"));
-    });
-    req.end();
-  });
+function fetchUrlRaw({ urlStr, cookie, timeoutMs = 30000, fetchImpl = fetch }) {
+  return fetchImpl(urlStr, {
+    method: "GET",
+    headers: {
+      Accept: "*/*",
+      Cookie: cookie,
+      Referer: "https://www.cursor.com/settings",
+      "User-Agent":
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    },
+    // Keep manual: the previous hop did not follow a second redirect.
+    // redirect:"follow" would turn a second 301/302/308 into a silent
+    // success and may drop the explicit Cookie on a cross-host hop.
+    redirect: "manual",
+    signal: AbortSignal.timeout(timeoutMs),
+  }).then(async (res) => {
+    if (res.status !== 200) {
+      throw new Error(`Cursor API returned ${res.status} from ${urlStr}`);
+    }
+    return res.text();
+  }).catch(remapCursorFetchTimeout);
 }
 
 // ── CSV parsing ──

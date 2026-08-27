@@ -68,6 +68,18 @@ interface UsageLimitsData {
     cached_at?: string | null;
     source?: string | null;
   };
+  codingPlan: {
+    configured: boolean;
+    error?: string | null;
+    plan_label?: string | null;
+    primary_window?: { used_percent: number; reset_at?: string | null } | null;
+    secondary_window?: { used_percent: number; reset_at?: string | null } | null;
+    tertiary_window?: { used_percent: number; reset_at?: string | null } | null;
+    cached?: boolean;
+    stale?: boolean;
+    cached_at?: string | null;
+    source?: string | null;
+  };
 }
 
 interface UsageLimitsInitialState {

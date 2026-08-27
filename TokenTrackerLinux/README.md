@@ -91,6 +91,35 @@ Until the extension is installed, closing the window hides the app with no way t
 get it back from the tray — quit it from the launcher or with `pkill
 tokentracker-linux`.
 
+### The window is blank, or the app exits immediately
+
+WebKitGTK renders through DMA-BUF by default. On some Wayland setups — most
+reliably NVIDIA's proprietary driver — that path either paints a permanently
+blank webview or loses the Wayland connection outright, exiting non-zero with:
+
+```
+Gdk-Message: Error 71 (Protocol error) dispatching to Wayland display.
+```
+
+The client therefore sets `WEBKIT_DISABLE_DMABUF_RENDERER=1` before starting
+GTK. To retry the accelerated renderer, set it explicitly — an explicit value is
+never overridden:
+
+```bash
+WEBKIT_DISABLE_DMABUF_RENDERER=0 tokentracker-linux
+```
+
+WebKitGTK treats the variable as "set and not `0`", so `=0` genuinely restores
+the accelerated path while any other value (including an empty string) disables
+it.
+
+Note that when the webview aborts this way the app never reaches its shutdown
+path, so the bundled Node server is left running and keeps port 17680. A later launch may fail to bind the preferred port until the orphan is stopped:
+
+```bash
+pkill -f 'tokentracker/bin/tracker.js serve'
+```
+
 ## Logs
 
 The bundled server's stderr goes to

@@ -488,6 +488,7 @@ function renderProviderGroup(id, data, mode, expanded, onToggle) {
       <ToolGroup key={id} name={limitProviderName(id)} providerId={id}>
         <StatusLine>{copy("limits.status.not_connected")}</StatusLine>
         {id === "opencodeGo" ? <OpenCodeGoSetupHint /> : null}
+        {id === "codingPlan" ? <ArkCodingPlanSetupHint /> : null}
       </ToolGroup>
     );
   }
@@ -506,6 +507,7 @@ function renderProviderGroup(id, data, mode, expanded, onToggle) {
           ? renderProviderExtra(PROVIDER_LIMIT_SPECS.kiro.extra, data)
           : null}
         {id === "opencodeGo" ? <OpenCodeGoSetupHint /> : null}
+        {id === "codingPlan" ? <ArkCodingPlanSetupHint /> : null}
       </ToolGroup>
     );
   }
@@ -521,7 +523,7 @@ function renderProviderGroup(id, data, mode, expanded, onToggle) {
       badge = <StatusBadge label={copy("limits.label.antigravity_live")} tone="live" tooltip={copy("limits.tooltip.antigravity_live")} />;
     }
   }
-  if ((id === "qoder" || id === "qoderCn") && data.cached) {
+  if ((id === "qoder" || id === "qoderCn" || id === "codingPlan") && data.cached) {
     badge = (
       <StatusBadge
         label={copy("limits.label.antigravity_cached")}
@@ -617,16 +619,18 @@ function ExternalArrow() {
   );
 }
 
-// OpenCode Go has no public quota API (anomalyco/opencode#16017), so limits are
-// read from the user's signed-in opencode.ai session via two env vars. The
-// macOS/Windows apps have no settings field for these yet, so this inline guide
-// shows up wherever OpenCode Go is enabled but unconfigured (or the cookie has
-// gone stale): sign in, grab two values, paste them in.
+// OpenCode Go limits come from OpenCode's official authenticated usage API
+// (GET /zen/go/v1/usage, Bearer OPENCODE_GO_API_KEY) once the user subscribes.
+// The macOS/Windows apps have no settings field for it yet, so this inline
+// guide shows up wherever OpenCode Go is enabled but unconfigured (or errored):
+// sign in, create an API key in the console, paste it into a copyable command.
+// No credential ever passes through TokenTracker itself.
 function OpenCodeGoSetupHint() {
   const [copied, setCopied] = useState(false);
   const snippet = [
-    'export OPENCODE_GO_AUTH_COOKIE="..."',
-    '# Optional: export OPENCODE_GO_WORKSPACE_ID="wrk_..." (Only if auto-discovery fails)',
+    "read -r -s OPENCODE_GO_API_KEY",
+    "export OPENCODE_GO_API_KEY",
+    'launchctl setenv OPENCODE_GO_API_KEY "$OPENCODE_GO_API_KEY"',
   ].join("\n");
 
   const onCopy = async (e) => {
@@ -661,10 +665,6 @@ function OpenCodeGoSetupHint() {
         </HintStep>
         <HintStep n="2">
           <div>{copy("limits.opencodeGo.setupHint.step2")}</div>
-          <ul className="mt-1 space-y-0.5 text-oai-gray-500 dark:text-oai-gray-400">
-            <li>{copy("limits.opencodeGo.setupHint.step2_workspace")}</li>
-            <li>{copy("limits.opencodeGo.setupHint.step2_cookie")}</li>
-          </ul>
         </HintStep>
         <HintStep n="3">
           <div className="flex items-center gap-2">
@@ -679,6 +679,72 @@ function OpenCodeGoSetupHint() {
           </div>
           <pre className="mt-1.5 overflow-x-auto rounded-md bg-oai-gray-100 dark:bg-oai-gray-900/60 px-2 py-1.5 font-mono text-[10.5px] leading-relaxed whitespace-pre">{snippet}</pre>
           <div className="mt-1 text-[10px] text-oai-gray-400 dark:text-oai-gray-500">{copy("limits.opencodeGo.setupHint.note_app")}</div>
+        </HintStep>
+      </ol>
+    </div>
+  );
+}
+
+// Ark Coding Plan (火山方舟) quota comes from the official Ark CLI (arkcli)
+// running on this machine — there is no public quota endpoint, so the CLI is
+// feature-detected at fetch time. When it is missing (or not signed in) the
+// provider reports `configured: false` and this inline guide shows how to
+// enable it, mirroring the OpenCode Go flow.
+function ArkCodingPlanSetupHint() {
+  const [copied, setCopied] = useState(false);
+  const snippet = [
+    "npm install -g @volcengine/ark-cli",
+    "arkcli auth login volc-sso   # browser SSO (recommended)",
+    "arkcli auth status           # verify the session",
+  ].join("\n");
+
+  const onCopy = async (e) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(snippet);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch (_e) {
+      // Clipboard can be unavailable in embedded or restricted contexts.
+    }
+  };
+
+  return (
+    <div className="mt-1.5 rounded-lg border border-oai-gray-200 dark:border-oai-gray-700/60 bg-oai-gray-50/50 dark:bg-oai-gray-900/20 p-3 text-[11px] text-oai-gray-600 dark:text-oai-gray-300">
+      <div className="text-[12px] font-semibold text-oai-gray-800 dark:text-oai-gray-100">{copy("limits.codingPlan.setupHint.title")}</div>
+      <div className="mt-0.5 leading-snug text-oai-gray-500 dark:text-oai-gray-400">{copy("limits.codingPlan.setupHint.subtitle")}</div>
+
+      <ol className="mt-2.5 space-y-2.5">
+        <HintStep n="1">
+          <div>{copy("limits.codingPlan.setupHint.step1")}</div>
+          <a
+            href="https://www.volcengine.com/docs/82379/2536875"
+            target="_blank"
+            rel="noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="mt-1 inline-flex items-center gap-1 rounded-md bg-oai-brand/10 px-2 py-1 font-medium text-oai-brand hover:bg-oai-brand/15 transition-colors"
+          >
+            {copy("limits.codingPlan.setupHint.cta")}
+            <ExternalArrow />
+          </a>
+        </HintStep>
+        <HintStep n="2">
+          <div>{copy("limits.codingPlan.setupHint.step2")}</div>
+          <div className="mt-0.5 text-oai-gray-500 dark:text-oai-gray-400">{copy("limits.codingPlan.setupHint.step2_remote")}</div>
+        </HintStep>
+        <HintStep n="3">
+          <div className="flex items-center gap-2">
+            <span>{copy("limits.codingPlan.setupHint.step3")}</span>
+            <button
+              type="button"
+              onClick={onCopy}
+              className="shrink-0 rounded-md border border-oai-gray-300 dark:border-oai-gray-700 px-2 py-0.5 text-[10.5px] text-oai-gray-700 dark:text-oai-gray-200 hover:bg-oai-gray-100 dark:hover:bg-oai-gray-800 transition-colors"
+            >
+              {copied ? copy("limits.codingPlan.setupHint.copied") : copy("limits.codingPlan.setupHint.copy")}
+            </button>
+          </div>
+          <pre className="mt-1.5 overflow-x-auto rounded-md bg-oai-gray-100 dark:bg-oai-gray-900/60 px-2 py-1.5 font-mono text-[10.5px] leading-relaxed whitespace-pre">{snippet}</pre>
+          <div className="mt-1 text-[10px] text-oai-gray-400 dark:text-oai-gray-500">{copy("limits.codingPlan.setupHint.note_app")}</div>
         </HintStep>
       </ol>
     </div>
@@ -719,8 +785,8 @@ function useWidestLabelWidth(containerRef) {
   return labelWidth;
 }
 
-export function UsageLimitsPanel({ claude, codex, cursor, gemini, kimi, kiro, grok, antigravity, copilot, zcode, opencodeGo, qoder, qoderCn, order, visibility, displayMode }) {
-  const dataById = { claude, codex, cursor, gemini, kimi, kiro, grok, antigravity, copilot, zcode, opencodeGo, qoder, qoderCn };
+export function UsageLimitsPanel({ claude, codex, cursor, gemini, kimi, kiro, grok, antigravity, copilot, zcode, opencodeGo, qoder, qoderCn, codingPlan, order, visibility, displayMode }) {
+  const dataById = { claude, codex, cursor, gemini, kimi, kiro, grok, antigravity, copilot, zcode, opencodeGo, qoder, qoderCn, codingPlan };
   const containerRef = useRef(null);
   const labelWidth = useWidestLabelWidth(containerRef);
   const [expandedId, setExpandedId] = useState(null);

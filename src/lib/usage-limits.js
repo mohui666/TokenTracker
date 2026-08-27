@@ -29,8 +29,14 @@ const { fetchGrokLimits } = require("./grok-limits");
 const { fetchZcodeLimits } = require("./zcode-limits");
 const { fetchOpencodeGoLimits } = require("./opencode-go-limits");
 const { fetchQoderLimits, fetchQoderCnLimits } = require("./qoder-limits");
+const { fetchArkCodingPlanLimits } = require("./ark-coding-plan-limits");
 const { fetchProviderServiceStatus } = require("./provider-status");
 const { readSqliteJsonRows, readSqliteJsonRowsAsync } = require("./sqlite-reader");
+const {
+  runCommand,
+  whichBinary,
+  isBinaryAvailable,
+} = require("./command-runner");
 
 const execFileAsync = promisify(cp.execFile);
 
@@ -145,6 +151,17 @@ function withProviderTimeout(promise, label, timeoutMs) {
     }, timeoutMs);
   });
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+// Provider timeouts normally race a promise so that an uncooperative remote
+// request cannot block all limit reads. Local CLI providers also need an abort
+// signal: without it, their spawned commands may continue after the caller has
+// already received a timeout result.
+function withAbortableProviderTimeout(start, label, timeoutMs) {
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return start(undefined);
+  const controller = new AbortController();
+  return withProviderTimeout(start(controller.signal), label, timeoutMs)
+    .finally(() => controller.abort());
 }
 
 function parseRetryAfterSeconds(headers) {
@@ -953,8 +970,7 @@ const GEMINI_CLI_FALLBACK_OAUTH_CLIENT = Object.freeze({
 });
 
 async function extractGeminiOauthClientCredentials({ commandRunner, home } = {}) {
-  const result = await runCommand(commandRunner, "which", ["gemini"], { timeout: 2000 });
-  const geminiPath = typeof result?.stdout === "string" ? result.stdout.trim() : "";
+  const geminiPath = (await whichBinary("gemini", { commandRunner })) ?? "";
 
   const geminiPaths = [
     ...(geminiPath ? [geminiPath] : []),
@@ -1228,145 +1244,10 @@ async function fetchGeminiLimits({ home, env, fetchImpl = fetch, commandRunner }
   }
 }
 
-// Async command runner. Previously this wrapped `cp.spawnSync`, which blocked the
-// Node event loop for the full command duration (up to 20s for Kiro) and froze every
-// other local-api endpoint plus the other providers' withProviderTimeout races.
-// Returns a promise for a spawnSync-shaped result: { status, stdout, stderr, error? }.
-// Injected runners (tests) may stay synchronous — their return value is wrapped in
-// Promise.resolve so both sync and async runners work.
-function runCommand(commandRunner, command, args, options = {}) {
-  const merged = {
-    encoding: "utf8",
-    maxBuffer: 10 * 1024 * 1024,
-    ...options,
-  };
-  if (typeof commandRunner === "function") {
-    return Promise.resolve(commandRunner(command, args, merged));
-  }
-
-  const {
-    timeout,
-    maxBuffer,
-    completeWhen,
-    completionGraceMs = 250,
-    killProcessGroup = false,
-    ...spawnOptions
-  } = merged;
-  return new Promise((resolve) => {
-    let child;
-    const useProcessGroup =
-      killProcessGroup && process.platform !== "win32";
-    try {
-      child = cp.spawn(command, args, {
-        ...spawnOptions,
-        detached: useProcessGroup || spawnOptions.detached,
-        stdio: ["ignore", "pipe", "pipe"],
-      });
-    } catch (error) {
-      resolve({ status: null, stdout: "", stderr: "", error });
-      return;
-    }
-
-    let stdout = "";
-    let stderr = "";
-    let settled = false;
-    let timedOut = false;
-    let timer = null;
-    let hardTimer = null;
-    let completionTimer = null;
-
-    const settle = ({ status = null, error = null } = {}) => {
-      if (settled) return;
-      settled = true;
-      if (timer) clearTimeout(timer);
-      if (hardTimer) clearTimeout(hardTimer);
-      if (completionTimer) clearTimeout(completionTimer);
-      let finalError = error;
-      if (!finalError && timedOut) {
-        finalError = new Error(`spawn ${command} ETIMEDOUT`);
-        finalError.code = "ETIMEDOUT";
-      }
-      const result = { status, stdout, stderr };
-      if (finalError) result.error = finalError;
-      resolve(result);
-    };
-
-    const signalChild = (signal) => {
-      try {
-        if (useProcessGroup && Number.isInteger(child.pid)) {
-          process.kill(-child.pid, signal);
-        } else {
-          child.kill(signal);
-        }
-      } catch (_error) {}
-    };
-
-    const stopChild = ({ timeoutExpired = false } = {}) => {
-      if (settled) return;
-      if (timeoutExpired) timedOut = true;
-      signalChild("SIGTERM");
-      // Guarantee settlement even if the process group ignores SIGTERM or
-      // keeps inherited stdio open.
-      hardTimer = setTimeout(() => {
-        signalChild("SIGKILL");
-        settle({ status: null });
-      }, 1000);
-      if (typeof hardTimer.unref === "function") hardTimer.unref();
-    };
-
-    if (Number.isFinite(timeout) && timeout > 0) {
-      timer = setTimeout(() => {
-        stopChild({ timeoutExpired: true });
-      }, timeout);
-    }
-
-    const scheduleCompletion = () => {
-      if (typeof completeWhen !== "function" || settled) return;
-      let complete = false;
-      try {
-        complete = Boolean(completeWhen(stdout, stderr));
-      } catch (_error) {}
-      if (!complete) return;
-      if (completionTimer) clearTimeout(completionTimer);
-      completionTimer = setTimeout(
-        () => stopChild(),
-        Math.max(0, Number(completionGraceMs) || 0),
-      );
-    };
-
-    const collect = (stream, append) => {
-      if (!stream) return;
-      stream.setEncoding("utf8");
-      stream.on("data", (chunk) => {
-        append(chunk);
-        if (stdout.length + stderr.length > maxBuffer) {
-          const error = new Error(`spawn ${command} maxBuffer length exceeded`);
-          error.code = "ERR_CHILD_PROCESS_STDIO_MAXBUFFER";
-          signalChild("SIGKILL");
-          settle({ status: null, error });
-          return;
-        }
-        scheduleCompletion();
-      });
-    };
-    collect(child.stdout, (chunk) => { stdout += chunk; });
-    collect(child.stderr, (chunk) => { stderr += chunk; });
-
-    child.on("error", (error) => settle({ status: null, error }));
-    child.on("close", (code) => settle({ status: timedOut ? null : code }));
-  });
-}
-
-async function whichBinary(binary, { commandRunner } = {}) {
-  const result = await runCommand(commandRunner, "which", [binary], { timeout: 2000 });
-  if (result?.error || result?.status !== 0) return null;
-  const stdout = typeof result?.stdout === "string" ? result.stdout.trim() : "";
-  return stdout ? stdout.split("\n")[0] : null;
-}
-
-async function isBinaryAvailable(binary, { commandRunner } = {}) {
-  return (await whichBinary(binary, { commandRunner })) !== null;
-}
+// runCommand / whichBinary / isBinaryAvailable now live in ./command-runner
+// (shared with ark-coding-plan-limits.js). The async runner there keeps the
+// same spawnSync-shaped contract: { status, stdout, stderr, error? }, and
+// injected test runners may stay synchronous.
 
 function stripAnsi(text) {
   return String(text || "").replace(/\x1B\[[0-9;?]*[A-Za-z]|\x1B\].*?\x07/g, "");
@@ -3182,7 +3063,7 @@ async function fetchUsageLimitsUncached({
     : null;
 
   const providerFetch = withFetchTimeout(fetchImpl, providerTimeoutMs);
-  const [claudeResult, codexResult, cursor, kimi, gemini, kiro, antigravity, copilot, grok, zcode, opencodeGo, qoder, qoderCn, claudeServiceStatus] = await Promise.all([
+  const [claudeResult, codexResult, cursor, kimi, gemini, kiro, antigravity, copilot, grok, zcode, opencodeGo, qoder, qoderCn, codingPlan, claudeServiceStatus] = await Promise.all([
     claudeToken && !freshClaudeCache && !claudeRetryAtMs
       ? withProviderTimeout(fetchClaudeUsageLimits(claudeToken, { fetchImpl: providerFetch, maxAttempts: 1 }), "Claude", providerTimeoutMs).then(
           (value) => ({ status: "fulfilled", value }),
@@ -3236,6 +3117,22 @@ async function fetchUsageLimitsUncached({
         fetchImpl: providerFetch,
       }),
       "Qoder CN",
+      providerTimeoutMs,
+    ).catch((reason) => ({ configured: true, error: reason?.message || "Unknown error" })),
+    // Ark Coding Plan (火山方舟): subscription quota via the user's own
+    // arkcli binary. No token-consumption source — consumption for the
+    // compatible CLIs is already counted from their local files; this only
+    // surfaces the 5h/week/month quota percentages.
+    withAbortableProviderTimeout(
+      (signal) => fetchArkCodingPlanLimits({
+        commandRunner,
+        home,
+        nowMs,
+        platform,
+        signal,
+        providerTimeoutMs,
+      }),
+      "Ark Coding Plan",
       providerTimeoutMs,
     ).catch((reason) => ({ configured: true, error: reason?.message || "Unknown error" })),
     // Public status-page probe (fail-soft, own 5-min cache in provider-status.js).
@@ -3398,6 +3295,7 @@ async function fetchUsageLimitsUncached({
     opencodeGo: withPlanLabel(opencodeGo, opencodeGo?.plan_label, "OpenCode Go"),
     qoder: withPlanLabel(qoder, qoder?.plan_label, "Qoder"),
     qoderCn: withPlanLabel(qoderCn, qoderCn?.plan_label, "Qoder CN"),
+    codingPlan: withPlanLabel(codingPlan, codingPlan?.plan_label, "Ark Coding Plan"),
   };
 
   for (const [providerName, provider] of Object.entries(data)) {

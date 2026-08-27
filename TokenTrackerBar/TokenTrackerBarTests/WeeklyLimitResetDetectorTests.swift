@@ -148,6 +148,46 @@ final class WeeklyLimitResetDetectorTests: XCTestCase {
         )
     }
 
+    func testReadingsUsePlanAndBonusLabelsForQoderAndQoderCn() throws {
+        // The menu-bar panel renders these windows as "Plan" / "Bonus"
+        // (Strings.qoderPlanLabel / qoderBonusLabel); the reset detector must
+        // use the same labels so notification copy matches the UI.
+        let json = """
+        {
+          "fetched_at": "2026-08-14T00:00:00Z",
+          "claude": { "configured": false, "error": null },
+          "codex": { "configured": false, "error": null },
+          "cursor": { "configured": false, "error": null },
+          "gemini": { "configured": false, "error": null },
+          "kiro": { "configured": false, "error": null },
+          "antigravity": { "configured": false, "error": null },
+          "qoder": {
+            "configured": true,
+            "error": null,
+            "primary_window": { "used_percent": 12, "reset_at": "2026-08-14T05:00:00Z" },
+            "secondary_window": { "used_percent": 3, "reset_at": "2026-08-20T00:00:00Z" }
+          },
+          "qoderCn": {
+            "configured": true,
+            "error": null,
+            "primary_window": { "used_percent": 40, "reset_at": "2026-08-14T05:00:00Z" },
+            "secondary_window": { "used_percent": 8, "reset_at": "2026-08-20T00:00:00Z" }
+          }
+        }
+        """
+        let response = try JSONDecoder().decode(UsageLimitsResponse.self, from: Data(json.utf8))
+        let readings = response.limitWindowReadings()
+
+        XCTAssertEqual(
+            readings.map { $0.windowKey },
+            ["qoder.primary", "qoder.secondary", "qoderCn.primary", "qoderCn.secondary"]
+        )
+        XCTAssertEqual(
+            readings.map { "\($0.provider).\($0.windowLabel)" },
+            ["qoder.Plan", "qoder.Bonus", "qoderCn.Plan", "qoderCn.Bonus"]
+        )
+    }
+
     func testCelebrationProviderIconMappingsCoverAssetAndSVGProviders() {
         XCTAssertEqual(LimitResetProviderIconCatalog.assetName(for: "claude"), "ClaudeLogo")
         XCTAssertEqual(LimitResetProviderIconCatalog.assetName(for: "antigravity"), "AntigravityLogo")

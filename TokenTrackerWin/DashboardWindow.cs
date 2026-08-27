@@ -30,8 +30,10 @@ namespace TokenTrackerWin;
 /// native caption bar — see "Window controls" below). <see cref="WindowChrome"/>
 /// keeps the window resizable + Aero-snappable despite having no visible caption.
 ///
-/// Closing hides the window (keeps cookies/page state + avoids re-initialising
-/// WebView2); the app exits via the tray "Quit" → <see cref="Shutdown"/>.
+/// Closing releases WebView2 so the hidden dashboard does not keep Chromium's
+/// renderer and graphics surfaces resident. Persistent WebView2 storage keeps
+/// page state across recreation.
+/// The app exits via the tray "Quit" -> <see cref="Shutdown"/>.
 /// </summary>
 internal sealed class DashboardWindow : Window
 {
@@ -62,6 +64,7 @@ internal sealed class DashboardWindow : Window
     public event Action? PetSettingsRequested;
     public event Action<string, string?>? PetSettingChanged;
     public event Action<string, string>? NotificationRequested;
+    public event Action<DashboardWindow>? ReleasedForIdle;
 
     public DashboardWindow(ServerManager server)
     {
@@ -132,7 +135,7 @@ internal sealed class DashboardWindow : Window
                 ? Visibility.Collapsed
                 : Visibility.Visible;
         };
-        KeyDown += (_, e) => { if (e.Key == System.Windows.Input.Key.Escape) Hide(); };
+        KeyDown += (_, e) => { if (e.Key == System.Windows.Input.Key.Escape) Close(); };
         _server.StatusChanged += OnServerStatusChanged;
     }
 
@@ -352,7 +355,7 @@ internal sealed class DashboardWindow : Window
                 case "theme": ThemeChanged?.Invoke(); break;
                 case "win:min": WindowState = WindowState.Minimized; break;
                 case "win:max": ToggleMaximize(); break;
-                case "win:close": Hide(); break;
+                case "win:close": Close(); break;
                 case "win:drag":
                     // Hand the drag off to the OS so Aero-snap / move works natively.
                     ReleaseCapture();
@@ -394,10 +397,10 @@ internal sealed class DashboardWindow : Window
         NavigateWhenServerReady("/?app=1");
     }
 
-    public void PushPetSettings(bool visible, string size, string character)
+    public void PushPetSettings(bool visible, string size, string character, string botColor)
     {
         if (!_coreReady) return;
-        var json = JsonSerializer.Serialize(new { visible, size, character });
+        var json = JsonSerializer.Serialize(new { visible, size, character, botColor });
         try
         {
             _ = _webView.CoreWebView2.ExecuteScriptAsync(
@@ -611,7 +614,7 @@ internal sealed class DashboardWindow : Window
     /// <summary>Toggle visibility — used by the tray left-click (popover-like).</summary>
     public void ToggleDashboard()
     {
-        if (IsVisible && WindowState != WindowState.Minimized) Hide();
+        if (IsVisible && WindowState != WindowState.Minimized) Close();
         else ShowDashboard();
     }
 
@@ -719,16 +722,17 @@ internal sealed class DashboardWindow : Window
 
     protected override void OnClosing(CancelEventArgs e)
     {
-        // Hide instead of close unless the app is actually exiting, so reopening is
-        // instant and the WebView2 session (cookies and page state) persists.
-        if (!_exiting)
-        {
-            e.Cancel = true;
-            Hide();
-            return;
-        }
         _server.StatusChanged -= OnServerStatusChanged;
         base.OnClosing(e);
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        _coreReady = false;
+        Content = null;
+        _webView.Dispose();
+        base.OnClosed(e);
+        if (!_exiting) ReleasedForIdle?.Invoke(this);
     }
 
     // ── P/Invoke + constants ───────────────────────────────────────────

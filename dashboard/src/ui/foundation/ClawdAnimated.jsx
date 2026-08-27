@@ -1,7 +1,15 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { Suspense, lazy, useState, useEffect, useRef } from "react";
 import { petVisualScale } from "../../lib/pet-appearance.js";
-import { normalizePetCharacter } from "../../lib/pet-personality.js";
+import { normalizePetCharacter, petRenderer } from "../../lib/pet-personality.js";
 import { PetAtlasAnimated } from "./PetAtlasAnimated.jsx";
+
+/**
+ * Lazy so the vector morphing engine (~28 kB raw / 11 kB gzip) stays out of the
+ * dashboard's entry chunk. MacAppBanner pulls ClawdAnimated into DashboardPage, so a
+ * static import made every visitor download the engine whether or not they ever open
+ * the Pet page or select the bot character.
+ */
+const BotAnimated = lazy(() => import("./BotAnimated.jsx").then((m) => ({ default: m.BotAnimated })));
 
 /**
  * SVG path mapping: state name → file path under /clawd/
@@ -153,9 +161,23 @@ export function ClawdAnimated({
   character = "clawd",
   pet = null,
   lookDirectionIndex = null,
+  botColor = "auto",
 }) {
   const id = normalizePetCharacter(character);
-  if (id !== "clawd") {
+  const renderer = petRenderer(id);
+  if (renderer === "vector") {
+    return (
+      <Suspense fallback={<span aria-hidden="true" style={{ width: size, height: size, display: "inline-block" }} />}>
+        <BotAnimated
+          state={state}
+          size={size * petVisualScale(id)}
+          className={className}
+          color={botColor}
+        />
+      </Suspense>
+    );
+  }
+  if (renderer === "atlas") {
     return (
       <PetAtlasAnimated
         character={id}

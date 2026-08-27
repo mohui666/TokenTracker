@@ -11,10 +11,13 @@ import {
 } from "./lib/pet-quips.js";
 import {
   normalizePetCharacter,
+  petRenderer,
   pickPetAmbientState,
   resolvePetState,
 } from "./lib/pet-personality.js";
+import { BOT_COLOR_CHOICES } from "./lib/bot-appearance.js";
 import { petVisualScale } from "./lib/pet-appearance.js";
+import { BotAnimated } from "./ui/foundation/BotAnimated.jsx";
 import { PetAtlasAnimated } from "./ui/foundation/PetAtlasAnimated.jsx";
 import { usePetCatalog } from "./hooks/use-pet-catalog.js";
 
@@ -133,6 +136,11 @@ function readPetLocale() {
 
 function readPetCharacter() {
   return normalizePetCharacter(typeof window !== "undefined" ? window.__ttPetCharacter : null);
+}
+
+function readPetBotColor() {
+  const value = typeof window !== "undefined" ? window.__ttPetBotColor : null;
+  return BOT_COLOR_CHOICES.includes(value) ? value : "auto";
 }
 
 function post(type) {
@@ -290,8 +298,22 @@ function PetClawd({ state, size, leanX }) {
   );
 }
 
-function PetCharacterSprite({ state, dragState, size, leanX, character, pet, lookDirectionIndex }) {
-  if (character !== "clawd") {
+function PetCharacterSprite({ state, dragState, size, leanX, character, pet, lookDirectionIndex, botColor }) {
+  const renderer = petRenderer(character);
+  if (renderer === "vector") {
+    // The outer wrapper already applies the body lean; leanX here drives the
+    // engine's spherical gaze, which replaces the flat eye shift Clawd uses.
+    return (
+      <BotAnimated
+        state={state}
+        dragState={dragState}
+        size={size * petVisualScale(character)}
+        leanX={leanX}
+        color={botColor}
+      />
+    );
+  }
+  if (renderer === "atlas") {
     return (
       <PetAtlasAnimated
         character={character}
@@ -500,6 +522,7 @@ function Pet() {
   const [currency, setCurrency] = useState(readPetCurrency);
   const [locale, setLocale] = useState(readPetLocale);
   const [character, setCharacter] = useState(readPetCharacter);
+  const [botColor, setBotColor] = useState(readPetBotColor);
   const [isSyncing, setIsSyncing] = useState(false);
   const [userTyping, setUserTyping] = useState(false);
   const [rage, setRage] = useState(false);
@@ -619,6 +642,25 @@ function Pet() {
     window.addEventListener("pet:character", update);
     return () => window.removeEventListener("pet:character", update);
   }, [refreshPetCatalog]);
+  useEffect(() => {
+    const update = () => setBotColor(readPetBotColor());
+    update();
+    window.addEventListener("pet:botColor", update);
+    return () => window.removeEventListener("pet:botColor", update);
+  }, []);
+  // This host renders without ThemeProvider, so the `dark` class nothing else sets
+  // here is applied from the appearance the native shell pushes. BotAnimated reads
+  // that class to resolve its theme-following default colour.
+  useEffect(() => {
+    const apply = () => {
+      // Undefined only before the first PushContext; the Windows shell opens dark.
+      const dark = window.__ttPetDark !== false;
+      document.documentElement.classList.toggle("dark", dark);
+    };
+    apply();
+    window.addEventListener("pet:dark", apply);
+    return () => window.removeEventListener("pet:dark", apply);
+  }, []);
   // Syncing state pushed by the native host (drives the typing animation, like macOS).
   useEffect(() => {
     const update = () => setIsSyncing(Boolean(window.__ttPetSyncing));
@@ -949,6 +991,7 @@ function Pet() {
             size={size}
             leanX={leanX}
             character={character}
+            botColor={botColor}
             pet={selectedPet}
             lookDirectionIndex={lookDirectionIndex}
           />

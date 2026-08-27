@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { copy } from "../../lib/copy";
+import { useLocale } from "../../hooks/useLocale.js";
 import { ProviderIcon } from "../dashboard/components/ProviderIcon.jsx";
 
 // Animated logo wall, adapted from cult-ui's LogoCarousel
@@ -39,6 +41,7 @@ function distributeLogos(allLogos, columnCount) {
 }
 
 const LogoColumn = React.memo(function LogoColumn({ logos, index, currentTime, onHoverChange }) {
+  useLocale();
   const [hovered, setHovered] = useState(false);
   const cycleInterval = 4000; // ms each logo stays visible
   const columnDelay = index * 400; // stagger columns so they flip out of sync
@@ -102,7 +105,7 @@ const LogoColumn = React.memo(function LogoColumn({ logos, index, currentTime, o
             exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.15 }}
           >
-            {logo.name}
+            {logo.nameKey ? copy(logo.nameKey) : logo.name}
           </motion.span>
         )}
       </AnimatePresence>

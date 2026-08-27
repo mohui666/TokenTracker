@@ -7,6 +7,7 @@ use std::fs;
 use std::net::TcpListener;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::Mutex;
 
 use tokentracker_linux::server::{
     dashboard_url, pick_available_port, rotate_log_if_oversized, serve_args, server_log_paths,
@@ -42,8 +43,23 @@ impl Drop for TempDir {
 
 const PREFERRED_PORT: u16 = 17680;
 
+// Both port tests bind PREFERRED_PORT, and cargo runs tests in parallel. The
+// free-port case drops its probe before calling pick_available_port() — which
+// is exactly the window the fallback case spends holding that same port — so
+// unserialized they race and the free-port case gets handed a fallback port.
+// Poisoning is recovered from rather than propagated: one test panicking must
+// not turn the other into a second, misleading failure.
+static PREFERRED_PORT_GUARD: Mutex<()> = Mutex::new(());
+
+fn preferred_port_guard() -> std::sync::MutexGuard<'static, ()> {
+    PREFERRED_PORT_GUARD
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+}
+
 #[test]
 fn preferred_port_is_used_when_free() {
+    let _serial = preferred_port_guard();
     // Only meaningful when nothing else on the machine holds 17680.
     let Ok(probe) = TcpListener::bind(("127.0.0.1", PREFERRED_PORT)) else {
         eprintln!("port {PREFERRED_PORT} is busy on this machine; skipping");
@@ -60,6 +76,7 @@ fn preferred_port_is_used_when_free() {
 
 #[test]
 fn port_selection_falls_back_when_the_preferred_port_is_taken() {
+    let _serial = preferred_port_guard();
     // Hold the preferred port for the duration of the call.
     let Ok(holder) = TcpListener::bind(("127.0.0.1", PREFERRED_PORT)) else {
         eprintln!("port {PREFERRED_PORT} is busy on this machine; skipping");

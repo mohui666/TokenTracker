@@ -2,6 +2,8 @@ import { getLocalApiAuthHeaders } from "./local-api-auth";
 
 export const BUILTIN_PETS = [
   { id: "clawd", displayName: "Clawd", nameKey: "pet.character.clawd", spriteVersionNumber: 1, custom: false },
+  // No assetUrl: bot is drawn from the vector engine in lib/bot/, not a sprite atlas.
+  { id: "bot", displayName: "Bot", nameKey: "pet.character.bot", spriteVersionNumber: 1, custom: false },
   { id: "sprout", displayName: "Sprout", nameKey: "pet.character.sprout", spriteVersionNumber: 1, custom: false, assetUrl: "/pets/sprout/spritesheet.webp" },
   { id: "byte", displayName: "Byte", nameKey: "pet.character.byte", spriteVersionNumber: 1, custom: false, assetUrl: "/pets/byte/spritesheet.webp" },
   { id: "ember", displayName: "Ember", nameKey: "pet.character.ember", spriteVersionNumber: 1, custom: false, assetUrl: "/pets/ember/spritesheet.webp" },
@@ -25,7 +27,9 @@ export async function listPets() {
     Array.isArray(data.hiddenBuiltinIds) ? data.hiddenBuiltinIds : [],
   );
   return [
-    ...BUILTIN_PETS.filter((pet) => pet.id === "clawd" || !hiddenBuiltinIds.has(pet.id)),
+    // clawd and bot have no atlas to reclaim, so they are never hideable — see
+    // REMOVABLE_BUILTIN_IDS in src/lib/pet-packages.js.
+    ...BUILTIN_PETS.filter((pet) => !pet.assetUrl || !hiddenBuiltinIds.has(pet.id)),
     ...(Array.isArray(data.pets) ? data.pets : []),
   ];
 }

@@ -189,6 +189,18 @@ export const PROVIDER_LIMIT_SPECS = {
       ];
     },
   },
+  codingPlan: {
+    // Volcano Ark Coding Plan quota refreshes on three windows: a rolling
+    // 5-hour (session), a weekly, and a monthly one. Percentages come straight
+    // from arkcli's usage plan payload; no client-side pacing data.
+    windows(data) {
+      return [
+        { key: "5h", labelKey: "limits.label.ark_coding_plan_5h", window: data.primary_window },
+        { key: "weekly", labelKey: "limits.label.ark_coding_plan_weekly", window: data.secondary_window },
+        { key: "monthly", labelKey: "limits.label.ark_coding_plan_monthly", window: data.tertiary_window },
+      ];
+    },
+  },
 };
 
 /** Static copy() anchors for validate:copy — labels resolve at runtime via spec.labelKey. */
@@ -237,5 +249,8 @@ export function usageLimitsLabelCopyAnchor() {
     copy("limits.label.qoder_ultimate"),
     copy("limits.label.qoder_cn_credits"),
     copy("limits.label.qoder_cn_ultimate"),
+    copy("limits.label.ark_coding_plan_5h"),
+    copy("limits.label.ark_coding_plan_weekly"),
+    copy("limits.label.ark_coding_plan_monthly"),
   ];
 }

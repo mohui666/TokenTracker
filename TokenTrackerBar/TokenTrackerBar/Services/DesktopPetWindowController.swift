@@ -558,6 +558,7 @@ struct PetCharacter: RawRepresentable, Hashable, Identifiable, CaseIterable {
     var id: String { rawValue }
 
     static let clawd = PetCharacter(rawValue: "clawd")!
+    static let bot = PetCharacter(rawValue: "bot")!
     static let sprout = PetCharacter(rawValue: "sprout")!
     static let byte = PetCharacter(rawValue: "byte")!
     static let ember = PetCharacter(rawValue: "ember")!
@@ -573,14 +574,33 @@ struct PetCharacter: RawRepresentable, Hashable, Identifiable, CaseIterable {
         self.rawValue = value
     }
 
-    /// SVG Clawd is tightly cropped; atlas pets carry transparent breathing room.
+    /// How this character is drawn. Explicit because it used to be inferred from a
+    /// missing sprite atlas, which made "no atlas" mean "this is Clawd". `bot` has no
+    /// atlas either — it draws vector paths — so that inference had to go.
+    /// Mirrors `petRenderer()` in dashboard/src/lib/pet-personality.js.
+    enum Renderer { case clawd, vector, atlas }
+
+    var renderer: Renderer {
+        if self == Self.clawd { return .clawd }
+        if self == Self.bot { return .vector }
+        return .atlas
+    }
+
+    /// SVG Clawd is tightly cropped; atlas pets carry transparent breathing room; bot
+    /// draws into a 316-unit viewBox whose margin is headroom for its orbit rings.
     /// Normalize painted size without changing the selected window-size preset.
+    /// Mirrors `petVisualScale()` in dashboard/src/lib/pet-appearance.js.
     var visualScale: CGFloat {
-        self == Self.clawd ? 0.84 : 1.0
+        switch renderer {
+        case .clawd: return 0.84
+        case .vector: return 1.35
+        case .atlas: return 1.0
+        }
     }
 
     var menuLabel: String {
         if self == Self.clawd { return Strings.petCharacterClawd }
+        if self == Self.bot { return Strings.petCharacterBot }
         if self == Self.sprout { return Strings.petCharacterSprout }
         if self == Self.byte { return Strings.petCharacterByte }
         if self == Self.ember { return Strings.petCharacterEmber }
@@ -594,7 +614,7 @@ struct PetCharacter: RawRepresentable, Hashable, Identifiable, CaseIterable {
 
 final class PetCatalog: ObservableObject {
     static let shared = PetCatalog()
-    private static let builtins: [PetCharacter] = [.clawd, .sprout, .byte, .ember]
+    private static let builtins: [PetCharacter] = [.clawd, .bot, .sprout, .byte, .ember]
     private static let hiddenBuiltinsFilename = ".hidden-builtins.json"
     private struct Metadata { let displayName: String; let spriteVersionNumber: Int; let atlasURL: URL }
 
@@ -658,8 +678,12 @@ final class PetCatalog: ObservableObject {
         }
         discovered.sort { $0.1.displayName.localizedCaseInsensitiveCompare($1.1.displayName) == .orderedAscending }
         metadata = Dictionary(uniqueKeysWithValues: discovered.map { ($0.0.rawValue, $0.1) })
+        // Only atlas-backed builtins are hideable — that list exists to reclaim the
+        // space a sheet takes. Keyed on the renderer rather than special-casing clawd,
+        // so it matches REMOVABLE_BUILTIN_IDS in src/lib/pet-packages.js; otherwise a
+        // hidden-builtins file naming `bot` would hide it here but not on the web.
         characters = Self.builtins.filter {
-            $0 == .clawd || !hiddenBuiltinIDs.contains($0.rawValue)
+            $0.renderer != .atlas || !hiddenBuiltinIDs.contains($0.rawValue)
         } + discovered.map(\.0)
     }
 
@@ -668,7 +692,8 @@ final class PetCatalog: ObservableObject {
     func spriteVersion(for character: PetCharacter) -> Int { metadata[character.rawValue]?.spriteVersionNumber ?? 1 }
     func atlasURL(for character: PetCharacter) -> URL? {
         if let custom = metadata[character.rawValue]?.atlasURL { return custom }
-        guard character != .clawd else { return nil }
+        // Only atlas-rendered characters have a sheet to find.
+        guard character.renderer == .atlas else { return nil }
         let name = "pet-\(character.rawValue)"
         return Bundle.main.url(forResource: name, withExtension: "png", subdirectory: "PetSprites")
             ?? Bundle.main.url(forResource: name, withExtension: "png")
@@ -691,10 +716,16 @@ final class PetCatalog: ObservableObject {
 final class PetCharacterStore: ObservableObject {
     static let shared = PetCharacterStore()
     private static let defaultsKey = "DesktopPetCharacter"
+    private static let botColorKey = "DesktopPetBotColor"
 
     @Published private(set) var character: PetCharacter
+    /// Body colour for the vector `bot` character: a palette id, or "auto" to follow
+    /// the system appearance. Validated against the palette shipped in BotFrames.json,
+    /// so a colour dropped from the picker degrades to "auto" instead of sticking.
+    @Published private(set) var botColor: String
 
     private init() {
+        botColor = Self.normalizeBotColor(UserDefaults.standard.string(forKey: Self.botColorKey))
         let raw = UserDefaults.standard.string(forKey: Self.defaultsKey)
         PetCatalog.shared.refresh()
         if let candidate = raw.flatMap(PetCharacter.init(rawValue:)),
@@ -703,6 +734,23 @@ final class PetCharacterStore: ObservableObject {
         } else {
             character = .clawd
             if raw != nil { UserDefaults.standard.removeObject(forKey: Self.defaultsKey) }
+        }
+    }
+
+    private static func normalizeBotColor(_ raw: String?) -> String {
+        guard let raw, raw != "auto",
+              BotFrames.payload?.palette[raw] != nil else { return "auto" }
+        return raw
+    }
+
+    func setBotColor(_ raw: String) {
+        let next = Self.normalizeBotColor(raw)
+        guard botColor != next else { return }
+        botColor = next
+        if next == "auto" {
+            UserDefaults.standard.removeObject(forKey: Self.botColorKey)
+        } else {
+            UserDefaults.standard.set(next, forKey: Self.botColorKey)
         }
     }
 

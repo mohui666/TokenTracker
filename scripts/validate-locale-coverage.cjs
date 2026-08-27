@@ -27,7 +27,7 @@ const SOURCE_IDENTICAL_KEY_ALLOWLIST = [
   /^leaderboard[.]community[.]modal[.]global_spend_detail$/,
   /^leaderboard[.]community[.]modal[.]platform[.]/,
   /^dashboard[.]install[.]cmd[.]/,
-  /^settings[.]menubar[.]iconStyle[.]clawd$/,
+  /^settings[.]menubar[.]iconStyle[.](?:clawd|bot)$/,
   /^settings[.]menubar[.]updates[.]footerCore$/,
   /^limits[.]provider[.]/,
   /^provider[.]display[.](?:omp|deepseek_harness)$/,
@@ -37,7 +37,7 @@ const SOURCE_IDENTICAL_KEY_ALLOWLIST = [
   /^ipcheck[.]props[.]asn$/,
   /^ipcheck[.]security[.](?:vpn|tor)$/,
   /^shared[.]app_name$/,
-  /^pet[.]character[.](?:clawd|sprout|byte|ember)$/,
+  /^pet[.]character[.](?:clawd|bot|sprout|byte|ember)$/,
 ];
 
 // Developer-facing product terms stay in English in Chinese UI copy. Scope

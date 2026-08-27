@@ -76,6 +76,8 @@ const {
   resolvePiSessionFiles,
   parsePiIncremental,
   piAgentDirCollidesWithOmp,
+  resolvePrimeAgentSessionFiles,
+  parsePrimeAgentIncremental,
   resolveCraftSessionFiles,
   parseCraftIncremental,
   resolveReasonixTelemetryFiles,
@@ -108,6 +110,7 @@ const {
   resolveDroidModel,
   resolveDshSessionFiles,
   parseDshIncremental,
+  parseTraeCnApiIncremental,
   bucketKey,
   toUtcHalfHourStart,
   totalsKey,
@@ -122,6 +125,11 @@ const {
   parseCursorCsv,
 } = require("../lib/cursor-config");
 const { purgeProjectUsage } = require("../lib/project-usage-purge");
+const {
+  fetchTraeCnUsageWithAuth,
+  resolveTraeCnStoragePath,
+  isTraeCnUsageEnabled,
+} = require("../lib/trae-cn-config");
 const {
   isCodexSessionCursorPath,
   isCursorStoreRetry,
@@ -266,6 +274,7 @@ const AUTO_SYNC_SOURCES = new Set([
   "qoder-cn",
   "reasonix",
   "roocode",
+  "trae-cn",
   "workbuddy",
   "zcode",
   "zed",
@@ -340,7 +349,7 @@ async function acquireSyncLock(
     priorityPollMs = PRIORITY_LOCK_POLL_MS,
   } = {},
 ) {
-  const waitsForPriority = Boolean(opts.drain || opts.publishAccount);
+  const waitsForPriority = Boolean(opts.waitForLock || opts.drain || opts.publishAccount);
   let lock = await openLock(lockPath, {
     quietIfLocked: opts.auto || waitsForPriority,
   });
@@ -426,6 +435,15 @@ async function cmdSync(argv, context = {}) {
     : null;
   const lockWaitOptions = context && typeof context === "object"
     ? context.lockWaitOptions
+    : undefined;
+  // Narrow test-only seam for TRAE Work CN: deterministic injected fetch + a
+  // fixed "now" for the rolling range. Production keeps the global fetch and
+  // current time; no public CLI flag/config is introduced.
+  const traeCnFetchImpl = context && typeof context === "object"
+    ? context.traeCnFetchImpl
+    : undefined;
+  const traeCnNowMs = context && typeof context === "object"
+    ? context.traeCnNowMs
     : undefined;
   const syncDiagnostics = diagnostics && typeof diagnostics === "object" ? diagnostics : null;
   const home = os.homedir();
@@ -1579,6 +1597,93 @@ async function cmdSync(argv, context = {}) {
       }
     }
 
+    // ── Trae Work CN (国内版) — account-level usage API ──
+    // A simple explicit rolling 30-day window captured once per sync (no
+    // cursor checkpoints / full-history import / page retries / background
+    // requests). Runs only when the user has opted in via
+    // TOKENTRACKER_TRAE_CN_USAGE=1 (the read transmits the locally stored
+    // sign-in JWT to TRAE's official endpoint, so it is never default-on),
+    // the sync is non-lightweight, the source is allowed, and the CN storage
+    // file exists — which excludes both ordinary background and `--auto
+    // --background --all-local-sources`. Fetching goes through the
+    // storage-backed helper so its single 401/403 reread/retry is used; an
+    // empty response is a successful no-op; each window is bounded to 100
+    // pages/2,000 rows and an over-capacity window is split into staggered
+    // sub-windows (still over capacity at the finest allowed granularity, or
+    // any other fetch/page/schema/auth failure) skips the parser and leaves
+    // prior data untouched while unrelated providers continue.
+    let traeCnResult = { recordsProcessed: 0, eventsAggregated: 0, bucketsQueued: 0 };
+    if (
+      !isBackgroundLightweightSync &&
+      isTraeCnUsageEnabled(process.env) &&
+      sourceAllowed("trae-cn")
+    ) {
+      const nowMs = Number.isFinite(traeCnNowMs) ? traeCnNowMs : Date.now();
+      const fetchImpl = typeof traeCnFetchImpl === "function" ? traeCnFetchImpl : fetch;
+      const endTime = Math.floor(nowMs / 1000);
+      // Align the REAL fetch start down to a half-hour boundary so the API
+      // range fully contains every bucket it can touch (a raw 08:37 start
+      // would only partially cover the 08:30 bucket) - session bucket floors
+      // never straddle the queried range.
+      const HALF_HOUR_SEC = 30 * 60;
+      const startTime = Math.max(
+        1,
+        Math.floor((endTime - 30 * 24 * 60 * 60) / HALF_HOUR_SEC) * HALF_HOUR_SEC,
+      );
+      try {
+        // Absent storage means "not signed in" — a silent skip, not an error.
+        const traeCnStoragePath = resolveTraeCnStoragePath({ env: process.env, home });
+        if (traeCnStoragePath && fssync.existsSync(traeCnStoragePath)) {
+          if (progress?.enabled) {
+            progress.start(`Fetching TRAE Work CN usage...`);
+          }
+          const traeCnUsage = await fetchTraeCnUsageWithAuth({
+            start_time: startTime,
+            end_time: endTime,
+            fetchImpl,
+            env: process.env,
+            home,
+          });
+          const traeCnSessions = Array.isArray(traeCnUsage?.sessions) ? traeCnUsage.sessions : [];
+          // An empty payload parses as a pure no-op: the TRAE absence
+          // contract is NOT PROVEN (no evidence that a missing session means
+          // deleted/zero), so an empty response asserts nothing - no usage
+          // mutation and no session states. Non-empty snapshots append one
+          // canonical session-state observation per CHANGED session (the
+          // cloud LWW upsert reconciles cross-device versions).
+          {
+            if (progress?.enabled && traeCnSessions.length > 0) {
+              progress.start(
+                `Parsing TRAE Work CN ${renderBar(0)} 0/${formatNumber(
+                  traeCnSessions.length,
+                )} records | buckets 0`,
+              );
+            }
+            traeCnResult = await parseTraeCnApiIncremental({
+              sessions: traeCnSessions,
+              cursors,
+              queuePath,
+              onProgress: makeProviderProgress("TRAE Work CN"),
+              windowStartMs: startTime * 1000,
+              windowEndMs: endTime * 1000,
+              // The LOGICAL fetch stamp carried into every session state's
+              // snapshot_verified_at: the same clock that produced the query
+              // range, not the later enqueue moment (append-only queue
+              // replays it verbatim, so transport retries never fake
+              // freshness).
+              snapshotVerifiedAtMs: nowMs,
+            });
+            // A partially malformed snapshot throws inside the parser (fail
+            // closed - it must not become the authoritative window state);
+            // warnProviderParseFailure below reports it without sensitive
+            // data while unrelated providers continue.
+          }
+        }
+      } catch (err) {
+        warnProviderParseFailure("TRAE Work CN", err, opts);
+      }
+    }
+
     // ── Kiro (SQLite-based, with JSONL fallback; dual-install aware) ──
     let kiroResult = { recordsProcessed: 0, eventsAggregated: 0, bucketsQueued: 0 };
     if (sourceAllowed("kiro")) {
@@ -1997,6 +2102,34 @@ async function cmdSync(argv, context = {}) {
       }
     }
 
+    // ── Prime Agent — passive ~/.prime/agent/sessions/*.jsonl usage reader ──
+    let primeAgentResult = { recordsProcessed: 0, eventsAggregated: 0, bucketsQueued: 0 };
+    const primeAgentFiles = sourceAllowed("prime-agent")
+      ? mergeBothFileSources({ resolveFiles: resolvePrimeAgentSessionFiles, env: process.env })
+      : [];
+    if (primeAgentFiles.length > 0) {
+      if (progress?.enabled) {
+        progress.start(`Parsing Prime Agent ${renderBar(0)} | buckets 0`);
+      }
+      try {
+        primeAgentResult = await parsePrimeAgentIncremental({
+          sessionFiles: primeAgentFiles,
+          cursors,
+          queuePath,
+          env: process.env,
+          onProgress: (p) => {
+            if (!progress?.enabled) return;
+            const pct = p.total > 0 ? p.index / p.total : 1;
+            progress.update(
+              `Parsing Prime Agent ${renderBar(pct)} ${formatNumber(p.index)}/${formatNumber(p.total)} files | buckets ${formatNumber(p.bucketsQueued)}`,
+            );
+          },
+        });
+      } catch (err) {
+        warnProviderParseFailure("Prime Agent", err, opts);
+      }
+    }
+
     // ── Craft Agents (passive ~/.craft-agent + workspaces session.jsonl reader) ──
     let craftResult = { recordsProcessed: 0, eventsAggregated: 0, bucketsQueued: 0 };
     const craftFiles = sourceAllowed("craft")
@@ -2045,7 +2178,12 @@ async function cmdSync(argv, context = {}) {
     }
 
     // ── Grok Build (xAI) ──
-    let grokResult = { recordsProcessed: 0, eventsAggregated: 0, bucketsQueued: 0 };
+    let grokResult = {
+      recordsProcessed: 0,
+      eventsAggregated: 0,
+      bucketsQueued: 0,
+      projectBucketsQueued: 0,
+    };
     // Full passive scan of all Grok sessions (historical + any not covered by hook)
     const grokSessions = sourceAllowed("grok") ? resolveGrokBuildSessions(process.env) : [];
     const grokSessionInputs = [...grokSessions];
@@ -2067,6 +2205,11 @@ async function cmdSync(argv, context = {}) {
           sessionId: hookSessionId,
           sessionDir:
             typeof grokHookSignal.sessionDir === "string" ? grokHookSignal.sessionDir : undefined,
+          cwd: typeof grokHookSignal.cwd === "string" ? grokHookSignal.cwd : undefined,
+          encodedCwd:
+            typeof grokHookSignal.sessionDir === "string" && grokHookSignal.sessionDir
+              ? path.basename(path.dirname(grokHookSignal.sessionDir))
+              : undefined,
           updatesPath:
             typeof grokHookSignal.updatesPath === "string" ? grokHookSignal.updatesPath : undefined,
           signalsPath:
@@ -2096,6 +2239,7 @@ async function cmdSync(argv, context = {}) {
           sessions: grokSessionInputs,
           cursors,
           queuePath,
+          projectQueuePath,
           env: process.env,
           onProgress: (p) => {
             if (!progress?.enabled) return;
@@ -2112,6 +2256,8 @@ async function cmdSync(argv, context = {}) {
         recordsProcessed: grokResult.recordsProcessed + grokScanResult.recordsProcessed,
         eventsAggregated: grokResult.eventsAggregated + grokScanResult.eventsAggregated,
         bucketsQueued: grokResult.bucketsQueued + grokScanResult.bucketsQueued,
+        projectBucketsQueued:
+          (grokResult.projectBucketsQueued || 0) + (grokScanResult.projectBucketsQueued || 0),
       };
     }
     if (isFullSourceScan && opts.repairGrok) {
@@ -2468,6 +2614,7 @@ async function cmdSync(argv, context = {}) {
       qoderCnResult.recordsProcessed +
       claudeScienceResult.recordsProcessed +
       cursorResult.recordsProcessed +
+      traeCnResult.recordsProcessed +
       kiroResult.recordsProcessed +
       kiroCliResult.recordsProcessed +
       hermesResult.recordsProcessed +
@@ -2477,6 +2624,7 @@ async function cmdSync(argv, context = {}) {
       workbuddyResult.recordsProcessed +
       ompResult.recordsProcessed +
       piResult.recordsProcessed +
+      primeAgentResult.recordsProcessed +
       craftResult.recordsProcessed +
       reasonixResult.recordsProcessed +
       grokResult.recordsProcessed +
@@ -2502,6 +2650,7 @@ async function cmdSync(argv, context = {}) {
       qoderCnResult.bucketsQueued +
       claudeScienceResult.bucketsQueued +
       cursorResult.bucketsQueued +
+      traeCnResult.bucketsQueued +
       kiroResult.bucketsQueued +
       kiroCliResult.bucketsQueued +
       hermesResult.bucketsQueued +
@@ -2511,6 +2660,7 @@ async function cmdSync(argv, context = {}) {
       workbuddyResult.bucketsQueued +
       ompResult.bucketsQueued +
       piResult.bucketsQueued +
+      primeAgentResult.bucketsQueued +
       craftResult.bucketsQueued +
       reasonixResult.bucketsQueued +
       grokResult.bucketsQueued +
@@ -2532,6 +2682,7 @@ async function cmdSync(argv, context = {}) {
       cursorStore.requiresCommit !== true &&
       totalParsed === 0 &&
       totalBuckets === 0 &&
+      !(grokResult.projectBucketsQueued > 0) &&
       !codexColdAuditDue &&
       !codexFallbackRetryRan &&
       !grokHookSignalConsumed &&
@@ -2591,6 +2742,7 @@ function parseArgs(argv) {
     fromOpenclaw: false,
     source: null,
     drain: false,
+    waitForLock: false,
     background: false,
     publishAccount: false,
     allLocalSources: false,
@@ -2608,6 +2760,7 @@ function parseArgs(argv) {
     }
     else if (a.startsWith("--source=")) out.source = normalizeSyncSource(a.slice("--source=".length));
     else if (a === "--drain") out.drain = true;
+    else if (a === "--wait-for-lock") out.waitForLock = true;
     else if (a === "--background" || a === "--lightweight") out.background = true;
     else if (a === "--publish-account") out.publishAccount = true;
     else if (a === "--all-local-sources") out.allLocalSources = true;

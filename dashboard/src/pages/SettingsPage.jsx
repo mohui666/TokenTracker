@@ -1,5 +1,5 @@
 import React from "react";
-import { FlaskConical, Gauge, Monitor, Palette } from "lucide-react";
+import { FlaskConical, Gauge, Globe, Monitor, Palette } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { LimitsSettingsPanel } from "../components/LimitsSettingsPanel.jsx";
 import { AppearanceSection } from "../components/settings/AppearanceSection.jsx";
@@ -11,14 +11,17 @@ import {
   ToggleSwitch,
 } from "../components/settings/Controls.jsx";
 import { MenuBarSection, NativeAppFooter } from "../components/settings/MenuBarSection.jsx";
+import { NetworkSection } from "../components/settings/NetworkSection.jsx";
 import { LIMIT_DISPLAY_MODES, useLimitsDisplayPrefs } from "../hooks/use-limits-display-prefs.js";
 import { useNativeSettings } from "../hooks/use-native-settings.js";
+import { useProxySettings } from "../hooks/use-proxy-settings.js";
 import { cn } from "../lib/cn";
 import { copy } from "../lib/copy";
 
 const SETTINGS_SECTION_IDS = {
   APPEARANCE: "appearance",
   NATIVE_APP: "native-app",
+  NETWORK: "network",
   LIMITS: "limits",
   LABS: "labs",
 };
@@ -43,13 +46,16 @@ export function SettingsPage() {
     settings: nativeSettings,
     setSetting: setNativeSetting,
   } = useNativeSettings();
+  const proxySettings = useProxySettings();
+  const { available: proxySettingsAvailable } = proxySettings;
   const toastOnReset = nativeSettings?.toastOnReset !== false;
   const confettiOnReset = nativeSettings?.confettiOnReset !== false;
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedSection = searchParams.get("section");
   const requestedSectionAvailable =
     Object.values(SETTINGS_SECTION_IDS).includes(requestedSection) &&
-    (requestedSection !== SETTINGS_SECTION_IDS.NATIVE_APP || nativeSettingsAvailable);
+    (requestedSection !== SETTINGS_SECTION_IDS.NATIVE_APP || nativeSettingsAvailable) &&
+    (requestedSection !== SETTINGS_SECTION_IDS.NETWORK || proxySettingsAvailable);
   const activeSection = requestedSectionAvailable
     ? requestedSection
     : SETTINGS_SECTION_IDS.APPEARANCE;
@@ -77,6 +83,14 @@ export function SettingsPage() {
           label: copy("settings.section.menubar"),
           Icon: Monitor,
           content: <MenuBarSection />,
+        }]
+      : []),
+    ...(proxySettingsAvailable
+      ? [{
+          id: SETTINGS_SECTION_IDS.NETWORK,
+          label: copy("settings.section.network"),
+          Icon: Globe,
+          content: <NetworkSection proxySettings={proxySettings} />,
         }]
       : []),
     {

@@ -16,12 +16,20 @@ import {
 } from "../lib/pets-api.js";
 import { copy } from "../lib/copy";
 import { cn } from "../lib/cn";
+import {
+  BOT_COLOR_CHOICES,
+  BOT_DEFAULT_COLOR_DARK,
+  BOT_DEFAULT_COLOR_LIGHT,
+} from "../lib/bot-appearance.js";
+import { COLOR_BY_ID } from "../lib/bot/skins";
+import { petRenderer } from "../lib/pet-personality.js";
 import { ClawdAnimated } from "../ui/foundation/ClawdAnimated.jsx";
 import { FadeIn } from "../ui/foundation/FadeIn.jsx";
 import { showToast } from "../ui/components/Toast.jsx";
 
 const CHARACTER_TINTS = {
   clawd: "from-oai-amber-50 dark:from-orange-950/70",
+  bot: "from-oai-brand-50 dark:from-teal-950/70",
   sprout: "from-oai-brand-100 dark:from-emerald-950/70",
   byte: "from-oai-gray-200 dark:from-slate-800/70",
   ember: "from-orange-100 dark:from-orange-950/80",
@@ -105,7 +113,63 @@ function CharacterCard({ character, selected, onSelect, onRemove, removeDisabled
   );
 }
 
-function PetStage({ pet, state, onStateChange }) {
+/**
+ * Body colour picker for the vector `bot` character. "auto" is not a hue — it
+ * follows the theme (ink on light, cream on dark) so the silhouette never sinks
+ * into its own background.
+ */
+function BotColorSwatches({ value, onChange }) {
+  // Literal keys, not `copy(\`pet.bot.color.${id}\`)`: validate:copy only sees
+  // string literals passed to copy(), so a template would report all nine unused.
+  const labels = {
+    auto: copy("pet.bot.color.auto"),
+    bleu: copy("pet.bot.color.bleu"),
+    turquoise: copy("pet.bot.color.turquoise"),
+    vert: copy("pet.bot.color.vert"),
+    ambre: copy("pet.bot.color.ambre"),
+    rose: copy("pet.bot.color.rose"),
+    violet: copy("pet.bot.color.violet"),
+  };
+  return (
+    <div
+      className="flex flex-wrap items-center justify-end gap-1.5 rounded-full border border-black/5 bg-white/65 px-2.5 py-1.5 backdrop-blur-md dark:border-white/10 dark:bg-black/20"
+      role="radiogroup"
+      aria-label={copy("pet.bot.color")}
+    >
+      {BOT_COLOR_CHOICES.map((id) => {
+        const selected = (value || "auto") === id;
+        return (
+          <button
+            key={id}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            aria-label={labels[id]}
+            title={labels[id]}
+            onClick={() => onChange(id)}
+            className={cn(
+              "h-4 w-4 rounded-full border transition-transform duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oai-brand-500",
+              selected
+                ? "scale-125 border-oai-black shadow-sm dark:border-white"
+                : "border-black/15 hover:scale-110 dark:border-white/25",
+            )}
+            style={
+              id === "auto"
+                ? {
+                    // Derived from the palette, not restated: these are exactly what
+                    // "auto" resolves to per appearance.
+                    background: `linear-gradient(135deg, ${COLOR_BY_ID.get(BOT_DEFAULT_COLOR_LIGHT).hex} 0 50%, ${COLOR_BY_ID.get(BOT_DEFAULT_COLOR_DARK).hex} 50% 100%)`,
+                  }
+                : { background: COLOR_BY_ID.get(id)?.hex }
+            }
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+function PetStage({ pet, state, onStateChange, botColor, onBotColorChange }) {
   const [lookDirectionIndex, setLookDirectionIndex] = useState(null);
   const spriteRef = useRef(null);
   const stateSpec = PREVIEW_STATES.find(function findState(item) {
@@ -136,9 +200,14 @@ function PetStage({ pet, state, onStateChange }) {
         <span className="text-xs font-semibold uppercase tracking-[0.14em] text-oai-gray-500 dark:text-oai-gray-400">
           {copy("pet.preview.states")}
         </span>
-        <div className="flex items-center gap-2 rounded-full border border-black/5 bg-white/65 px-3 py-1.5 text-[11px] font-medium text-oai-gray-600 backdrop-blur-md dark:border-white/10 dark:bg-black/20 dark:text-oai-gray-300">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden />
-          {stateLabel}
+        <div className="flex items-center gap-2">
+          {petRenderer(pet?.id) === "vector" ? (
+            <BotColorSwatches value={botColor} onChange={onBotColorChange} />
+          ) : null}
+          <div className="flex items-center gap-2 rounded-full border border-black/5 bg-white/65 px-3 py-1.5 text-[11px] font-medium text-oai-gray-600 backdrop-blur-md dark:border-white/10 dark:bg-black/20 dark:text-oai-gray-300">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden />
+            {stateLabel}
+          </div>
         </div>
       </div>
       <div className="relative flex flex-1 items-center justify-center px-6 py-5">
@@ -155,6 +224,7 @@ function PetStage({ pet, state, onStateChange }) {
               pet={pet}
               size={190}
               lookDirectionIndex={lookDirectionIndex}
+              botColor={botColor}
             />
           </div>
         </div>
@@ -391,6 +461,8 @@ export function PetPage() {
                   setAutoRotate(false);
                   setPreviewState(state);
                 }}
+                botColor={settings.botColor}
+                onBotColorChange={(id) => setSetting("botColor", id)}
               />
 
               <aside className="flex flex-col border-t border-oai-gray-200 p-5 dark:border-oai-gray-800 lg:min-h-[480px] lg:border-l lg:border-t-0">
@@ -411,7 +483,7 @@ export function PetPage() {
                         selected={selectedCharacter === character.id}
                         onSelect={() => setSetting("character", character.id)}
                         removeDisabled={importBusy}
-                        onRemove={catalogAvailable && character.id !== "clawd"
+                        onRemove={catalogAvailable && character.id !== "clawd" && character.id !== "bot"
                           ? () => runImport(async () => {
                             await removePet(character.id);
                             if (selectedCharacter === character.id) setSetting("character", "clawd");

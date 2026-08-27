@@ -5,18 +5,33 @@ const { test } = require("node:test");
 
 const repoRoot = path.join(__dirname, "..");
 
+function personalitySource() {
+  return fs.readFileSync(path.join(repoRoot, "dashboard/src/lib/pet-personality.js"), "utf8");
+}
+
 function configuredCharacterIds() {
-  const source = fs.readFileSync(
-    path.join(repoRoot, "dashboard/src/lib/pet-personality.js"),
-    "utf8",
-  );
-  const match = source.match(/PET_CHARACTER_IDS\s*=\s*(\[[^;]+\])/);
+  const match = personalitySource().match(/PET_CHARACTER_IDS\s*=\s*(\[[^;]+\])/);
   assert.ok(match, "PET_CHARACTER_IDS must remain a literal array so assets can be validated");
   return JSON.parse(match[1]);
 }
 
+/**
+ * Characters drawn from something other than a sprite atlas, and so with no
+ * sheet to validate. Read from the RENDERERS map rather than hardcoded: "not
+ * clawd" used to imply "has an atlas", and `bot` broke that.
+ */
+function nonAtlasCharacterIds() {
+  const match = personalitySource().match(/const RENDERERS\s*=\s*Object\.assign\([^{]*\{([^}]+)\}/);
+  assert.ok(match, "RENDERERS must remain a literal object so assets can be validated");
+  return [...match[1].matchAll(/([a-z0-9-]+)\s*:/g)].map((entry) => entry[1]);
+}
+
 test("every atlas-backed pet ships matching web and macOS assets", () => {
-  const atlasCharacters = configuredCharacterIds().filter((id) => id !== "clawd");
+  const vectorOrCustomDrawn = nonAtlasCharacterIds();
+  assert.deepEqual(vectorOrCustomDrawn, ["clawd", "bot"]);
+  const atlasCharacters = configuredCharacterIds().filter(
+    (id) => !vectorOrCustomDrawn.includes(id),
+  );
   assert.deepEqual(atlasCharacters, ["sprout", "byte", "ember"]);
 
   for (const id of atlasCharacters) {

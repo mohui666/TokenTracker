@@ -428,3 +428,208 @@ test("status renders the Trae SOLO entitlement snapshot from Local State", async
     await fs.rm(tmp, { recursive: true, force: true });
   }
 });
+
+
+// ---------------------------------------------------------------------------
+// TRAE Work CN install detection + auth state (PR #474): a RESOLVABLE default
+// path does not mean the app is installed - the macOS resolver always derives
+// one. installed must mean the storage file actually EXISTS (same semantics
+// as the sync path), and the auth state must distinguish not-signed-in /
+// readable / malformed / unreadable.
+// ---------------------------------------------------------------------------
+
+test("status trae-cn installed=false when the default path resolves but no storage file exists", async () => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "tokentracker-status-traecn-"));
+  const prevHome = process.env.HOME;
+  const prevUserProfile = process.env.USERPROFILE;
+  const prevAppData = process.env.APPDATA;
+  const prevTraeCnHome = process.env.TOKENTRACKER_TRAE_CN_HOME;
+  const prevTraeCnUsage = process.env.TOKENTRACKER_TRAE_CN_USAGE;
+  const prevWrite = process.stdout.write;
+
+  try {
+    process.env.HOME = tmp;
+    process.env.USERPROFILE = tmp;
+    process.env.APPDATA = path.join(tmp, "AppData", "Roaming");
+    delete process.env.TOKENTRACKER_TRAE_CN_HOME;
+    delete process.env.TOKENTRACKER_TRAE_CN_USAGE;
+
+    // Nothing is created under the default TRAE SOLO CN path: the resolver
+    // still derives it, but the file is absent -> NOT installed.
+    let out = "";
+    process.stdout.write = (chunk, enc, cb) => {
+      out += typeof chunk === "string" ? chunk : chunk.toString(enc || "utf8");
+      if (typeof cb === "function") cb();
+      return true;
+    };
+    await cmdStatus(["--json"]);
+    const summary = JSON.parse(out);
+    assert.equal(summary.providers["trae-cn"].installed, false, "absent storage file must not report installed");
+
+    out = "";
+    await cmdStatus();
+    assert.doesNotMatch(out, /- Trae SOLO CN: usage sync/);
+  } finally {
+    process.stdout.write = prevWrite;
+    if (prevHome === undefined) delete process.env.HOME;
+    else process.env.HOME = prevHome;
+    if (prevUserProfile === undefined) delete process.env.USERPROFILE;
+    else process.env.USERPROFILE = prevUserProfile;
+    if (prevTraeCnHome === undefined) delete process.env.TOKENTRACKER_TRAE_CN_HOME;
+    else process.env.TOKENTRACKER_TRAE_CN_HOME = prevTraeCnHome;
+    if (prevAppData === undefined) delete process.env.APPDATA;
+    else process.env.APPDATA = prevAppData;
+    if (prevTraeCnUsage === undefined) delete process.env.TOKENTRACKER_TRAE_CN_USAGE;
+    else process.env.TOKENTRACKER_TRAE_CN_USAGE = prevTraeCnUsage;
+    await fs.rm(tmp, { recursive: true, force: true });
+  }
+});
+
+test("status trae-cn installed=true with auth readable when the storage file exists", async () => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "tokentracker-status-traecn-"));
+  const prevHome = process.env.HOME;
+  const prevUserProfile = process.env.USERPROFILE;
+  const prevTraeCnHome = process.env.TOKENTRACKER_TRAE_CN_HOME;
+  const prevTraeCnUsage = process.env.TOKENTRACKER_TRAE_CN_USAGE;
+  const prevWrite = process.stdout.write;
+
+  try {
+    process.env.HOME = tmp;
+    process.env.USERPROFILE = tmp;
+    // Platform-independent: the default-path resolver is darwin-only, so point
+    // the env override at a synthetic install. Same semantics under test:
+    // storage.json exists -> installed=true, auth readable.
+    process.env.TOKENTRACKER_TRAE_CN_HOME = path.join(tmp, "trae-install");
+    delete process.env.TOKENTRACKER_TRAE_CN_USAGE;
+
+    const storageDir = path.join(
+      process.env.TOKENTRACKER_TRAE_CN_HOME, "User", "globalStorage",
+    );
+    await fs.mkdir(storageDir, { recursive: true });
+    await fs.writeFile(
+      path.join(storageDir, "storage.json"),
+      JSON.stringify({ "iCubeAuthInfo://icube.cloudide": { token: "fake.jwt.value", refreshToken: "synthetic" } }),
+      "utf8",
+    );
+
+    let out = "";
+    process.stdout.write = (chunk, enc, cb) => {
+      out += typeof chunk === "string" ? chunk : chunk.toString(enc || "utf8");
+      if (typeof cb === "function") cb();
+      return true;
+    };
+    await cmdStatus(["--json"]);
+    const summary = JSON.parse(out);
+    assert.equal(summary.providers["trae-cn"].installed, true);
+    assert.equal(summary.providers["trae-cn"].auth, "readable");
+    assert.equal(summary.providers["trae-cn"].usage_opt_in, false, "opt-in stays off by default");
+
+    out = "";
+    await cmdStatus();
+    // Signed in but not opted in is the one actionable state here: the user
+    // has TRAE Work CN installed and readable, and a single env var is all
+    // that stands between them and usage data. Flag it so the line does not
+    // read like the ~30 other neutral install lines around it (#492).
+    assert.match(out, /- ⚠ Trae SOLO CN: usage sync off \(set TOKENTRACKER_TRAE_CN_USAGE=1 to enable\), auth readable/);
+  } finally {
+    process.stdout.write = prevWrite;
+    if (prevHome === undefined) delete process.env.HOME;
+    else process.env.HOME = prevHome;
+    if (prevUserProfile === undefined) delete process.env.USERPROFILE;
+    else process.env.USERPROFILE = prevUserProfile;
+    if (prevTraeCnHome === undefined) delete process.env.TOKENTRACKER_TRAE_CN_HOME;
+    else process.env.TOKENTRACKER_TRAE_CN_HOME = prevTraeCnHome;
+    if (prevTraeCnUsage === undefined) delete process.env.TOKENTRACKER_TRAE_CN_USAGE;
+    else process.env.TOKENTRACKER_TRAE_CN_USAGE = prevTraeCnUsage;
+    await fs.rm(tmp, { recursive: true, force: true });
+  }
+});
+
+test("status trae-cn installed=false for a custom TOKENTRACKER_TRAE_CN_HOME that does not exist", async () => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "tokentracker-status-traecn-"));
+  const prevHome = process.env.HOME;
+  const prevUserProfile = process.env.USERPROFILE;
+  const prevTraeCnHome = process.env.TOKENTRACKER_TRAE_CN_HOME;
+  const prevWrite = process.stdout.write;
+
+  try {
+    process.env.HOME = tmp;
+    process.env.USERPROFILE = tmp;
+    process.env.TOKENTRACKER_TRAE_CN_HOME = path.join(tmp, "no-such-install");
+
+    let out = "";
+    process.stdout.write = (chunk, enc, cb) => {
+      out += typeof chunk === "string" ? chunk : chunk.toString(enc || "utf8");
+      if (typeof cb === "function") cb();
+      return true;
+    };
+    await cmdStatus(["--json"]);
+    const summary = JSON.parse(out);
+    assert.equal(summary.providers["trae-cn"].installed, false, "env override pointing at nothing is not installed");
+  } finally {
+    process.stdout.write = prevWrite;
+    if (prevHome === undefined) delete process.env.HOME;
+    else process.env.HOME = prevHome;
+    if (prevUserProfile === undefined) delete process.env.USERPROFILE;
+    else process.env.USERPROFILE = prevUserProfile;
+    if (prevTraeCnHome === undefined) delete process.env.TOKENTRACKER_TRAE_CN_HOME;
+    else process.env.TOKENTRACKER_TRAE_CN_HOME = prevTraeCnHome;
+    await fs.rm(tmp, { recursive: true, force: true });
+  }
+});
+
+test("status trae-cn distinguishes malformed vs unreadable storage", async () => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "tokentracker-status-traecn-"));
+  const prevHome = process.env.HOME;
+  const prevUserProfile = process.env.USERPROFILE;
+  const prevTraeCnHome = process.env.TOKENTRACKER_TRAE_CN_HOME;
+  const prevWrite = process.stdout.write;
+
+  try {
+    process.env.HOME = tmp;
+    process.env.USERPROFILE = tmp;
+    const traeCnHome = path.join(tmp, "trae-cn-data");
+    process.env.TOKENTRACKER_TRAE_CN_HOME = traeCnHome;
+
+    const capture = () => {
+      let out = "";
+      process.stdout.write = (chunk, enc, cb) => {
+        out += typeof chunk === "string" ? chunk : chunk.toString(enc || "utf8");
+        if (typeof cb === "function") cb();
+        return true;
+      };
+      return async () => {
+        await cmdStatus(["--json"]);
+        return JSON.parse(out);
+      };
+    };
+
+    // Present but malformed JSON -> malformed (NOT not-signed-in, NOT unreadable).
+    const storageDir = path.join(traeCnHome, "User", "globalStorage");
+    await fs.mkdir(storageDir, { recursive: true });
+    await fs.writeFile(path.join(storageDir, "storage.json"), "{not json", "utf8");
+    let run = capture();
+    let summary = await run();
+    assert.equal(summary.providers["trae-cn"].installed, true);
+    assert.equal(summary.providers["trae-cn"].auth, "malformed");
+
+    // A storage path that exists but cannot be READ as a file (EISDIR: the
+    // resolved storage.json is itself a directory) -> unreadable, the
+    // fail-closed IO state, distinct from malformed.
+    await fs.rm(path.join(storageDir, "storage.json"), { force: true });
+    await fs.mkdir(path.join(storageDir, "storage.json"), { recursive: true });
+    run = capture();
+    summary = await run();
+    assert.equal(summary.providers["trae-cn"].installed, true);
+    assert.equal(summary.providers["trae-cn"].auth, "unreadable");
+  } finally {
+    process.stdout.write = prevWrite;
+    if (prevHome === undefined) delete process.env.HOME;
+    else process.env.HOME = prevHome;
+    if (prevUserProfile === undefined) delete process.env.USERPROFILE;
+    else process.env.USERPROFILE = prevUserProfile;
+    if (prevTraeCnHome === undefined) delete process.env.TOKENTRACKER_TRAE_CN_HOME;
+    else process.env.TOKENTRACKER_TRAE_CN_HOME = prevTraeCnHome;
+    await fs.rm(tmp, { recursive: true, force: true });
+  }
+});

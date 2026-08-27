@@ -20,6 +20,25 @@ describe("formatProviderDisplayName", () => {
     expect(formatProviderDisplayName("PI-GITHUB-COPILOT")).toBe("Pi · GitHub Copilot");
   });
 
+  it("names Dots both standalone and pi-routed", () => {
+    expect(formatProviderDisplayName("dots")).toBe("Dots");
+    expect(formatProviderDisplayName("DOTS")).toBe("Dots");
+    expect(formatProviderDisplayName("pi-dots")).toBe("Pi · Dots");
+    expect(formatProviderDisplayName("PI-DOTS")).toBe("Pi · Dots");
+  });
+
+  it("names pi backends that are not in the enumerated list", () => {
+    expect(formatProviderDisplayName("pi-xai")).toBe("Pi · xAI");
+    expect(formatProviderDisplayName("pi-opencode-go")).toBe("Pi · OpenCode Go");
+    expect(formatProviderDisplayName("pi")).toBe("Pi");
+  });
+
+  it("gives Prime Agent routed providers distinct readable names", () => {
+    expect(formatProviderDisplayName("prime-agent")).toBe("Prime Agent");
+    expect(formatProviderDisplayName("prime-agent-anthropic")).toBe("Prime Agent · Anthropic");
+    expect(formatProviderDisplayName("PRIME_AGENT_GITHUB_COPILOT")).toBe("Prime Agent · GitHub Copilot");
+  });
+
   it("formats omp as oh-my-pi", () => {
     expect(formatProviderDisplayName("omp")).toBe("oh-my-pi");
     expect(formatProviderDisplayName("OMP")).toBe("oh-my-pi");
@@ -29,4 +48,11 @@ describe("formatProviderDisplayName", () => {
     expect(formatProviderDisplayName("dsh")).toBe("DeepSeek Harness");
     expect(formatProviderDisplayName("deepseek")).toBe("DeepSeek Harness");
   });
+
+  it.each(["trae-cn", "TRAE-CN", "Trae_Cn", "TRAE Work CN"])(
+    "uses the catalog-backed TRAE Work CN name for %s",
+    (value) => {
+      expect(formatProviderDisplayName(value)).toBe("TRAE Work CN");
+    },
+  );
 });

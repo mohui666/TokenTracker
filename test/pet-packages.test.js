@@ -421,3 +421,42 @@ test("removing bundled pets hides every built-in except Clawd", async () => {
     assert.deepEqual(pets.readHiddenBuiltinIds(), ["ember", "sprout"]);
   });
 });
+
+test("reclaims a directory whose id became a reserved built-in", () => {
+  // `bot` became a built-in in 0.93.0. Before this reclaim, a package already sitting
+  // at pets/bot/ was skipped by every listing (BUILTIN_IDS) and removeInstalledPet
+  // routed it to hideBuiltinPet, which rejects a non-removable built-in — leaving it
+  // invisible and undeletable.
+  const reserved = path.join(root, "bot");
+  fs.mkdirSync(reserved, { recursive: true });
+  fs.writeFileSync(path.join(reserved, "pet.json"), JSON.stringify({
+    id: "bot",
+    displayName: "Third Party Bot",
+    description: "A community pet that happened to claim the id we later reserved.",
+    spritesheetPath: "spritesheet.webp",
+  }));
+  fs.writeFileSync(path.join(reserved, "spritesheet.webp"), webpHeader(1536, 1872));
+
+  const listed = pets.listInstalledPets();
+
+  assert.ok(!fs.existsSync(reserved), "the reserved directory must be vacated");
+  const moved = path.join(root, "bot-imported");
+  assert.ok(fs.existsSync(moved), "the package must be renamed, not deleted");
+  assert.equal(
+    JSON.parse(fs.readFileSync(path.join(moved, "pet.json"), "utf8")).id,
+    "bot-imported",
+    "the manifest id must follow the directory or the package cannot load",
+  );
+  assert.ok(
+    listed.some((pet) => pet.id === "bot-imported"),
+    "the rescued package must be listed again",
+  );
+
+  // Idempotent: a second pass must not invent bot-imported-2.
+  pets.listInstalledPets();
+  assert.ok(!fs.existsSync(path.join(root, "bot-imported-2")));
+
+  // And it is removable now, which it was not before.
+  pets.removeInstalledPet("bot-imported");
+  assert.ok(!fs.existsSync(moved));
+});

@@ -268,6 +268,30 @@ test("native account publication waits for an overlapping sync instead of report
   });
 });
 
+test("explicit wait-for-lock fails instead of reporting success when the lock stays busy", async () => {
+  await withTempSyncEnv(async (home) => {
+    const trackerDir = path.join(home, ".tokentracker", "tracker");
+    await fs.mkdir(trackerDir, { recursive: true });
+    const lockPath = path.join(trackerDir, "sync.lock");
+    const active = await openLock(lockPath, {
+      quietIfLocked: true,
+    });
+    assert.ok(active);
+
+    try {
+      await assert.rejects(
+        cmdSync(
+          ["--wait-for-lock"],
+          { lockWaitOptions: { priorityWaitMs: 40, priorityPollMs: 5 } },
+        ),
+        (error) => error.code === "SYNC_BUSY",
+      );
+    } finally {
+      await active.release();
+    }
+  });
+});
+
 test("manual drain fails explicitly when the sync lock stays busy", async () => {
   await withTempSyncEnv(async (home) => {
     const trackerDir = path.join(home, ".tokentracker", "tracker");

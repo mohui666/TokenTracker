@@ -49,11 +49,23 @@ describe("ProviderIcon", () => {
     expect(icon).toHaveAttribute("height", "20");
   });
 
-  it("renders the multi-color Pi brand logo", () => {
+  it("renders the official white Pi mark with explicit light and dark treatment", () => {
     const { container } = render(<ProviderIcon provider="pi" size={18} />);
     const icon = container.querySelector('img[src="/brand-logos/pi.svg"]');
     expect(icon).not.toBeNull();
     expect(icon).toHaveAttribute("width", "18");
+    // Official pi.dev/logo.svg is white-only: black on light, white on dark.
+    expect(icon).toHaveClass("brightness-0", "dark:brightness-100");
+  });
+
+  it("renders the Dots Studio sail brand logo for both the standalone and pi-routed sources", () => {
+    for (const provider of ["dots", "pi-dots"]) {
+      const { container } = render(<ProviderIcon provider={provider} size={18} />);
+      const icon = container.querySelector('img[src="/brand-logos/dots.png"]');
+      expect(icon, `${provider} maps to dots.png`).not.toBeNull();
+      expect(icon).toHaveAttribute("width", "18");
+      expect(icon).toHaveClass("dark:invert");
+    }
   });
 
   it("renders the Reasonix brand icon", () => {
@@ -77,6 +89,22 @@ describe("ProviderIcon", () => {
       expect(icon?.querySelector('path[fill="currentColor"]')).not.toBeNull();
     }
   });
+
+  it("renders the compact TRAE CN mark instead of the unknown-provider placeholder", () => {
+    const { container } = render(<ProviderIcon provider="trae-cn" size={20} />);
+    const icon = container.querySelector('svg[data-brand="trae-cn"]');
+
+    expect(icon).not.toBeNull();
+    expect(icon).toHaveAttribute("width", "20");
+    expect(icon).toHaveAttribute("height", "20");
+    expect(icon).toHaveAttribute("aria-hidden", "true");
+    // Official app-icon palette: white rounded square + black mask, fixed
+    // colors instead of currentColor (same policy as the Craft mark).
+    expect(icon?.querySelector("rect")).not.toBeNull();
+    expect(icon?.querySelector("path")).not.toBeNull();
+    expect(icon?.querySelector("circle")).toBeNull();
+    expect(container.querySelector(".text-oai-gray-400")).toBeNull();
+  });
 });
 
   it("renders the Qoder CN green-crescent mark from its own asset", () => {
@@ -88,10 +116,19 @@ describe("ProviderIcon", () => {
     expect(icon).not.toHaveClass("dark:invert");
   });
 
-  it("renders the multi-color Pi mark for the DeepSeek and OpenAI-Codex variants", () => {
-    for (const provider of ["pi-deepseek", "pi-openai-codex"]) {
+  it("renders the Pi mark for every routed pi-* source, listed or not", () => {
+    // rollout.js mints `pi-<provider>` from an open-ended slug, so unlisted
+    // backends (pi-xai, pi-opencode-go) must resolve too. A backend with its
+    // own brand mark (pi-dots) keeps it — see the Dots case above.
+    for (const provider of [
+      "pi-deepseek",
+      "pi-openai-codex",
+      "pi-xai",
+      "pi-opencode-go",
+    ]) {
       const { container } = render(<ProviderIcon provider={provider} size={16} />);
       const icon = container.querySelector('img[src="/brand-logos/pi.svg"]');
       expect(icon, `${provider} maps to pi.svg`).not.toBeNull();
+      expect(icon, `${provider} switches luminance`).toHaveClass("brightness-0", "dark:brightness-100");
     }
   });

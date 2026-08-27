@@ -57,6 +57,7 @@ internal sealed class PetWindow : Window
     private bool _syncing;
     private JsonNode? _limits;
     private string _character = CurrentCharacter;
+    private string _botColor = CurrentBotColor;
     private UsagePoller.UsageStats _stats;
     private bool _connected = true;
     private double _bubbleBand = MinBubbleBand;
@@ -714,6 +715,11 @@ internal sealed class PetWindow : Window
         var rate = _curRate.ToString(inv);
         var loc = System.Text.Json.JsonSerializer.Serialize(_locale);
         var character = System.Text.Json.JsonSerializer.Serialize(_character);
+        var botColor = System.Text.Json.JsonSerializer.Serialize(_botColor);
+        // The pet host renders without ThemeProvider, so nothing there can resolve the
+        // appearance on its own. Without this the bot's default "auto" body colour is
+        // stuck on the light value — a near-black blob on a dark desktop.
+        var petDark = NativeTheme.ResolveIsLight(NativeTheme.CurrentPreference) ? "false" : "true";
         var syncing = _syncing ? "true" : "false";
         var cost = _stats.TodayCostUsd.ToString(inv);
         var limitsJson = _limits?.ToJsonString() ?? "null";
@@ -741,6 +747,8 @@ internal sealed class PetWindow : Window
                 $"window.__ttPetCurrency={{symbol:{sym},rate:{rate}}};" +
                 $"window.__ttPetLocale={loc};" +
                 $"window.__ttPetCharacter={character};" +
+                $"window.__ttPetBotColor={botColor};" +
+                $"window.__ttPetDark={petDark};" +
                 $"window.__ttPetLookDirectionIndex={lookDirection};" +
                 $"window.__ttPetSyncing={syncing};" +
                 $"window.__ttPetTokens={_stats.TodayTokens};" +
@@ -753,6 +761,8 @@ internal sealed class PetWindow : Window
                 "window.dispatchEvent(new Event('pet:currency'));" +
                 "window.dispatchEvent(new Event('pet:locale'));" +
                 "window.dispatchEvent(new Event('pet:character'));" +
+                "window.dispatchEvent(new Event('pet:botColor'));" +
+                "window.dispatchEvent(new Event('pet:dark'));" +
                 "window.dispatchEvent(new Event('pet:look'));" +
                 "window.dispatchEvent(new Event('pet:syncing'));" +
                 "window.dispatchEvent(new Event('pet:usage'));" +
@@ -799,6 +809,46 @@ internal sealed class PetWindow : Window
         WriteSettings(s => s["PetCharacter"] = normalized);
     }
 
+    /// <summary>Body colour for the vector `bot` character ("auto" follows the theme).</summary>
+    public void ApplyBotColor(string colorId)
+    {
+        _botColor = NormalizeBotColor(colorId);
+        WriteSettings(s => s["PetBotColor"] = _botColor);
+        PushContext();
+    }
+
+    public static void PersistBotColor(string colorId)
+    {
+        WriteSettings(s => s["PetBotColor"] = NormalizeBotColor(colorId));
+    }
+
+    /// Validated web-side against the palette shipped with the engine; here we only
+    /// keep it to a short slug so a bad value cannot become script.
+    private static string NormalizeBotColor(string? colorId)
+    {
+        var value = (colorId ?? string.Empty).Trim().ToLowerInvariant();
+        if (value.Length == 0 || value.Length > 32) return "auto";
+        foreach (var c in value)
+        {
+            if (!(char.IsAsciiLetterLower(c) || char.IsAsciiDigit(c) || c == '-')) return "auto";
+        }
+        return value;
+    }
+
+    public static string CurrentBotColor
+    {
+        get
+        {
+            try
+            {
+                if (!File.Exists(SettingsPath)) return "auto";
+                var s = JsonNode.Parse(File.ReadAllText(SettingsPath))?.AsObject();
+                return NormalizeBotColor(s?["PetBotColor"]?.GetValue<string>());
+            }
+            catch { return "auto"; }
+        }
+    }
+
     public void TogglePet()
     {
         if (IsVisible) HidePet();
@@ -836,18 +886,22 @@ internal sealed class PetWindow : Window
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "TokenTracker", "native-settings.json");
 
-    /// <summary>True if the pet was visible when the app last exited (restored on launch).</summary>
-    public static bool WasVisible
+    /// <summary>
+    /// The persisted pet visibility, or null when the user has never toggled it.
+    /// Null lets first launches fall back to the default (show on a manual run);
+    /// an explicit false must survive restarts (issue #475).
+    /// </summary>
+    public static bool? StoredVisible
     {
         get
         {
             try
             {
-                if (!File.Exists(SettingsPath)) return false;
+                if (!File.Exists(SettingsPath)) return null;
                 var s = JsonNode.Parse(File.ReadAllText(SettingsPath))?.AsObject();
-                return s?["PetVisible"]?.GetValue<bool>() ?? false;
+                return s?["PetVisible"]?.GetValue<bool>();
             }
-            catch { return false; }
+            catch { return null; }
         }
     }
 
@@ -863,6 +917,7 @@ internal sealed class PetWindow : Window
     public const string SizeLarge = "large";
 
     public const string CharacterClawd = "clawd";
+    public const string CharacterBot = "bot";
     public const string CharacterSprout = "sprout";
     public const string CharacterByte = "byte";
     public const string CharacterEmber = "ember";
@@ -892,6 +947,7 @@ internal sealed class PetWindow : Window
             CharacterByte => CharacterByte,
             CharacterEmber => CharacterEmber,
             CharacterClawd => CharacterClawd,
+            CharacterBot => CharacterBot,
             _ when Regex.IsMatch(normalized, "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$")
                 => normalized,
             _ => CharacterClawd,

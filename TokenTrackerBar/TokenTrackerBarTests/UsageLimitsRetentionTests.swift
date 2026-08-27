@@ -72,6 +72,14 @@ final class UsageLimitsRetentionTests: XCTestCase {
         XCTAssertTrue(response.hasAnyProviderWithoutError)
     }
 
+    func testQoderCnCountsWhenUsable() throws {
+        let response = try decodeResponse(overrides: [
+            "qoderCn": ["configured": true],
+        ])
+
+        XCTAssertTrue(response.hasAnyProviderWithoutError)
+    }
+
     func testOptionalProviderWithErrorDoesNotCount() throws {
         let response = try decodeResponse(overrides: [
             "copilot": ["configured": true, "error": "rate limited"],

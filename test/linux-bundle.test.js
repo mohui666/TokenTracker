@@ -35,6 +35,24 @@ test("Linux bundle rebuilds an isolated runtime and synchronizes an isolated Tau
     fs.mkdirSync(dashboardDist, { recursive: true });
     fs.writeFileSync(path.join(dashboardDist, "index.html"), "<main>dashboard fixture</main>");
 
+    // The bundle script verifies the downloaded Node tarball with `sha256sum`,
+    // and so does the stubbed curl below. That binary is GNU coreutils and does
+    // not exist on macOS, so stubbing curl/tar/npm but not the checksum tool is
+    // what kept this test Linux-only. The shim is a real SHA-256 in sha256sum's
+    // output format, so the checksum gate is still exercised, not bypassed.
+    fs.writeFileSync(path.join(toolsDir, "sha256sum.cjs"), `const { createHash } = require("node:crypto");
+const fs = require("node:fs");
+const digest = (buffer) => createHash("sha256").update(buffer).digest("hex");
+const files = process.argv.slice(2);
+const targets = files.length > 0 ? files : ["-"];
+for (const target of targets) {
+  process.stdout.write(\`\${digest(fs.readFileSync(target === "-" ? 0 : target))}  \${target}\\n\`);
+}
+`);
+    writeExecutable(path.join(toolsDir, "sha256sum"), `#!/usr/bin/env bash
+set -euo pipefail
+exec "\${TOKENTRACKER_TEST_NODE:-node}" "$(dirname "$0")/sha256sum.cjs" "$@"
+`);
     writeExecutable(path.join(toolsDir, "curl"), `#!/usr/bin/env bash
 set -euo pipefail
 output=""
@@ -63,6 +81,7 @@ chmod +x "$destination/node-v22.22.2-linux-x64/bin/node"
       env: {
         ...process.env,
         PATH: `${toolsDir}:${process.env.PATH}`,
+        TOKENTRACKER_TEST_NODE: process.execPath,
         TOKENTRACKER_LINUX_EMBED_DIR: embeddedServer,
         TOKENTRACKER_DASHBOARD_DIST: dashboardDist,
         TOKENTRACKER_TAURI_ICON: tauriIcon,

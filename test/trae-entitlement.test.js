@@ -116,6 +116,17 @@ test("resolveTraeStoragePath resolves existing storage.json", () => {
   );
 });
 
+test("resolveTraeStoragePath finds the CN IDE build (Trae CN) on Windows", () => {
+  if (process.platform !== "win32") return; // path layout is Windows-specific
+  const appData = fs.mkdtempSync(path.join(os.tmpdir(), "trae-cn-ide-"));
+  const traeCnDir = path.join(appData, "Trae CN");
+  const storagePath = writeStorage(traeCnDir, sampleEntitlement());
+  assert.equal(
+    resolveTraeStoragePath({ APPDATA: appData }),
+    storagePath,
+  );
+});
+
 test("toUtcHalfHourStart buckets to :00 and :30 UTC starts", () => {
   assert.equal(
     toUtcHalfHourStart("2026-08-07T01:15:00.000Z"),

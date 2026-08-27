@@ -1,6 +1,7 @@
 // Canonical list of supported coding agents, in display order. Shared by the
 // marketing landing carousel and the dashboard auth/expired gate so the two
 // surfaces can't drift. Names are tooltip/a11y metadata only.
+
 export const AGENT_LOGOS = [
   { id: 1, name: "Claude Code", provider: "claude" },
   { id: 2, name: "Codex", provider: "codex" },
@@ -19,18 +20,28 @@ export const AGENT_LOGOS = [
   { id: 15, name: "Grok", provider: "grok" },
   { id: 16, name: "oh-my-pi", provider: "omp" },
   { id: 17, name: "Pi", provider: "pi" },
-  { id: 18, name: "Craft", provider: "craft" },
-  { id: 19, name: "Reasonix", provider: "reasonix" },
-  { id: 20, name: "Kilo CLI", provider: "kilo-cli" },
-  { id: 21, name: "Kilo Code", provider: "kilocode" },
-  { id: 22, name: "Roo Code", provider: "roocode" },
-  { id: 23, name: "Zed", provider: "zed" },
-  { id: 24, name: "Goose", provider: "goose" },
-  { id: 25, name: "Droid", provider: "droid" },
-  { id: 26, name: "Mimo", provider: "mimo" },
-  { id: 27, name: "ZCode", provider: "zcode" },
-  { id: 28, name: "Qoder", provider: "qoder" },
-  { id: 29, name: "AnythingLLM", provider: "anythingllm" },
-  { id: 30, name: "Claude Science", provider: "claude-science" },
-  { id: 31, name: "DeepSeek Harness", provider: "dsh" },
+  { id: 18, name: "Dots", provider: "dots" },
+  { id: 19, name: "Prime Agent", provider: "prime-agent" },
+  { id: 20, name: "Craft", provider: "craft" },
+  { id: 21, name: "Reasonix", provider: "reasonix" },
+  { id: 22, name: "Kilo CLI", provider: "kilo-cli" },
+  { id: 23, name: "Kilo Code", provider: "kilocode" },
+  { id: 24, name: "Roo Code", provider: "roocode" },
+  { id: 25, name: "Zed", provider: "zed" },
+  { id: 26, name: "Goose", provider: "goose" },
+  { id: 27, name: "Droid", provider: "droid" },
+  { id: 28, name: "Mimo", provider: "mimo" },
+  { id: 29, name: "ZCode", provider: "zcode" },
+  { id: 30, name: "Qoder", provider: "qoder" },
+  { id: 31, name: "AnythingLLM", provider: "anythingllm" },
+  { id: 32, name: "Claude Science", provider: "claude-science" },
+  { id: 33, name: "DeepSeek Harness", provider: "dsh" },
+  {
+    id: 34,
+    // No hardcoded English fallback name: every consumer renders through
+    // copy() (LogoCarousel prefers nameKey; see LogoCarousel.test.jsx), so a
+    // parallel "name" string would just duplicate the copy.csv entry.
+    nameKey: "provider.display.trae_work_cn",
+    provider: "trae-cn",
+  },
 ];

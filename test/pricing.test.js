@@ -711,6 +711,100 @@ test("index: getModelPricing resolves Cursor Grok and version-first Claude alias
   );
 });
 
+test("index: DeepSeek V4 pricing follows official UTC peak and off-peak windows (#491)", () => {
+  pricing.resetPricingForTests();
+  const row = (model, hour_start) => ({
+    source: "dsh",
+    model,
+    hour_start,
+    input_tokens: 1_000_000,
+    cached_input_tokens: 1_000_000,
+    cache_creation_input_tokens: 1_000_000,
+    output_tokens: 1_000_000,
+    reasoning_output_tokens: 0,
+  });
+
+  assert.deepEqual(
+    pricing.getModelPricing("deepseek-v4-flash"),
+    { input: 0.44, output: 1.32, cache_read: 0.014, cache_write: 0.44 },
+  );
+  assert.deepEqual(
+    pricing.getModelPricing("deepseek-v4-pro"),
+    { input: 1.32, output: 3.96, cache_read: 0.044, cache_write: 1.32 },
+  );
+  assert.deepEqual(
+    pricing.getModelPricing("deepseek-v4-flash-vision-exp"),
+    { input: 0.44, output: 1.32, cache_read: 0.014, cache_write: 0.44 },
+  );
+
+  assert.equal(pricing.computeRowCost(row("deepseek-v4-flash", "2026-08-21T01:00:00Z")), 2.214);
+  assert.equal(pricing.computeRowCost(row("deepseek-v4-flash", "2026-08-21T03:30:00Z")), 2.214);
+  assert.equal(pricing.computeRowCost(row("deepseek-v4-flash", "2026-08-21T04:00:00Z")), 1.107);
+  assert.equal(pricing.computeRowCost(row("deepseek-v4-pro", "2026-08-21T06:00:00Z")), 6.644);
+  assert.equal(pricing.computeRowCost(row("deepseek-v4-pro", "2026-08-21T10:00:00Z")), 3.322);
+
+  assert.equal(
+    pricing.computeRowCost({ ...row("deepseek-v4-pro", null), pricing_tier: "off_peak" }),
+    3.322,
+  );
+  assert.equal(
+    pricing.computeRowCost({ ...row("deepseek-v4-pro", "2026-08-21T12:00:00Z"), pricing_tier: "peak" }),
+    6.644,
+  );
+  assert.equal(
+    pricing.computeRowCost(row("deepseek-v4-pro", "invalid")),
+    6.644,
+    "missing/invalid timestamps fail closed to peak pricing",
+  );
+
+  // From 00:00 Beijing time on 2026-08-23 — 2026-08-22T16:00Z — whole Beijing
+  // weekends bill off-peak, peak hours included.
+  assert.equal(
+    pricing.computeRowCost(row("deepseek-v4-pro", "2026-08-22T06:00:00Z")),
+    6.644,
+    "Beijing Saturday before the rule takes effect is still peak",
+  );
+  assert.equal(
+    pricing.computeRowCost(row("deepseek-v4-pro", "2026-08-23T01:00:00Z")),
+    3.322,
+    "Beijing Sunday 09:00 is the first peak window the weekend rule flips",
+  );
+  assert.equal(
+    pricing.computeRowCost(row("deepseek-v4-flash", "2026-08-23T09:59:00Z")),
+    1.107,
+    "Beijing Sunday 17:59 is still inside the weekend",
+  );
+  assert.equal(
+    pricing.computeRowCost(row("deepseek-v4-pro", "2026-08-24T01:00:00Z")),
+    6.644,
+    "Beijing Monday 09:00 is a weekday again",
+  );
+  assert.equal(
+    pricing.computeRowCost(row("deepseek-v4-pro", "2026-08-28T06:00:00Z")),
+    6.644,
+    "Beijing Friday 14:00 is a weekday",
+  );
+  assert.equal(
+    pricing.computeRowCost(row("deepseek-v4-pro", "2026-08-29T06:00:00Z")),
+    3.322,
+    "Beijing Saturday 14:00 is off-peak",
+  );
+  assert.equal(
+    pricing.computeRowCost({
+      ...row("deepseek-v4-pro", "2026-08-23T01:00:00Z"),
+      pricing_tier: "peak",
+    }),
+    6.644,
+    "an explicit stored tier still wins over the derived weekend rule",
+  );
+
+  assert.deepEqual(
+    pricing.getModelPricing("deepseek-chat"),
+    { input: 0.14, output: 0.28, cache_read: 0.0028, cache_write: 0.14 },
+    "legacy model ids keep their historical static rate",
+  );
+});
+
 test("index: Cursor Fast SKUs keep their distinct curated pricing (#446)", () => {
   const rates = (model) => {
     const { input, output, cache_read, cache_write } = model;

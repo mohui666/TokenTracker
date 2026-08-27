@@ -14,6 +14,10 @@ const nativeSettingsMock = vi.hoisted(() => ({
   setSetting: vi.fn(),
 }));
 
+const proxySettingsMock = vi.hoisted(() => ({
+  available: false,
+}));
+
 const LABELS = {
   "settings.page.title": "Settings",
   "settings.page.subtitle": "Manage your preferences",
@@ -21,6 +25,7 @@ const LABELS = {
   "settings.section.menubar": "Menu Bar App",
   "settings.section.limits": "Limits Display",
   "settings.section.labs": "Labs",
+  "settings.section.network": "Network",
   "settings.limits.providers": "Providers",
   "limits.settings.display_mode_label": "Usage Display",
   "settings.menubar.toastOnReset": "Toast on limits reset",
@@ -54,6 +59,16 @@ vi.mock("../hooks/use-native-settings.js", () => ({
   }),
 }));
 
+vi.mock("../hooks/use-proxy-settings.js", () => ({
+  useProxySettings: () => ({
+    available: proxySettingsMock.available,
+    loading: false,
+    config: { mode: "system", protocol: "http", host: "", port: "", effective: "none" },
+    save: vi.fn(),
+    testConnection: vi.fn(),
+  }),
+}));
+
 vi.mock("../components/settings/AppearanceSection.jsx", () => ({
   AppearanceSection: () => <div data-testid="appearance-content" />,
 }));
@@ -65,6 +80,10 @@ vi.mock("../components/settings/MenuBarSection.jsx", () => ({
 
 vi.mock("../components/settings/LabsSection.jsx", () => ({
   LabsSection: () => <div data-testid="labs-content" />,
+}));
+
+vi.mock("../components/settings/NetworkSection.jsx", () => ({
+  NetworkSection: () => <div data-testid="network-content" />,
 }));
 
 vi.mock("../components/LimitsSettingsPanel.jsx", () => ({
@@ -112,6 +131,7 @@ describe("SettingsPage category navigation", () => {
       confettiOnReset: true,
     };
     nativeSettingsMock.setSetting.mockReset();
+    proxySettingsMock.available = false;
   });
 
   it("switches the visible category while keeping every section mounted", async () => {
@@ -137,6 +157,23 @@ describe("SettingsPage category navigation", () => {
     expect(appearanceButton).not.toHaveAttribute("aria-current");
     expect(appearancePanel).toHaveAttribute("hidden");
     expect(labsPanel).not.toHaveAttribute("hidden");
+  });
+
+  it("omits the network category when the local proxy API is unavailable", () => {
+    proxySettingsMock.available = false;
+    const { container } = renderSettings();
+
+    expect(screen.queryByRole("button", { name: "Network" })).not.toBeInTheDocument();
+    expect(container.querySelector('[data-settings-panel="network"]')).toBeNull();
+  });
+
+  it("shows the network category when the local proxy API is available", () => {
+    proxySettingsMock.available = true;
+    const { container } = renderSettings();
+
+    expect(screen.getByRole("button", { name: "Network" })).toBeInTheDocument();
+    expect(container.querySelector('[data-settings-panel="network"]')).not.toBeNull();
+    expect(screen.getByTestId("network-content")).toBeInTheDocument();
   });
 
   it("omits the native-app category when the native bridge is unavailable", () => {

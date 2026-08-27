@@ -2,6 +2,10 @@ import XCTest
 import Combine
 
 final class LimitsSettingsStoreTests: XCTestCase {
+
+    func testQoderCnUsesItsDedicatedIcon() {
+        XCTAssertEqual(LimitsSettingsStore.iconNames["qoderCn"], "QoderCnLogo")
+    }
     private var cancellables: Set<AnyCancellable> = []
 
     override func tearDown() {

@@ -241,9 +241,12 @@ test("V2 look directions use the same 16-cell row mapping on web, macOS, and Win
 
 test("removed bundled pets disappear from both native character menus while Clawd remains", () => {
   assert.match(macControllerSource, /hiddenBuiltinsFilename = "\.hidden-builtins\.json"/);
+  // Keyed on the renderer rather than special-casing clawd: only atlas-backed
+  // builtins are hideable, which is what REMOVABLE_BUILTIN_IDS encodes on the Node
+  // side. `bot` is drawn from the vector engine and so is never hideable either.
   assert.match(
     macControllerSource,
-    /\$0 == \.clawd \|\| !hiddenBuiltinIDs\.contains\(\$0\.rawValue\)/,
+    /\$0\.renderer != \.atlas \|\| !hiddenBuiltinIDs\.contains\(\$0\.rawValue\)/,
   );
   assert.match(windowsPetSource, /HiddenBuiltinsFilename = "\.hidden-builtins\.json"/);
   assert.match(windowsPetSource, /IsBuiltinCharacterHidden\(normalized\)/);

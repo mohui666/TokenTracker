@@ -265,6 +265,7 @@ final class NativeBridge {
         let payload: [String: Any] = [
             "visible": controller.isVisible,
             "character": PetCharacterStore.shared.character.rawValue,
+            "botColor": PetCharacterStore.shared.botColor,
             "size": PetSizePreset.from(scale: controller.uiState.floatingScale).rawValue,
         ]
         guard let data = try? JSONSerialization.data(withJSONObject: payload),
@@ -412,6 +413,13 @@ final class NativeBridge {
         case "character":
             if let raw = value as? String, let character = PetCharacter(rawValue: raw) {
                 controller.setCharacter(character)
+            }
+        case "botColor":
+            if let raw = value as? String {
+                // Unlike the paths above, the store has no dashboard-visible side effect
+                // to echo, so push explicitly after it settles.
+                PetCharacterStore.shared.setBotColor(raw)
+                pushPetSettings()
             }
         case "size":
             if let raw = value as? String, let size = PetSizePreset(rawValue: raw) {

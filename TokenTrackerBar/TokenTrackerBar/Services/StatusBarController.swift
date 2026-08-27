@@ -27,6 +27,12 @@ final class StatusBarController: NSObject {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let popover = NSPopover()
     private var popoverAnchorWindow: NSWindow?
+    private var popoverDismissMonitor: Any?
+    /// systemUptime when the popover was last shown — the debounce reference for
+    /// duplicated status-button action dispatches (full-screen menu bar reveal).
+    private var popoverShownAt: TimeInterval = 0
+    /// One-shot latch so the full-screen activation recovery never loops.
+    private var popoverReshowAttempted = false
     private let viewModel: DashboardViewModel
     private let serverManager: ServerManager
     private let launchAtLoginManager: LaunchAtLoginManager
@@ -776,6 +782,16 @@ final class StatusBarController: NSObject {
     }
 
     private func handlePopoverDidClose() {
+        if let popoverDismissMonitor {
+            NSEvent.removeMonitor(popoverDismissMonitor)
+            self.popoverDismissMonitor = nil
+        }
+        // Detach the reused popover window from the anchor before hiding the
+        // anchor, or the next show inherits a stale child relationship.
+        if let popoverWindow = popover.contentViewController?.view.window,
+           popoverWindow.parent === popoverAnchorWindow {
+            popoverAnchorWindow?.removeChildWindow(popoverWindow)
+        }
         viewModel.setPopoverVisible(false)
         popoverAnchorWindow?.orderOut(nil)
         updateStatsDisplay()
@@ -789,6 +805,7 @@ final class StatusBarController: NSObject {
         if event.type == .rightMouseUp {
             showMenu()
         } else {
+            popoverReshowAttempted = false
             togglePopover()
         }
     }
@@ -797,12 +814,28 @@ final class StatusBarController: NSObject {
         guard let button = statusItem.button else { return }
 
         if popover.isShown {
-            closePopoverIfShown()
+            // The revealed auto-hiding menu bar over a full-screen Space can
+            // dispatch the status button's action twice for one physical click
+            // (macOS 26), which closed the popover before the user ever saw it.
+            // Swallow a "close" toggle arriving right after the popover opened.
+            if ProcessInfo.processInfo.systemUptime - popoverShownAt > 0.5 {
+                closePopoverIfShown()
+            }
             return
         }
 
         guard let anchorView = positionPopoverAnchorWindow(under: button) else { return }
+        // The window's Space assignment happens inside popover.show(). The
+        // reused _NSPopoverWindow keeps the desktop it was first ordered in on,
+        // and on macOS 26 the post-show insert below is applied too late — the
+        // popover then renders only on that one desktop (#506). Mark the reused
+        // window for all Spaces *before* showing so the assignment made during
+        // show already sees .canJoinAllSpaces.
+        if let reusedWindow = popover.contentViewController?.view.window {
+            reusedWindow.collectionBehavior.insert([.canJoinAllSpaces, .fullScreenAuxiliary])
+        }
         popover.show(relativeTo: anchorView.bounds, of: anchorView, preferredEdge: .minY)
+        popoverShownAt = ProcessInfo.processInfo.systemUptime
         viewModel.setPopoverVisible(true)
 
         // Keep keyboard focus inside the popover while it is visible.
@@ -816,12 +849,134 @@ final class StatusBarController: NSObject {
             // while the Dashboard window is frontmost). .fullScreenAuxiliary matches
             // the anchor window so the popover also shows over full-screen Spaces.
             window.collectionBehavior.insert([.canJoinAllSpaces, .fullScreenAuxiliary])
-            NSApp.activate(ignoringOtherApps: true)
+            // Over another app's full-screen Space, an inactive app's popover is
+            // not admitted onto the Space and never becomes visible even though
+            // isVisible reports true (collectionBehavior alone doesn't help — the
+            // Space assignment already happened during show). Attach the popover
+            // window as a child of the status-bar-level anchor window, which is
+            // admitted everywhere, so the popover inherits its Space placement.
+            window.level = .statusBar
+            if let anchorWindow = popoverAnchorWindow, window.parent == nil {
+                anchorWindow.addChildWindow(window, ordered: .above)
+            }
+            window.orderFrontRegardless()
             window.makeKey()
+
+            // Tahoe renders the automatic NSPopover Liquid Glass subdued while the
+            // owning app is inactive, so the full material needs app activation.
+            // Activating in the same runloop pass as popover.show() can switch the
+            // app's Space/window association mid-anchor and strand the popover on
+            // another display (#481), so defer activation until the popover has
+            // anchored, gate it on no other window being able to steal key focus,
+            // then realign the popover with its anchor if activation displaced it.
+            // Older systems use the classic material and stay non-activating.
+            if #available(macOS 26, *) {
+                DispatchQueue.main.async { [weak self] in
+                    guard let self, self.popover.isShown else { return }
+                    // Check the popover window itself, not the anchor: the anchor
+                    // is .canJoinAllSpaces, so it reports admitted on every regular
+                    // Space even when the popover window stayed pinned to another
+                    // desktop (#506).
+                    let popoverAdmitted = self.popover.contentViewController?.view.window?.isOnActiveSpace ?? true
+                    if popoverAdmitted {
+                        guard self.canActivateForPopoverGlass() else { return }
+                        NSApp.activate(ignoringOtherApps: true)
+                        DispatchQueue.main.async { [weak self] in
+                            self?.realignPopoverWithAnchorIfDisplaced()
+                        }
+                    } else {
+                        // The popover is shown but not admitted onto the active
+                        // Space — either that Space is another app's full-screen
+                        // Space (admits no window of an inactive app), or the
+                        // reused popover window stayed pinned to the desktop it
+                        // was first ordered in on (#506). Activation is the only
+                        // way in; then re-show it once at the same anchor.
+                        NSApp.activate(ignoringOtherApps: true)
+                        DispatchQueue.main.async { [weak self] in
+                            self?.reshowPopoverOnActiveSpace()
+                        }
+                    }
+                }
+            }
+        }
+
+        popoverDismissMonitor = NSEvent.addGlobalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown]
+        ) { [weak self] _ in
+            Task { @MainActor in self?.closePopoverIfShown() }
         }
 
         // Opportunistically sync stale local data before refreshing the popover.
         Task { await viewModel.refreshForPopoverOpen() }
+    }
+
+    // After activating to get admitted onto the active Space, the transient
+    // popover may have been dismissed (another app window grabbed key during
+    // activation). Re-open it once at the same anchor now that the app is active.
+    // If it survived but is still stranded on another desktop (#506), close it
+    // first — the fresh show lands on the now-active Space. If it survived on
+    // the right Space, just realign it.
+    private func reshowPopoverOnActiveSpace() {
+        if popover.isShown {
+            if popover.contentViewController?.view.window?.isOnActiveSpace == false {
+                guard !popoverReshowAttempted else { return }
+                popoverReshowAttempted = true
+                closePopoverIfShown()
+                // Re-show on the next tick, not inline: the reused
+                // _NSPopoverWindow has to actually order out before a fresh
+                // show can pick up the active Space, and `popover.isShown` is
+                // still settling — an inline toggle would be swallowed by the
+                // double-click guard and leave nothing on screen.
+                DispatchQueue.main.async { [weak self] in self?.togglePopover() }
+                return
+            }
+            realignPopoverWithAnchorIfDisplaced()
+            return
+        }
+        guard !popoverReshowAttempted else { return }
+        popoverReshowAttempted = true
+        togglePopover()
+    }
+
+    // Activation hands key focus to the app's regular windows. When one of them
+    // (typically the Dashboard) is visible on another screen or Space, activating
+    // steals key from the popover and dismisses the transient popover outright, or
+    // drags it across displays (#481). Only report it safe to activate when every
+    // key-capable visible window already lives on the anchor's screen and Space —
+    // otherwise keep Tahoe's subdued glass and the guaranteed correct placement.
+    private func canActivateForPopoverGlass() -> Bool {
+        guard let anchorScreen = popoverAnchorWindow?.screen else { return false }
+        let popoverWindow = popover.contentViewController?.view.window
+        for window in NSApp.windows {
+            guard window.isVisible,
+                  window.canBecomeKey,
+                  !(window is NSPanel),
+                  window !== popoverAnchorWindow,
+                  window !== popoverWindow else { continue }
+            if window.screen !== anchorScreen || !window.isOnActiveSpace {
+                return false
+            }
+        }
+        return true
+    }
+
+    // App-wide activation can still yank the reused _NSPopoverWindow onto another
+    // display's Space (#481). The anchor window is canJoinAllSpaces and pinned in
+    // screen coordinates under the clicked status item, so it is the ground truth:
+    // if the popover window strayed from it, move the popover window back.
+    private func realignPopoverWithAnchorIfDisplaced() {
+        guard popover.isShown,
+              let popoverWindow = popover.contentViewController?.view.window,
+              let anchorWindow = popoverAnchorWindow else { return }
+        let anchor = anchorWindow.frame
+        var frame = popoverWindow.frame
+        let displaced = popoverWindow.screen !== anchorWindow.screen
+            || abs(frame.midX - anchor.midX) > frame.width / 2
+            || abs(frame.maxY - anchor.minY) > 24
+        guard displaced else { return }
+        frame.origin.x = anchor.midX - frame.width / 2
+        frame.origin.y = anchor.minY - frame.height
+        popoverWindow.setFrame(frame, display: true)
     }
 
     private func makePopoverAnchorWindow() -> NSWindow {
@@ -847,7 +1002,22 @@ final class StatusBarController: NSObject {
     private func positionPopoverAnchorWindow(under button: NSStatusBarButton) -> NSView? {
         guard let buttonWindow = button.window else { return nil }
         let buttonRectInWindow = button.convert(button.bounds, to: nil)
-        let buttonRectOnScreen = buttonWindow.convertToScreen(buttonRectInWindow)
+        var buttonRectOnScreen = buttonWindow.convertToScreen(buttonRectInWindow)
+
+        // The status item is rendered on every display's menu bar, but its real
+        // window lives on only one of them. When the click happened on another
+        // display's mirrored copy, anchor under the cursor on that display —
+        // anchoring to the real window would open the popover on the wrong
+        // display (#481).
+        let mouse = NSEvent.mouseLocation
+        if let buttonScreen = buttonWindow.screen,
+           let clickScreen = NSScreen.screens.first(where: { NSMouseInRect(mouse, $0.frame, false) }),
+           clickScreen != buttonScreen {
+            let menuBarTopOffset = buttonScreen.frame.maxY - buttonRectOnScreen.minY
+            buttonRectOnScreen.origin.x = mouse.x - buttonRectOnScreen.width / 2
+            buttonRectOnScreen.origin.y = clickScreen.frame.maxY - menuBarTopOffset
+        }
+
         let anchorSize = NSSize(width: 2, height: 1)
         let anchorFrame = NSRect(
             x: buttonRectOnScreen.midX - anchorSize.width / 2,
@@ -966,13 +1136,25 @@ final class StatusBarController: NSObject {
         // Display Metrics Submenu (affects both Dynamic Island & Menu Bar Icon)
         let displayItem = NSMenuItem(title: Strings.menuDisplayMetrics, action: nil, keyEquivalent: "")
         let displayMenu = NSMenu()
+        displayMenu.autoenablesItems = false
 
         let statsItem = NSMenuItem(title: Strings.menuShowStats, action: #selector(toggleStats), keyEquivalent: "")
         statsItem.target = self
         statsItem.state = showStats ? .on : .off
         displayMenu.addItem(statsItem)
 
-        if showStats {
+        let compactItem = NSMenuItem(title: Strings.menuDynamicIslandCompactMode, action: #selector(toggleDynamicIslandCompact), keyEquivalent: "")
+        compactItem.target = self
+        compactItem.state = DynamicIslandCompactPolicy.isEnabled() ? .on : .off
+        compactItem.isEnabled = islandEnabled
+        displayMenu.addItem(compactItem)
+
+        let remainingItem = NSMenuItem(title: Strings.menuRingShowsRemaining, action: #selector(selectRingDisplayMode(_:)), keyEquivalent: "")
+        remainingItem.target = self
+        remainingItem.state = LimitsSettingsStore.shared.displayMode == .remaining ? .on : .off
+        displayMenu.addItem(remainingItem)
+
+        if showStats || islandEnabled {
             displayMenu.addItem(.separator())
             let selectedIDs = MenuBarDisplayPreferences.read()
             let payload = MenuBarDisplayPreferences.availableItemsPayload(
@@ -1147,6 +1329,17 @@ final class StatusBarController: NSObject {
         showStats.toggle()
     }
 
+    @objc private func toggleDynamicIslandCompact() {
+        DynamicIslandCompactPolicy.write(!DynamicIslandCompactPolicy.isEnabled())
+        NotificationCenter.default.post(name: .nativeSettingsChanged, object: nil)
+    }
+
+    @objc private func selectRingDisplayMode(_ sender: NSMenuItem) {
+        let next: LimitDisplayMode =
+            LimitsSettingsStore.shared.displayMode == .remaining ? .used : .remaining
+        LimitsSettingsStore.shared.setDisplayModeFromMenu(next)
+    }
+
     @objc private func selectMenuBarSlotMetric(_ sender: NSMenuItem) {
         guard let info = sender.representedObject as? [String: Any],
               let slot = info["slot"] as? Int,
@@ -1169,6 +1362,7 @@ final class StatusBarController: NSObject {
     private func iconStyleLabel(_ style: MenuBarIconStyle) -> String {
         switch style {
         case .clawd: return Strings.petCharacterClawd
+        case .bot: return Strings.petCharacterBot
         case .cat: return Strings.iconStyleCat
         case .pet: return Strings.iconStyleMyPet
         case .static: return Strings.iconStyleStatic

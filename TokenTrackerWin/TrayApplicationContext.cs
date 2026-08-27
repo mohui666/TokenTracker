@@ -38,6 +38,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private readonly ToolStripMenuItem _petCharacterSprout;
     private readonly ToolStripMenuItem _petCharacterByte;
     private readonly ToolStripMenuItem _petCharacterEmber;
+    private readonly ToolStripMenuItem _petCharacterBot;
     private readonly ToolStripMenuItem _startupItem;
     private readonly ToolStripMenuItem _checkUpdatesItem;
 
@@ -55,6 +56,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private readonly ToolStripMenuItem _petCtxCharacterSprout;
     private readonly ToolStripMenuItem _petCtxCharacterByte;
     private readonly ToolStripMenuItem _petCtxCharacterEmber;
+    private readonly ToolStripMenuItem _petCtxCharacterBot;
     private readonly ToolStripMenuItem _petCtxClose;
     private readonly ToolStripMenuItem _starItem;
     private readonly ToolStripMenuItem _quitItem;
@@ -97,12 +99,13 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _petSizeItem.DropDownItems.Add(_petSizeLarge);
         StyleSubmenu(_petSizeItem.DropDown);
         _petCharacterClawd = CreateMenuItem("", (_, _) => SetPetCharacter(PetWindow.CharacterClawd));
+        _petCharacterBot = CreateMenuItem("", (_, _) => SetPetCharacter(PetWindow.CharacterBot));
         _petCharacterSprout = CreateMenuItem("", (_, _) => SetPetCharacter(PetWindow.CharacterSprout));
         _petCharacterByte = CreateMenuItem("", (_, _) => SetPetCharacter(PetWindow.CharacterByte));
         _petCharacterEmber = CreateMenuItem("", (_, _) => SetPetCharacter(PetWindow.CharacterEmber));
         _petCharacterItem = CreateMenuItem("", (_, _) => { });
         _petCharacterItem.DropDownItems.AddRange([
-            _petCharacterClawd, _petCharacterSprout, _petCharacterByte, _petCharacterEmber]);
+            _petCharacterClawd, _petCharacterBot, _petCharacterSprout, _petCharacterByte, _petCharacterEmber]);
         StyleSubmenu(_petCharacterItem.DropDown);
 
         // Pet right-click context menu: open/close dashboard / size / close pet.
@@ -117,12 +120,13 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _petCtxSizeItem.DropDownItems.Add(_petCtxSizeMedium);
         _petCtxSizeItem.DropDownItems.Add(_petCtxSizeLarge);
         _petCtxCharacterClawd = CreateMenuItem("", (_, _) => SetPetCharacter(PetWindow.CharacterClawd));
+        _petCtxCharacterBot = CreateMenuItem("", (_, _) => SetPetCharacter(PetWindow.CharacterBot));
         _petCtxCharacterSprout = CreateMenuItem("", (_, _) => SetPetCharacter(PetWindow.CharacterSprout));
         _petCtxCharacterByte = CreateMenuItem("", (_, _) => SetPetCharacter(PetWindow.CharacterByte));
         _petCtxCharacterEmber = CreateMenuItem("", (_, _) => SetPetCharacter(PetWindow.CharacterEmber));
         _petCtxCharacterItem = CreateMenuItem("", (_, _) => { });
         _petCtxCharacterItem.DropDownItems.AddRange([
-            _petCtxCharacterClawd, _petCtxCharacterSprout, _petCtxCharacterByte, _petCtxCharacterEmber]);
+            _petCtxCharacterClawd, _petCtxCharacterBot, _petCtxCharacterSprout, _petCtxCharacterByte, _petCtxCharacterEmber]);
         _petCtxClose = CreateMenuItem("", (_, _) => ClosePet());
         _petMenu = new ContextMenuStrip
         {
@@ -226,9 +230,10 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _ = _updateChecker.CheckAsync(silent: true);
 
         // The desktop pet is the app's visible presence now — the dashboard no longer
-        // auto-opens. Show the pet on a normal launch, or whenever it was open last exit.
+        // auto-opens. A stored preference (user toggled the pet at least once) always
+        // wins; only first launches fall back to the show-on-manual-run default.
         // Deferred onto the dispatcher so it shows once the message pump is running.
-        if (showPetOnLaunch || PetWindow.WasVisible)
+        if (PetWindow.StoredVisible ?? showPetOnLaunch)
         {
             _uiDispatcher.BeginInvoke(new Action(() =>
             {
@@ -314,6 +319,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _petCharacterSprout.Text = _strings.CharacterSprout;
         _petCharacterByte.Text = _strings.CharacterByte;
         _petCharacterEmber.Text = _strings.CharacterEmber;
+        _petCharacterBot.Text = _strings.CharacterBot;
         // Pet right-click context menu.
         _petMenu.Font = _menuFont;
         _petCtxOpen.Text = _strings.OpenDashboard;
@@ -327,6 +333,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _petCtxCharacterSprout.Text = _strings.CharacterSprout;
         _petCtxCharacterByte.Text = _strings.CharacterByte;
         _petCtxCharacterEmber.Text = _strings.CharacterEmber;
+        _petCtxCharacterBot.Text = _strings.CharacterBot;
         _petCtxClose.Text = _strings.ClosePet;
         UpdatePetSizeChecks();
         UpdatePetCharacterChecks();
@@ -480,10 +487,12 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _petCharacterSprout.Checked = selected == PetWindow.CharacterSprout;
         _petCharacterByte.Checked = selected == PetWindow.CharacterByte;
         _petCharacterEmber.Checked = selected == PetWindow.CharacterEmber;
+        _petCharacterBot.Checked = selected == PetWindow.CharacterBot;
         _petCtxCharacterClawd.Checked = selected == PetWindow.CharacterClawd;
         _petCtxCharacterSprout.Checked = selected == PetWindow.CharacterSprout;
         _petCtxCharacterByte.Checked = selected == PetWindow.CharacterByte;
         _petCtxCharacterEmber.Checked = selected == PetWindow.CharacterEmber;
+        _petCtxCharacterBot.Checked = selected == PetWindow.CharacterBot;
         foreach (ToolStripItem item in _petCharacterItem.DropDownItems)
         {
             if (item.Tag is string id) ((ToolStripMenuItem)item).Checked = selected == id;
@@ -510,7 +519,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
             foreach (var directory in Directory.EnumerateDirectories(sourceRoot))
             {
                 var id = Path.GetFileName(directory).ToLowerInvariant();
-                if (seen.Contains(id) || PetWindow.NormalizeCharacter(id) != id || id is PetWindow.CharacterClawd or PetWindow.CharacterSprout or PetWindow.CharacterByte or PetWindow.CharacterEmber) continue;
+                if (seen.Contains(id) || PetWindow.NormalizeCharacter(id) != id || id is PetWindow.CharacterClawd or PetWindow.CharacterBot or PetWindow.CharacterSprout or PetWindow.CharacterByte or PetWindow.CharacterEmber) continue;
                 var manifestPath = Path.Combine(directory, "pet.json");
                 var spritesheetPath = Path.Combine(directory, "spritesheet.webp");
                 if (!File.Exists(manifestPath) || !File.Exists(spritesheetPath)) continue;
@@ -594,7 +603,9 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private void EnsureDashboard()
     {
         if (_dashboard is not null) return;
-        _dashboard = new DashboardWindow(_server);
+        var dashboard = new DashboardWindow(_server);
+        _dashboard = dashboard;
+        dashboard.ReleasedForIdle += OnDashboardReleasedForIdle;
         // Re-render the cost when the dashboard reports a currency change (and once
         // it has loaded, so we pick up the user's chosen currency right away), and cache
         // it natively so a future cold-launched pet shows the same unit before the
@@ -607,6 +618,13 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _dashboard.PetSettingChanged += (key, value) => PostToUi(() => ApplyDashboardPetSetting(key, value));
         _dashboard.NotificationRequested += (title, body) => PostToUi(() =>
             _trayIcon.ShowBalloonTip(7000, title, body, ToolTipIcon.Warning));
+    }
+
+    private void OnDashboardReleasedForIdle(DashboardWindow dashboard)
+    {
+        if (!ReferenceEquals(_dashboard, dashboard)) return;
+        dashboard.ReleasedForIdle -= OnDashboardReleasedForIdle;
+        _dashboard = null;
     }
 
     private void ApplyDashboardPetSetting(string key, string? value)
@@ -641,7 +659,17 @@ internal sealed class TrayApplicationContext : ApplicationContext
             case "character":
                 SetPetCharacter(value ?? PetWindow.CharacterClawd);
                 break;
+            case "botColor":
+                SetPetBotColor(value ?? "auto");
+                break;
         }
+    }
+
+    private void SetPetBotColor(string colorId)
+    {
+        if (_petWindow is not null) _petWindow.ApplyBotColor(colorId);
+        else PetWindow.PersistBotColor(colorId);
+        PushDashboardPetSettings();
     }
 
     private void PushDashboardPetSettings()
@@ -649,7 +677,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _dashboard?.PushPetSettings(
             _petWindow?.IsVisible == true,
             PetWindow.CurrentSize,
-            PetWindow.CurrentCharacter);
+            PetWindow.CurrentCharacter,
+            PetWindow.CurrentBotColor);
     }
 
     /// <summary>Diagnostics → %LOCALAPPDATA%\TokenTracker\windows-host.log (shared with ServerManager).</summary>

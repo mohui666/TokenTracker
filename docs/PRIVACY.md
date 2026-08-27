@@ -10,14 +10,14 @@ This document lists **every** network request the software can make, what each o
 
 ## 1. What never leaves your machine
 
-TokenTracker's parsers extract numbers and timestamps only.
+TokenTracker's parsers extract numbers and timestamps only. TRAE Work CN is a narrow exception to the local-only source model, and it is off by default: only when you explicitly set `TOKENTRACKER_TRAE_CN_USAGE=1`, during an eligible non-background sync, when local TRAE Work CN auth exists, does TokenTracker transmit the existing sign-in authorization from the locally signed-in app to TRAE's internal API for a read-only usage request. Without that variable nothing is ever sent. It is not an unconditional or default generic network request. That authorization is never persisted or logged.
 
-**Never read, never recorded anywhere:**
+**Apart from the disclosed TRAE Work CN authorization, never read or recorded anywhere:**
 
 - **Prompts, responses, and conversation bodies**
 - **File contents** from your projects
 - **Commit messages and diffs** — Git attribution runs `git log` locally, uses the subject line only to detect reverts, and keeps nothing
-- **API keys, cookies, and session tokens** belonging to your AI providers
+- **API keys, cookies, and session tokens** belonging to your AI providers are never persisted or logged by TokenTracker
 
 **Recorded locally, never uploaded:**
 
@@ -52,6 +52,7 @@ To erase everything TokenTracker knows about you, delete that directory. `tokent
 | Request | Destination | What is sent | Frequency |
 |---|---|---|---|
 | **Provider quota reads** | The provider's own API (`api.anthropic.com`, `chatgpt.com`, `cursor.com`, `api.github.com`, `api.kimi.com`, `api.z.ai`, `qoder.com`, `qoder.com.cn`, `openapi.qoder.sh`, `openapi.qoder.com.cn`, `cloudcode-pa.googleapis.com`, …) | Whatever that provider's own endpoint requires, authenticated with the credentials **that provider already stored on your machine**. These requests go directly from your machine to the provider — they never pass through our servers, and we never see the response. | While quota bars are visible |
+| **TRAE Work CN usage read** | TRAE's internal API | Transmits the existing sign-in authorization from the locally signed-in TRAE Work CN app to TRAE; reads usage metadata only. TokenTracker never persists or logs the auth token or prompt/response content. | Off unless you set `TOKENTRACKER_TRAE_CN_USAGE=1`; then during eligible non-background sync when local TRAE Work CN auth exists |
 | **GitHub star count** | `api.github.com` | Nothing but the request itself (public repo metadata) | On dashboard load |
 | **Update check** | `api.github.com` | Nothing but the request itself | Windows: once at launch. macOS: only when you click "Check for Updates" |
 

@@ -12,6 +12,7 @@ const {
   readCursorAccessTokenFromStateDb,
   extractCursorSessionToken,
   resolveCursorPaths,
+  fetchCursorUsageCsv,
 } = require("../src/lib/cursor-config");
 
 function makeCursorJwt(userId = "user_TEST123") {
@@ -533,5 +534,266 @@ describe("extractCursorSessionToken", () => {
     });
 
     assert.equal(result, null);
+  });
+});
+
+// ── fetchCursorUsageCsv / fetchUrlRaw (injectable fetch) ──
+
+const CURSOR_CSV_URL = "https://cursor.com/api/dashboard/export-usage-events-csv?strategy=tokens";
+const CURSOR_CSV_UA =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+const CURSOR_CSV_COOKIE = "WorkosCursorSessionToken=user_TEST%3A%3Ajwt";
+const CURSOR_CSV_BODY = "Date,Model,Input (w/ Cache Write),Input (w/o Cache Write),Cache Read,Output Tokens,Total Tokens,Cost\n2026-01-01,gpt-4o,1,1,0,1,2,$0.01";
+
+function timeoutError(name = "TimeoutError") {
+  const err = new Error("The operation was aborted due to timeout");
+  err.name = name;
+  return err;
+}
+
+function jsonLikeResponse({ status, body = "", headers = {} }) {
+  return {
+    status,
+    headers: new Headers(headers),
+    async text() {
+      return body;
+    },
+  };
+}
+
+function assertCsvRequestInit(init, { redirect = "manual" } = {}) {
+  assert.ok(init);
+  assert.equal(init.method, "GET");
+  assert.equal(init.redirect, redirect);
+  assert.equal(init.headers.Accept, "*/*");
+  assert.equal(init.headers.Cookie, CURSOR_CSV_COOKIE);
+  assert.equal(init.headers.Referer, "https://www.cursor.com/settings");
+  assert.equal(init.headers["User-Agent"], CURSOR_CSV_UA);
+  assert.ok(init.signal, "expected AbortSignal.timeout to be passed through");
+}
+
+describe("fetchCursorUsageCsv — injectable fetch", () => {
+  it("returns the raw CSV text on 200", async () => {
+    const calls = [];
+    const csv = await fetchCursorUsageCsv({
+      cookie: CURSOR_CSV_COOKIE,
+      fetchImpl: async (url, init) => {
+        calls.push({ url: String(url), init });
+        return jsonLikeResponse({ status: 200, body: CURSOR_CSV_BODY });
+      },
+    });
+    assert.equal(csv, CURSOR_CSV_BODY);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].url, CURSOR_CSV_URL);
+    assertCsvRequestInit(calls[0].init);
+  });
+
+  it("throws the session-expired message on 401", async () => {
+    await assert.rejects(
+      () =>
+        fetchCursorUsageCsv({
+          cookie: CURSOR_CSV_COOKIE,
+          fetchImpl: async () => jsonLikeResponse({ status: 401 }),
+        }),
+      { message: "Cursor session expired — re-login in Cursor to refresh" },
+    );
+  });
+
+  it("throws the session-expired message on 403", async () => {
+    await assert.rejects(
+      () =>
+        fetchCursorUsageCsv({
+          cookie: CURSOR_CSV_COOKIE,
+          fetchImpl: async () => jsonLikeResponse({ status: 403 }),
+        }),
+      { message: "Cursor session expired — re-login in Cursor to refresh" },
+    );
+  });
+
+  it("throws Cursor API returned <status> on other non-200", async () => {
+    await assert.rejects(
+      () =>
+        fetchCursorUsageCsv({
+          cookie: CURSOR_CSV_COOKIE,
+          fetchImpl: async () => jsonLikeResponse({ status: 500 }),
+        }),
+      { message: "Cursor API returned 500" },
+    );
+  });
+
+  it("follows a 308 Location once via fetchUrlRaw and returns that text", async () => {
+    const location = "https://www.cursor.com/api/dashboard/export-usage-events-csv?strategy=tokens";
+    const calls = [];
+    const csv = await fetchCursorUsageCsv({
+      cookie: CURSOR_CSV_COOKIE,
+      fetchImpl: async (url, init) => {
+        calls.push({ url: String(url), init });
+        if (calls.length === 1) {
+          return jsonLikeResponse({ status: 308, headers: { Location: location } });
+        }
+        return jsonLikeResponse({ status: 200, body: CURSOR_CSV_BODY });
+      },
+    });
+    assert.equal(csv, CURSOR_CSV_BODY);
+    assert.equal(calls.length, 2);
+    assert.equal(calls[0].url, CURSOR_CSV_URL);
+    assert.equal(calls[1].url, location);
+    assertCsvRequestInit(calls[0].init);
+    assertCsvRequestInit(calls[1].init);
+  });
+
+  it("follows 301 and 302 the same way as 308", async () => {
+    for (const status of [301, 302]) {
+      const location = `https://www.cursor.com/redirect-${status}`;
+      const calls = [];
+      const csv = await fetchCursorUsageCsv({
+        cookie: CURSOR_CSV_COOKIE,
+        fetchImpl: async (url, init) => {
+          calls.push({ url: String(url), init });
+          if (String(url) === CURSOR_CSV_URL) {
+            return jsonLikeResponse({ status, headers: { Location: location } });
+          }
+          return jsonLikeResponse({ status: 200, body: `csv-${status}` });
+        },
+      });
+      assert.equal(csv, `csv-${status}`);
+      assert.equal(calls.length, 2);
+      assert.equal(calls[1].url, location);
+    }
+  });
+
+  it("resolves a relative Location against the CSV URL", async () => {
+    const calls = [];
+    const csv = await fetchCursorUsageCsv({
+      cookie: CURSOR_CSV_COOKIE,
+      fetchImpl: async (url) => {
+        calls.push(String(url));
+        if (calls.length === 1) {
+          return jsonLikeResponse({ status: 308, headers: { Location: "/api/moved-csv" } });
+        }
+        return jsonLikeResponse({ status: 200, body: CURSOR_CSV_BODY });
+      },
+    });
+    assert.equal(csv, CURSOR_CSV_BODY);
+    assert.equal(calls[1], "https://cursor.com/api/moved-csv");
+  });
+
+  it("refuses to forward the session cookie to an off-origin redirect", async () => {
+    for (const location of [
+      "https://evil.example.com/steal",
+      "https://cursor.com.evil.example.com/steal",
+      "http://cursor.com/downgraded",
+      "//evil.example.com/protocol-relative",
+    ]) {
+      const calls = [];
+      await assert.rejects(
+        () =>
+          fetchCursorUsageCsv({
+            cookie: CURSOR_CSV_COOKIE,
+            fetchImpl: async (url) => {
+              calls.push(String(url));
+              if (calls.length === 1) {
+                return jsonLikeResponse({ status: 308, headers: { Location: location } });
+              }
+              return jsonLikeResponse({ status: 200, body: CURSOR_CSV_BODY });
+            },
+          }),
+        { message: "Cursor API redirect to an untrusted origin" },
+        `expected ${location} to be rejected`,
+      );
+      assert.equal(calls.length, 1, `${location} must not trigger a second request`);
+    }
+  });
+
+  it("throws when a 308 has no Location header", async () => {
+    await assert.rejects(
+      () =>
+        fetchCursorUsageCsv({
+          cookie: CURSOR_CSV_COOKIE,
+          fetchImpl: async () => jsonLikeResponse({ status: 308 }),
+        }),
+      { message: "Cursor API redirect without Location header" },
+    );
+  });
+
+  it("surfaces fetchUrlRaw non-200 as Cursor API returned <status> from <url>", async () => {
+    const location = "https://www.cursor.com/api/dashboard/export-usage-events-csv?strategy=tokens";
+    await assert.rejects(
+      () =>
+        fetchCursorUsageCsv({
+          cookie: CURSOR_CSV_COOKIE,
+          fetchImpl: async (url) => {
+            if (String(url) === CURSOR_CSV_URL) {
+              return jsonLikeResponse({ status: 308, headers: { Location: location } });
+            }
+            return jsonLikeResponse({ status: 502 });
+          },
+        }),
+      { message: `Cursor API returned 502 from ${location}` },
+    );
+  });
+
+  it("maps TimeoutError to Cursor API request timed out", async () => {
+    await assert.rejects(
+      () =>
+        fetchCursorUsageCsv({
+          cookie: CURSOR_CSV_COOKIE,
+          fetchImpl: async () => {
+            throw timeoutError("TimeoutError");
+          },
+        }),
+      { message: "Cursor API request timed out" },
+    );
+  });
+
+  it("maps AbortError to Cursor API request timed out", async () => {
+    await assert.rejects(
+      () =>
+        fetchCursorUsageCsv({
+          cookie: CURSOR_CSV_COOKIE,
+          fetchImpl: async () => {
+            throw timeoutError("AbortError");
+          },
+        }),
+      { message: "Cursor API request timed out" },
+    );
+  });
+
+  it("maps a timeout on the redirect hop the same way", async () => {
+    const location = "https://www.cursor.com/api/dashboard/export-usage-events-csv?strategy=tokens";
+    await assert.rejects(
+      () =>
+        fetchCursorUsageCsv({
+          cookie: CURSOR_CSV_COOKIE,
+          fetchImpl: async (url) => {
+            if (String(url) === CURSOR_CSV_URL) {
+              return jsonLikeResponse({ status: 308, headers: { Location: location } });
+            }
+            throw timeoutError("TimeoutError");
+          },
+        }),
+      { message: "Cursor API request timed out" },
+    );
+  });
+
+  it("uses injectable fetch (undici-dispatcher path), not https.request", async () => {
+    let fetchImplCalled = false;
+    await fetchCursorUsageCsv({
+      cookie: CURSOR_CSV_COOKIE,
+      fetchImpl: async (url, init) => {
+        fetchImplCalled = true;
+        assert.equal(String(url), CURSOR_CSV_URL);
+        assertCsvRequestInit(init);
+        return jsonLikeResponse({ status: 200, body: "ok" });
+      },
+    });
+    assert.equal(fetchImplCalled, true);
+
+    const src = fs.readFileSync(path.join(__dirname, "../src/lib/cursor-config.js"), "utf8");
+    assert.equal(src.includes("https.request"), false);
+    assert.equal(src.includes('require("node:https")'), false);
+    assert.match(src, /fetchImpl\s*=\s*fetch/);
+    assert.match(src, /function fetchUrlRaw\(/);
+    assert.match(src, /return fetchImpl\(urlStr,/);
   });
 });

@@ -485,6 +485,17 @@ export function TrendMonitor({
     }, 150);
   }, []);
 
+  const handleTooltipMouseEnter = React.useCallback(() => {
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
+    }
+  }, []);
+
+  const handleTooltipMouseLeave = React.useCallback(() => {
+    handleBarMouseLeave();
+  }, [handleBarMouseLeave]);
+
   return (
     <div
       ref={containerRef}
@@ -610,7 +621,10 @@ export function TrendMonitor({
       {/* 2D 精致 Hover Tooltip */}
       {hoveredBar && (
         <div
-          className="absolute z-[9999] w-0 h-0 transition-all duration-100 ease-out pointer-events-none"
+          data-trend-tooltip="true"
+          onMouseEnter={handleTooltipMouseEnter}
+          onMouseLeave={handleTooltipMouseLeave}
+          className="absolute z-[9999] w-0 h-0 transition-all duration-100 ease-out"
           style={{
             left: `${tooltipPos.x}px`,
             top: `${tooltipPos.y}px`,

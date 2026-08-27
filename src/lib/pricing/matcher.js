@@ -172,6 +172,7 @@ const SOURCE_MODEL_NORMALIZERS = {
   claude: normalizeClaudeModel,
   cursor: normalizeCursorModel,
   "pi-anthropic": normalizeClaudeModel,
+  "prime-agent-anthropic": normalizeClaudeModel,
   zed: normalizeZedModel,
   workbuddy: normalizeWorkbuddyModel,
 };

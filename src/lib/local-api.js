@@ -329,6 +329,10 @@ function readQueueData(queuePath) {
       if (!line.trim()) continue;
       try {
         const row = JSON.parse(line);
+        // Account session states (and the pre-release watermark records
+        // this branch may still hold in a dev queue) are cloud-side control
+        // records, not usage rows - never surface them locally.
+        if (row?.kind === "account_session_state" || row?.kind === "account_sync_watermark") continue;
         // Deduplicate: each sync appends cumulative totals per bucket, so for
         // each (source, model, hour_start) keep only the latest (last) entry.
         const key = `${row.source || ""}|${row.model || ""}|${row.hour_start || ""}`;
@@ -1004,6 +1008,7 @@ function runSyncCommand(extraEnv = {}, opts = {}) {
     if (opts.publishAccount === true) args.push("--publish-account");
     if (opts.allLocalSources === true) args.push("--all-local-sources");
     if (opts.drain === true) args.push("--drain");
+    if (opts.waitForLock === true) args.push("--wait-for-lock");
     const child = spawn(process.execPath, args, {
       env: { ...process.env, ...extraEnv },
       stdio: ["ignore", "pipe", "pipe"],
@@ -1892,6 +1897,135 @@ function createLocalApiHandler({ queuePath }) {
           account_view: false,
         },
       });
+      return true;
+    }
+
+    // --- outbound proxy preference (manual / system / off) ---
+    // Persisted on config.json next to the queue. GET is unauthenticated so the
+    // settings page can probe availability; POST requires local-auth.
+    if (p === "/functions/tokentracker-proxy-config") {
+      const {
+        normalizeProxyConfig,
+        parseProxyPayload,
+      } = require("./proxy-settings");
+      const {
+        applyUndiciProxyIfNeeded,
+        getLastProxyApplyError,
+        resolveEffectiveProxySource,
+        invalidateSystemProxyCache,
+      } = require("./proxy-env");
+      const { writeFileAtomic, chmod600IfPossible } = require("./fs");
+      const configPath = path.join(path.dirname(qp), "config.json");
+      const readConfig = () => {
+        try {
+          const parsed = JSON.parse(fs.readFileSync(configPath, "utf8"));
+          return parsed && typeof parsed === "object" ? parsed : {};
+        } catch {
+          return {};
+        }
+      };
+      const writeConfig = async (next) => {
+        await writeFileAtomic(configPath, JSON.stringify(next, null, 2));
+        await chmod600IfPossible(configPath);
+      };
+      const toResponse = (configObj) => {
+        const normalized = normalizeProxyConfig(configObj?.proxy);
+        const effective = resolveEffectiveProxySource({
+          env: process.env,
+          proxyConfig: configObj?.proxy,
+        });
+        return {
+          mode: normalized.mode,
+          protocol: normalized.protocol,
+          host: normalized.host,
+          port: normalized.port,
+          effective: effective.source,
+          applyError: getLastProxyApplyError(),
+        };
+      };
+      const method = String(req.method || "GET").toUpperCase();
+      if (method === "GET") {
+        json(res, toResponse(readConfig()));
+        return true;
+      }
+      if (method === "POST" || method === "PUT") {
+        if (!isAuthorizedLocalMutation(req)) {
+          json(res, { ok: false, error: "Unauthorized" }, 401);
+          return true;
+        }
+        let body = {};
+        try {
+          body = await readJsonBody(req);
+        } catch {
+          json(res, { ok: false, error: "invalid JSON" }, 400);
+          return true;
+        }
+        const parsed = parseProxyPayload(body);
+        if (!parsed.ok) {
+          json(res, { ok: false, error: parsed.error }, 400);
+          return true;
+        }
+        const current = readConfig();
+        const prevProxy = current.proxy && typeof current.proxy === "object" && !Array.isArray(current.proxy)
+          ? current.proxy
+          : {};
+        current.proxy = {
+          ...prevProxy,
+          mode: parsed.value.mode,
+          protocol: parsed.value.protocol,
+          host: parsed.value.host,
+          port: parsed.value.port,
+        };
+        try {
+          await writeConfig(current);
+        } catch (error) {
+          json(res, { ok: false, error: error?.message || "failed to save proxy config" }, 500);
+          return true;
+        }
+        invalidateSystemProxyCache();
+        const applyResult = applyUndiciProxyIfNeeded({ proxyConfig: current.proxy });
+        json(res, {
+          ok: applyResult?.ok !== false,
+          unprotected: applyResult?.unprotected === true,
+          ...toResponse(current),
+        });
+        return true;
+      }
+      json(res, { error: "Method Not Allowed" }, 405);
+      return true;
+    }
+
+    if (p === "/functions/tokentracker-proxy-test") {
+      const { parseProxyPayload, buildProxyUrl } = require("./proxy-settings");
+      const { runProxyConnectivityTest } = require("./proxy-env");
+      if (String(req.method || "GET").toUpperCase() !== "POST") {
+        json(res, { error: "Method Not Allowed" }, 405);
+        return true;
+      }
+      if (!isAuthorizedLocalMutation(req)) {
+        json(res, { ok: false, error: "Unauthorized" }, 401);
+        return true;
+      }
+      let body = {};
+      try {
+        body = await readJsonBody(req);
+      } catch {
+        json(res, { ok: false, error: "invalid JSON" }, 400);
+        return true;
+      }
+      const parsed = parseProxyPayload({ ...body, mode: "manual" });
+      if (!parsed.ok) {
+        json(res, { ok: false, error: parsed.error }, 400);
+        return true;
+      }
+      const proxyUrl = buildProxyUrl({ ...parsed.value, mode: "manual" });
+      const targetUrl = "https://github.com";
+      const result = await runProxyConnectivityTest({
+        proxyUrl,
+        targetUrl,
+        timeoutMs: 5000,
+      });
+      json(res, result);
       return true;
     }
 

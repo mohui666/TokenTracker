@@ -147,6 +147,7 @@ export function LimitsPage() {
                 opencodeGo={usageLimits?.opencodeGo}
                 qoder={usageLimits?.qoder}
                 qoderCn={usageLimits?.qoderCn}
+                codingPlan={usageLimits?.codingPlan}
                 order={prefs.order}
                 visibility={prefs.visibility}
                 displayMode={prefs.displayMode}

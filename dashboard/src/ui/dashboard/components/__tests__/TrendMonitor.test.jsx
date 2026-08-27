@@ -1,6 +1,6 @@
 import React from "react";
-import { render } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 // The zoom modal pulls in use-trend-data (a .ts hook imported with a .js
 // specifier) which vitest's resolver can't follow the way the Vite build does.
@@ -25,6 +25,10 @@ describe("getTrendMonitorScale", () => {
 });
 
 describe("TrendMonitor", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("keeps normal bars visible when a single day is an outlier", () => {
     const rows = [80, 90, 95, 110, 120, 140, 10000].map((value) => ({
       billable_total_tokens: value,
@@ -113,6 +117,33 @@ describe("TrendMonitor", () => {
       <TrendMonitor rows={rows} zoomConfig={{ baseUrl: "http://localhost" }} showTimeZoneLabel={false} />,
     );
     expect(withCfg.queryByRole("button")).not.toBeNull();
+  });
+
+  it("keeps the scrollable tooltip open while the pointer moves from a bar into it", () => {
+    vi.useFakeTimers();
+    const models = Object.fromEntries(
+      Array.from({ length: 8 }, (_, index) => [`model-${index + 1}`, 100 - index]),
+    );
+    const { container } = render(
+      <TrendMonitor
+        rows={[{ billable_total_tokens: 772, models }]}
+        showTimeZoneLabel={false}
+      />,
+    );
+
+    const bar = container.querySelector('[data-trend-bar="true"]');
+    fireEvent.mouseEnter(bar);
+    const tooltip = container.querySelector('[data-trend-tooltip="true"]');
+    expect(tooltip).not.toBeNull();
+
+    fireEvent.mouseLeave(bar);
+    fireEvent.mouseEnter(tooltip);
+    act(() => vi.advanceTimersByTime(200));
+    expect(container.querySelector('[data-trend-tooltip="true"]')).not.toBeNull();
+
+    fireEvent.mouseLeave(tooltip);
+    act(() => vi.advanceTimersByTime(200));
+    expect(container.querySelector('[data-trend-tooltip="true"]')).toBeNull();
   });
 });
 

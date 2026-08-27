@@ -6,9 +6,10 @@ import {
   requestNativePetSettings,
   setNativePetSetting,
 } from "../lib/native-bridge";
+import { BOT_COLOR_CHOICES } from "../lib/bot-appearance.js";
 import { normalizePetCharacter } from "../lib/pet-personality";
 
-const DEFAULTS = { visible: false, character: "clawd", size: "medium" };
+const DEFAULTS = { visible: false, character: "clawd", size: "medium", botColor: "auto" };
 
 export function usePetSettings() {
   const available = isNativeApp() && isPetBridgeAvailable();
@@ -21,6 +22,7 @@ export function usePetSettings() {
         visible: Boolean(next.visible),
         character: normalizePetCharacter(next.character),
         size: ["small", "medium", "large"].includes(next.size) ? next.size : "medium",
+        botColor: BOT_COLOR_CHOICES.includes(next.botColor) ? next.botColor : "auto",
       });
     });
     requestNativePetSettings();
